@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/clipboard_service.dart';
 import '../services/vault_service.dart';
 import 'setup_screen.dart';
+import 'unlock_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onChanged;
@@ -21,12 +22,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _biometricEnabled   = false;
   bool _biometricAvailable = false;
   int  _clipboardClear     = 30;
+  int  _autoLockSeconds    = 300;
 
   static const _clipOptions = [
     (label: '15 secondes', value: 15),
     (label: '30 secondes', value: 30),
     (label: '60 secondes', value: 60),
     (label: 'Jamais',      value: 0),
+  ];
+
+  static const _lockOptions = [
+    (label: 'Immédiatement', value: 0),
+    (label: '1 minute',      value: 60),
+    (label: '5 minutes',     value: 300),
+    (label: '15 minutes',    value: 900),
+    (label: '30 minutes',    value: 1800),
+    (label: 'Jamais',        value: -1),
   ];
 
   @override
@@ -39,16 +50,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final canCheck = await _auth.canCheckBiometrics;
     final hasKey   = await VaultService().hasBiometricKey;
     final prefs    = await SharedPreferences.getInstance();
-    final clip     = prefs.getInt('clipboard_clear') ?? 30;
+    final clip     = prefs.getInt('clipboard_clear')   ?? 30;
+    final lock     = prefs.getInt('auto_lock_seconds') ?? 300;
     ClipboardService.clearAfterSeconds = clip;
     if (mounted) {
       setState(() {
         _biometricAvailable = canCheck;
         _biometricEnabled   = canCheck && hasKey;
         _clipboardClear     = clip;
+        _autoLockSeconds    = lock;
       });
     }
   }
+
+  Future<void> _setAutoLock(int v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('auto_lock_seconds', v);
+    if (mounted) setState(() => _autoLockSeconds = v);
+  }
+
+  void _lockNow() {
+    VaultService().lock();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const UnlockScreen()),
+      (_) => false,
+    );
+  }
+
+  String get _autoLockLabel => _lockOptions
+      .firstWhere((o) => o.value == _autoLockSeconds,
+          orElse: () => _lockOptions[2])
+      .label;
 
   Future<void> _toggleBiometric(bool v) async {
     if (v) {
@@ -160,6 +192,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Changer le mot de passe maître'),
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: _changePassword,
+          ),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Verrouillage automatique'),
+            subtitle: Text(_autoLockLabel),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () async {
+              final v = await showDialog<int>(
+                context: context,
+                builder: (_) => SimpleDialog(
+                  title: const Text('Verrouiller l\'app après'),
+                  children: _lockOptions
+                      .map((o) => ListTile(
+                            title: Text(o.label),
+                            trailing: _autoLockSeconds == o.value
+                                ? const Icon(Icons.check)
+                                : null,
+                            onTap: () => Navigator.pop(context, o.value),
+                          ))
+                      .toList(),
+                ),
+              );
+              if (v != null) _setAutoLock(v);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('Verrouiller maintenant'),
+            onTap: _lockNow,
           ),
 
           _section('Presse-papiers'),

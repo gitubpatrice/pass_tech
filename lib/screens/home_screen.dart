@@ -7,6 +7,7 @@ import 'entry_edit_screen.dart';
 import 'generator_screen.dart';
 import 'settings_screen.dart';
 import 'about_screen.dart';
+import 'unlock_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -81,6 +82,17 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Générateur',
             onPressed: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const GeneratorScreen())),
+          ),
+          IconButton(
+            icon: const Icon(Icons.lock_outline),
+            tooltip: 'Verrouiller',
+            onPressed: () {
+              VaultService().lock();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const UnlockScreen()),
+                (_) => false,
+              );
+            },
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),

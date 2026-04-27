@@ -13,15 +13,15 @@ import '../models/entry.dart';
 
 // Top-level function required by compute()
 Uint8List _pbkdf2Worker(List<dynamic> args) {
-  final password = args[0] as List<int>;
-  final salt = args[1] as List<int>;
+  final password   = args[0] as List<int>;
+  final salt       = args[1] as List<int>;
   final iterations = args[2] as int;
-  final keyLen = args[3] as int;
+  final keyLen     = args[3] as int;
 
   final hmacGen = Hmac(sha256, password);
-  const hLen = 32;
+  const hLen   = 32;
   final blocks = (keyLen / hLen).ceil();
-  final dk = BytesBuilder();
+  final dk     = BytesBuilder();
 
   for (int i = 1; i <= blocks; i++) {
     final saltI = Uint8List(salt.length + 4);
@@ -44,6 +44,8 @@ Uint8List _pbkdf2Worker(List<dynamic> args) {
   return dk.toBytes().sublist(0, keyLen);
 }
 
+enum UnlockResult { success, wrongPassword, lockedOut }
+
 class VaultService {
   static final VaultService _instance = VaultService._();
   factory VaultService() => _instance;
@@ -52,8 +54,20 @@ class VaultService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
-  static const _saltKey        = 'pt_salt';
+
+  // Secure storage keys
+  static const _saltKey         = 'pt_salt';
   static const _biometricKeyKey = 'pt_biometric_key';
+  static const _failCountKey    = 'pt_fail_count';
+  static const _lockoutKey      = 'pt_lockout_until';
+
+  // Crypto parameters
+  static const _currentIterations = 250000;
+  static const _legacyIterations  = 100000; // for v1.0.0 vaults without iterations field
+
+  // Brute-force protection: progressive lockout after 5 fails
+  static const _failThreshold = 5;
+  static const _lockoutSteps  = [30, 60, 300, 900, 1800]; // seconds
 
   // 64-byte derived key: bytes 0-31 = AES-256 enc key, 32-63 = HMAC-SHA256 key
   Uint8List? _key;
@@ -70,28 +84,73 @@ class VaultService {
   Future<void> createVault(String masterPassword) async {
     final salt = _randomBytes(32);
     await _storage.write(key: _saltKey, value: base64Encode(salt));
-    _key = await _deriveKey(masterPassword, salt);
+    _key = await _deriveKey(masterPassword, salt, _currentIterations);
     _entries = [];
     _isOpen = true;
-    await _saveVault();
+    await _saveVault(iterations: _currentIterations);
+    await _onUnlockSuccess();
   }
 
   // ── Unlock ──────────────────────────────────────────────────────────────────
 
-  Future<bool> unlock(String masterPassword) async {
+  /// Returns remaining lockout in seconds, or null if not locked out.
+  Future<int?> getLockoutRemaining() async {
+    final s = await _storage.read(key: _lockoutKey);
+    if (s == null) return null;
+    final until = int.tryParse(s) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now >= until) return null;
+    return ((until - now) / 1000).ceil();
+  }
+
+  Future<UnlockResult> unlock(String masterPassword) async {
+    if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     try {
       final saltB64 = await _storage.read(key: _saltKey);
-      if (saltB64 == null) return false;
-      _key = await _deriveKey(masterPassword, base64Decode(saltB64));
-      return await _loadVault();
+      if (saltB64 == null) return UnlockResult.wrongPassword;
+      final salt = base64Decode(saltB64);
+
+      // Read vault file to get iterations (legacy v1.0.0 has no iterations field)
+      final file = await _vaultFile();
+      Map<String, dynamic>? raw;
+      int iterations = _currentIterations;
+      bool isLegacy  = false;
+      if (file.existsSync()) {
+        raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        final stored = raw['iterations'] as int?;
+        if (stored == null) {
+          iterations = _legacyIterations;
+          isLegacy   = true;
+        } else {
+          iterations = stored;
+        }
+      }
+
+      _key = await _deriveKey(masterPassword, salt, iterations);
+      final ok = _decryptVault(raw);
+      if (ok) {
+        await _onUnlockSuccess();
+        // Silent migration: re-derive with stronger iterations and re-save
+        if (isLegacy && iterations < _currentIterations) {
+          _wipeKey();
+          _key = await _deriveKey(masterPassword, salt, _currentIterations);
+          await _saveVault(iterations: _currentIterations);
+        }
+        return UnlockResult.success;
+      } else {
+        _wipeKey();
+        await _onUnlockFail();
+        return UnlockResult.wrongPassword;
+      }
     } catch (_) {
-      _key = null;
-      return false;
+      _wipeKey();
+      await _onUnlockFail();
+      return UnlockResult.wrongPassword;
     }
   }
 
   Future<bool> get hasBiometricKey async =>
-      await _storage.containsKey(key: _biometricKeyKey);
+      _storage.containsKey(key: _biometricKeyKey);
 
   Future<void> saveBiometricKey() async {
     if (_key == null) return;
@@ -101,21 +160,35 @@ class VaultService {
   Future<void> deleteBiometricKey() async =>
       _storage.delete(key: _biometricKeyKey);
 
-  Future<bool> unlockWithBiometric() async {
+  Future<UnlockResult> unlockWithBiometric() async {
+    if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     try {
       final keyB64 = await _storage.read(key: _biometricKeyKey);
-      if (keyB64 == null) return false;
+      if (keyB64 == null) return UnlockResult.wrongPassword;
       _key = base64Decode(keyB64);
-      return await _loadVault();
+
+      final file = await _vaultFile();
+      Map<String, dynamic>? raw;
+      if (file.existsSync()) {
+        raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      }
+      final ok = _decryptVault(raw);
+      if (ok) {
+        await _onUnlockSuccess();
+        return UnlockResult.success;
+      } else {
+        _wipeKey();
+        return UnlockResult.wrongPassword;
+      }
     } catch (_) {
-      _key = null;
-      return false;
+      _wipeKey();
+      return UnlockResult.wrongPassword;
     }
   }
 
   void lock() {
+    _wipeKey();
     _entries = [];
-    _key = null;
     _isOpen = false;
   }
 
@@ -144,9 +217,10 @@ class VaultService {
   Future<void> changeMasterPassword(String newPassword) async {
     final salt = _randomBytes(32);
     await _storage.write(key: _saltKey, value: base64Encode(salt));
-    _key = await _deriveKey(newPassword, salt);
-    await _saveVault();
-    await deleteBiometricKey(); // invalidate old biometric key
+    _wipeKey();
+    _key = await _deriveKey(newPassword, salt, _currentIterations);
+    await _saveVault(iterations: _currentIterations);
+    await deleteBiometricKey();
   }
 
   String exportJson() =>
@@ -159,52 +233,52 @@ class VaultService {
     if (file.existsSync()) file.deleteSync();
     await _storage.delete(key: _saltKey);
     await _storage.delete(key: _biometricKeyKey);
+    await _storage.delete(key: _failCountKey);
+    await _storage.delete(key: _lockoutKey);
   }
 
-  // ── Internal ─────────────────────────────────────────────────────────────────
+  // ── Internal ────────────────────────────────────────────────────────────────
 
   Future<File> _vaultFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/pt_vault.enc');
   }
 
-  Future<bool> _loadVault() async {
-    final file = await _vaultFile();
-    if (!file.existsSync()) {
-      _entries = [];
-      _isOpen = true;
-      return true;
-    }
+  bool _decryptVault(Map<String, dynamic>? raw) {
     try {
-      final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      if (raw == null) {
+        _entries = [];
+        _isOpen = true;
+        return true;
+      }
+
       final ivBytes     = base64Decode(raw['iv']   as String);
       final macBytes    = base64Decode(raw['mac']  as String);
       final cipherBytes = base64Decode(raw['data'] as String);
 
       // Verify HMAC-SHA256(macKey, IV || ciphertext) — constant-time comparison
-      final macKey = _key!.sublist(32);
-      final computed = Hmac(sha256, macKey).convert([...ivBytes, ...cipherBytes]).bytes;
-      if (!_constEq(computed, macBytes)) {
-        _key = null;
-        return false;
-      }
+      final macKey   = _key!.sublist(32);
+      final computed = Hmac(sha256, macKey)
+          .convert([...ivBytes, ...cipherBytes]).bytes;
+      if (!_constEq(computed, macBytes)) return false;
 
       final encKey    = enc.Key(_key!.sublist(0, 32));
       final iv        = enc.IV(Uint8List.fromList(ivBytes));
       final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-      final plain     = encrypter.decrypt(enc.Encrypted(Uint8List.fromList(cipherBytes)), iv: iv);
+      final plain = encrypter.decrypt(
+          enc.Encrypted(Uint8List.fromList(cipherBytes)),
+          iv: iv);
 
       final list = jsonDecode(plain) as List;
       _entries = list.map((e) => Entry.fromJson(e as Map<String, dynamic>)).toList();
       _isOpen = true;
       return true;
     } catch (_) {
-      _key = null;
       return false;
     }
   }
 
-  Future<void> _saveVault() async {
+  Future<void> _saveVault({int? iterations}) async {
     if (_key == null) return;
 
     final iv        = enc.IV.fromSecureRandom(16);
@@ -214,19 +288,64 @@ class VaultService {
 
     final plain     = jsonEncode(_entries.map((e) => e.toJson()).toList());
     final encrypted = encrypter.encrypt(plain, iv: iv);
-    final mac       = Hmac(sha256, macKey).convert([...iv.bytes, ...encrypted.bytes]).bytes;
+    final mac = Hmac(sha256, macKey)
+        .convert([...iv.bytes, ...encrypted.bytes]).bytes;
+
+    // Preserve existing iterations if not specified (incremental updates keep them)
+    int storedIter = iterations ?? _currentIterations;
+    if (iterations == null) {
+      final file = await _vaultFile();
+      if (file.existsSync()) {
+        try {
+          final prev = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+          storedIter = prev['iterations'] as int? ?? _currentIterations;
+        } catch (_) {}
+      }
+    }
 
     final saltB64 = await _storage.read(key: _saltKey) ?? '';
     final out = {
-      'version': 1,
-      'salt': saltB64,
-      'iv':   base64Encode(iv.bytes),
-      'mac':  base64Encode(mac),
-      'data': base64Encode(encrypted.bytes),
+      'version':    2,
+      'iterations': storedIter,
+      'salt':       saltB64,
+      'iv':         base64Encode(iv.bytes),
+      'mac':        base64Encode(mac),
+      'data':       base64Encode(encrypted.bytes),
     };
 
     (await _vaultFile()).writeAsStringSync(jsonEncode(out));
   }
+
+  // ── Brute-force protection ──────────────────────────────────────────────────
+
+  Future<void> _onUnlockFail() async {
+    final s = await _storage.read(key: _failCountKey);
+    final count = (int.tryParse(s ?? '0') ?? 0) + 1;
+    await _storage.write(key: _failCountKey, value: count.toString());
+
+    if (count >= _failThreshold) {
+      final stepIdx = (count - _failThreshold).clamp(0, _lockoutSteps.length - 1);
+      final lockSec = _lockoutSteps[stepIdx];
+      final until   = DateTime.now().millisecondsSinceEpoch + lockSec * 1000;
+      await _storage.write(key: _lockoutKey, value: until.toString());
+    }
+  }
+
+  Future<void> _onUnlockSuccess() async {
+    await _storage.delete(key: _failCountKey);
+    await _storage.delete(key: _lockoutKey);
+  }
+
+  // ── Memory hygiene ──────────────────────────────────────────────────────────
+
+  void _wipeKey() {
+    if (_key != null) {
+      for (int i = 0; i < _key!.length; i++) { _key![i] = 0; }
+      _key = null;
+    }
+  }
+
+  // ── Crypto helpers ──────────────────────────────────────────────────────────
 
   static bool _constEq(List<int> a, List<int> b) {
     if (a.length != b.length) return false;
@@ -235,8 +354,9 @@ class VaultService {
     return diff == 0;
   }
 
-  static Future<Uint8List> _deriveKey(String password, List<int> salt) async =>
-      compute(_pbkdf2Worker, [utf8.encode(password), salt, 100000, 64]);
+  static Future<Uint8List> _deriveKey(
+          String password, List<int> salt, int iterations) async =>
+      compute(_pbkdf2Worker, [utf8.encode(password), salt, iterations, 64]);
 
   static Uint8List _randomBytes(int n) {
     final rng = Random.secure();

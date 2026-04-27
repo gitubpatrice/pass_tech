@@ -52,15 +52,35 @@ class _PassTechAppState extends State<PassTechApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _handleLifecycle(state);
+  }
+
+  Future<void> _handleLifecycle(AppLifecycleState state) async {
     if (state == AppLifecycleState.paused) {
       _pausedAt = DateTime.now();
       ClipboardService.cancel();
+      final prefs = await SharedPreferences.getInstance();
+      final lockSec = prefs.getInt('auto_lock_seconds') ?? 300;
+      // Immediate lock: wipe key now, navigate on resume
+      if (lockSec == 0 && VaultService().isOpen) VaultService().lock();
     } else if (state == AppLifecycleState.resumed) {
       final paused = _pausedAt;
       _pausedAt = null;
-      // Auto-lock after 5 minutes of background
+
+      // If vault was locked while paused (immediate option) → go to unlock
+      if (!VaultService().isOpen) {
+        _navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const UnlockScreen()),
+          (_) => false,
+        );
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final lockSec = prefs.getInt('auto_lock_seconds') ?? 300;
+      if (lockSec < 0) return; // never
       if (paused != null &&
-          DateTime.now().difference(paused).inMinutes >= 5 &&
+          DateTime.now().difference(paused).inSeconds >= lockSec &&
           VaultService().isOpen) {
         VaultService().lock();
         _navigatorKey.currentState?.pushAndRemoveUntil(

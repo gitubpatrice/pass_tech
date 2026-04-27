@@ -9,16 +9,24 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.0.0';
+  static const _version = '1.1.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
 
   static const _features = [
     (icon: Icons.lock_outline,       label: 'Coffre-fort chiffré',
-        desc: 'AES-256-CBC + HMAC-SHA256, clé dérivée PBKDF2 (100 000 itérations)'),
+        desc: 'AES-256-CBC + HMAC-SHA256, clé dérivée PBKDF2 (250 000 itérations)'),
     (icon: Icons.fingerprint,        label: 'Biométrie',
         desc: 'Déverrouillage par empreinte ou Face ID'),
+    (icon: Icons.shield_outlined,    label: 'Anti-brute force',
+        desc: 'Verrouillage progressif après 5 tentatives (30s → 30min)'),
+    (icon: Icons.no_photography_outlined, label: 'Captures bloquées',
+        desc: 'Aucune capture d\'écran ni aperçu dans le sélecteur récent'),
+    (icon: Icons.cloud_off_outlined, label: 'Backup désactivé',
+        desc: 'Le coffre-fort n\'est jamais sauvegardé dans le cloud Android'),
+    (icon: Icons.timer_outlined,     label: 'Auto-lock configurable',
+        desc: 'Immédiat, 1 / 5 / 15 / 30 minutes ou jamais'),
     (icon: Icons.password,           label: 'Générateur',
         desc: 'Longueur 8–64, majuscules, chiffres, symboles'),
     (icon: Icons.folder_outlined,    label: 'Catégories',
