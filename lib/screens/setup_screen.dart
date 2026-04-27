@@ -26,10 +26,10 @@ class _SetupScreenState extends State<SetupScreen> {
   double _strength(String p) {
     if (p.isEmpty) return 0;
     double s = 0;
-    if (p.length >= 8)  s += 0.2;
-    if (p.length >= 12) s += 0.2;
-    if (p.length >= 16) s += 0.1;
-    if (p.contains(RegExp(r'[A-Z]')))       s += 0.15;
+    if (p.length >= 12) s += 0.25;
+    if (p.length >= 16) s += 0.20;
+    if (p.length >= 20) s += 0.10;
+    if (p.contains(RegExp(r'[A-Z]')))       s += 0.10;
     if (p.contains(RegExp(r'[a-z]')))       s += 0.10;
     if (p.contains(RegExp(r'[0-9]')))       s += 0.10;
     if (p.contains(RegExp(r'[^A-Za-z0-9]')))s += 0.15;
@@ -53,8 +53,12 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<void> _create() async {
     final p1 = _pass1.text;
     final p2 = _pass2.text;
-    if (p1.length < 8) {
-      setState(() => _error = 'Minimum 8 caractères');
+    if (p1.length < 12) {
+      setState(() => _error = 'Minimum 12 caractères');
+      return;
+    }
+    if (_strength(p1) < 0.6) {
+      setState(() => _error = 'Mot de passe trop faible — variez majuscules, chiffres, symboles');
       return;
     }
     if (p1 != p2) {
@@ -63,6 +67,8 @@ class _SetupScreenState extends State<SetupScreen> {
     }
     setState(() { _loading = true; _error = null; });
     await VaultService().createVault(p1);
+    _pass1.clear();
+    _pass2.clear();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -105,9 +111,12 @@ class _SetupScreenState extends State<SetupScreen> {
                 TextField(
                   controller: _pass1,
                   obscureText: !_show1,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  keyboardType: TextInputType.visiblePassword,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    labelText: 'Mot de passe maître',
+                    labelText: 'Mot de passe maître (min. 12)',
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(_show1 ? Icons.visibility_off : Icons.visibility, size: 20),
@@ -145,6 +154,9 @@ class _SetupScreenState extends State<SetupScreen> {
                 TextField(
                   controller: _pass2,
                   obscureText: !_show2,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  keyboardType: TextInputType.visiblePassword,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: 'Confirmer le mot de passe',

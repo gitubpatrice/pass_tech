@@ -559,8 +559,11 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
           controller: _ctrl1,
           obscureText: !_show,
           autofocus: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          keyboardType: TextInputType.visiblePassword,
           decoration: InputDecoration(
-            labelText: 'Passphrase',
+            labelText: widget.confirm ? 'Passphrase (min. 12)' : 'Passphrase',
             border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               icon: Icon(_show ? Icons.visibility_off : Icons.visibility, size: 20),
@@ -573,6 +576,9 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
           TextField(
             controller: _ctrl2,
             obscureText: !_show,
+            enableSuggestions: false,
+            autocorrect: false,
+            keyboardType: TextInputType.visiblePassword,
             decoration: const InputDecoration(
               labelText: 'Confirmer',
               border: OutlineInputBorder(),
@@ -593,8 +599,8 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
               return;
             }
             if (widget.confirm) {
-              if (_ctrl1.text.length < 8) {
-                setState(() => _error = 'Minimum 8 caractères');
+              if (_ctrl1.text.length < 12) {
+                setState(() => _error = 'Minimum 12 caractères');
                 return;
               }
               if (_ctrl1.text != _ctrl2.text) {
@@ -641,8 +647,11 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         TextField(
           controller: _ctrl1,
           obscureText: !_show,
+          enableSuggestions: false,
+          autocorrect: false,
+          keyboardType: TextInputType.visiblePassword,
           decoration: InputDecoration(
-            labelText: 'Nouveau mot de passe',
+            labelText: 'Nouveau mot de passe (min. 12)',
             border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               icon: Icon(_show ? Icons.visibility_off : Icons.visibility, size: 20),
@@ -654,6 +663,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         TextField(
           controller: _ctrl2,
           obscureText: !_show,
+          enableSuggestions: false,
+          autocorrect: false,
+          keyboardType: TextInputType.visiblePassword,
           decoration: const InputDecoration(
             labelText: 'Confirmer',
             border: OutlineInputBorder(),
@@ -669,8 +681,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         TextButton(onPressed: () => nav.pop(), child: const Text('Annuler')),
         FilledButton(
           onPressed: () {
-            if (_ctrl1.text.length < 8) {
-              setState(() => _error = 'Minimum 8 caractères');
+            if (_ctrl1.text.length < 12) {
+              setState(() => _error = 'Minimum 12 caractères');
               return;
             }
             if (_ctrl1.text != _ctrl2.text) {

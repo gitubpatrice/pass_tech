@@ -319,6 +319,9 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     TextField(
       controller: _passCtrl,
       obscureText: !_showPass,
+      enableSuggestions: false,
+      autocorrect: false,
+      keyboardType: TextInputType.visiblePassword,
       decoration: InputDecoration(
         hintText: 'Mot de passe',
         border: const OutlineInputBorder(),
@@ -360,6 +363,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     TextField(
       controller: _totpCtrl,
       obscureText: !_showTotp,
+      enableSuggestions: false,
+      autocorrect: false,
       onChanged: (_) {
         if (_totpError != null) setState(() => _totpError = null);
       },

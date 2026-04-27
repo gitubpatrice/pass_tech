@@ -91,6 +91,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (pass.isEmpty || _lockoutRemaining != null) return;
     setState(() { _loading = true; _error = null; });
     final result = await VaultService().unlock(pass);
+    _passCtrl.clear();
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
@@ -179,6 +180,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     onSubmitted: (_) => _unlock(),
                     enableSuggestions: false,
                     autocorrect: false,
+                    keyboardType: TextInputType.visiblePassword,
                     decoration: InputDecoration(
                       labelText: 'Mot de passe maître',
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),

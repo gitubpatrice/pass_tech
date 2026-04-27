@@ -18,7 +18,14 @@ class ImportResult {
 class ImportExportService {
   // ── Plain JSON / CSV parsing ────────────────────────────────────────────────
 
+  /// Plain JSON/CSV files larger than this are rejected (DoS safety).
+  static const _maxImportBytes = 50 * 1024 * 1024; // 50 MB
+
   static ImportResult parse(String content) {
+    if (content.length > _maxImportBytes) {
+      return const ImportResult(entries: [], format: 'unknown',
+          error: 'Fichier trop volumineux (max 50 Mo)');
+    }
     final trimmed = content.trim();
     if (trimmed.isEmpty) {
       return const ImportResult(entries: [], format: 'unknown', error: 'Fichier vide');
@@ -239,11 +246,14 @@ class ImportExportService {
   }
 
   // ── Encrypted .ptbak format ─────────────────────────────────────────────────
-  // {magic:'PTBAK', version:1, iterations, salt, iv, mac, data}
-  // PBKDF2 100k → 64 bytes (32 enc + 32 mac)
-  // AES-256-CBC + HMAC-SHA256(IV || ciphertext)
+  // v2 (current): MAC = HMAC(macKey, AAD || IV || ciphertext)
+  //               AAD = "ptbak:v=2|iter=N|salt=..."  (covers metadata)
+  // v1 (legacy):  MAC = HMAC(macKey, IV || ciphertext)
+  // PBKDF2-SHA256 600 000 (OWASP 2023) → 64 bytes (32 enc + 32 mac)
 
-  static const _backupIterations = 100000;
+  static const _backupIterations    = 600000;
+  static const _maxBackupIterations = 2000000;
+  static const _backupVersion       = 2;
 
   static Future<String> exportEncrypted(
       List<Entry> entries, String passphrase) async {
@@ -256,13 +266,18 @@ class ImportExportService {
     final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
     final plain = jsonEncode(entries.map((e) => e.toJson()).toList());
     final encrypted = encrypter.encrypt(plain, iv: iv);
-    final mac = Hmac(sha256, macKey).convert([...iv.bytes, ...encrypted.bytes]).bytes;
+
+    final saltB64 = base64Encode(salt);
+    final aad = utf8.encode(
+        'ptbak:v=$_backupVersion|iter=$_backupIterations|salt=$saltB64');
+    final mac = Hmac(sha256, macKey)
+        .convert([...aad, ...iv.bytes, ...encrypted.bytes]).bytes;
 
     return jsonEncode({
       'magic':      'PTBAK',
-      'version':    1,
+      'version':    _backupVersion,
       'iterations': _backupIterations,
-      'salt':       base64Encode(salt),
+      'salt':       saltB64,
       'iv':         base64Encode(iv.bytes),
       'mac':        base64Encode(mac),
       'data':       base64Encode(encrypted.bytes),
@@ -275,19 +290,34 @@ class ImportExportService {
   static Future<List<Entry>?> importEncrypted(
       String fileContent, String passphrase) async {
     try {
+      if (fileContent.length > _maxImportBytes) return null;
       final json = jsonDecode(fileContent) as Map<String, dynamic>;
       if (json['magic'] != 'PTBAK') return null;
 
+      final version    = json['version'] as int? ?? 1;
       final iterations = json['iterations'] as int? ?? _backupIterations;
-      final salt = base64Decode(json['salt'] as String);
-      final iv  = base64Decode(json['iv']   as String);
-      final mac = base64Decode(json['mac']  as String);
-      final cipher = base64Decode(json['data'] as String);
+      if (iterations < 1 || iterations > _maxBackupIterations) return null;
+
+      final saltB64 = json['salt'] as String;
+      final salt    = base64Decode(saltB64);
+      final iv      = base64Decode(json['iv']   as String);
+      final mac     = base64Decode(json['mac']  as String);
+      final cipher  = base64Decode(json['data'] as String);
 
       final key = await compute(
           pbkdf2Worker, [utf8.encode(passphrase), salt, iterations, 64]);
       final macKey = key.sublist(32);
-      final computed = Hmac(sha256, macKey).convert([...iv, ...cipher]).bytes;
+
+      // v2+: MAC covers metadata. v1 (legacy): MAC over IV||cipher only.
+      final List<int> macInput;
+      if (version >= 2) {
+        final aad = utf8.encode(
+            'ptbak:v=$version|iter=$iterations|salt=$saltB64');
+        macInput = [...aad, ...iv, ...cipher];
+      } else {
+        macInput = [...iv, ...cipher];
+      }
+      final computed = Hmac(sha256, macKey).convert(macInput).bytes;
       if (!_constEq(computed, mac)) return null;
 
       final encKey = enc.Key(key.sublist(0, 32));

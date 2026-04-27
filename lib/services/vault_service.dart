@@ -61,9 +61,11 @@ class VaultService {
   static const _failCountKey    = 'pt_fail_count';
   static const _lockoutKey      = 'pt_lockout_until';
 
-  // Crypto parameters
-  static const _currentIterations = 250000;
+  // Crypto parameters (OWASP 2023 PBKDF2-SHA256 ≥ 600 000)
+  static const _currentIterations = 600000;
   static const _legacyIterations  = 100000; // for v1.0.0 vaults without iterations field
+  static const _maxIterations     = 2000000; // hard cap to prevent DoS via tampered file
+  static const _currentVersion    = 3;
 
   // Brute-force protection: progressive lockout after 5 fails
   static const _failThreshold = 5;
@@ -122,6 +124,9 @@ class VaultService {
           iterations = _legacyIterations;
           isLegacy   = true;
         } else {
+          if (stored < 1 || stored > _maxIterations) {
+            return UnlockResult.wrongPassword;
+          }
           iterations = stored;
         }
       }
@@ -130,10 +135,15 @@ class VaultService {
       final ok = _decryptVault(raw);
       if (ok) {
         await _onUnlockSuccess();
-        // Silent migration: re-derive with stronger iterations and re-save
-        if (isLegacy && iterations < _currentIterations) {
-          _wipeKey();
-          _key = await _deriveKey(masterPassword, salt, _currentIterations);
+        // Silent migration: re-derive with stronger iterations and re-save in v3
+        final needsMigration = isLegacy ||
+            iterations < _currentIterations ||
+            (raw?['version'] as int? ?? 0) < _currentVersion;
+        if (needsMigration) {
+          if (iterations != _currentIterations) {
+            _wipeKey();
+            _key = await _deriveKey(masterPassword, salt, _currentIterations);
+          }
           await _saveVault(iterations: _currentIterations);
         }
         return UnlockResult.success;
@@ -255,11 +265,22 @@ class VaultService {
       final ivBytes     = base64Decode(raw['iv']   as String);
       final macBytes    = base64Decode(raw['mac']  as String);
       final cipherBytes = base64Decode(raw['data'] as String);
+      final version     = raw['version'] as int? ?? 1;
+      final iterations  = raw['iterations'] as int? ?? _legacyIterations;
+      final saltB64     = raw['salt'] as String? ?? '';
 
-      // Verify HMAC-SHA256(macKey, IV || ciphertext) — constant-time comparison
-      final macKey   = _key!.sublist(32);
-      final computed = Hmac(sha256, macKey)
-          .convert([...ivBytes, ...cipherBytes]).bytes;
+      // Verify HMAC — constant-time comparison
+      // v3+ : HMAC over (version || iterations || salt || IV || ciphertext)
+      // v1/v2 : HMAC over (IV || ciphertext) only
+      final macKey = _key!.sublist(32);
+      final List<int> macInput;
+      if (version >= 3) {
+        final aad = utf8.encode('pt:v=$version|iter=$iterations|salt=$saltB64');
+        macInput = [...aad, ...ivBytes, ...cipherBytes];
+      } else {
+        macInput = [...ivBytes, ...cipherBytes];
+      }
+      final computed = Hmac(sha256, macKey).convert(macInput).bytes;
       if (!_constEq(computed, macBytes)) return false;
 
       final encKey    = enc.Key(_key!.sublist(0, 32));
@@ -281,16 +302,6 @@ class VaultService {
   Future<void> _saveVault({int? iterations}) async {
     if (_key == null) return;
 
-    final iv        = enc.IV.fromSecureRandom(16);
-    final encKey    = enc.Key(_key!.sublist(0, 32));
-    final macKey    = _key!.sublist(32);
-    final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-
-    final plain     = jsonEncode(_entries.map((e) => e.toJson()).toList());
-    final encrypted = encrypter.encrypt(plain, iv: iv);
-    final mac = Hmac(sha256, macKey)
-        .convert([...iv.bytes, ...encrypted.bytes]).bytes;
-
     // Preserve existing iterations if not specified (incremental updates keep them)
     int storedIter = iterations ?? _currentIterations;
     if (iterations == null) {
@@ -304,8 +315,22 @@ class VaultService {
     }
 
     final saltB64 = await _storage.read(key: _saltKey) ?? '';
+    final iv        = enc.IV.fromSecureRandom(16);
+    final encKey    = enc.Key(_key!.sublist(0, 32));
+    final macKey    = _key!.sublist(32);
+    final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
+
+    final plain     = jsonEncode(_entries.map((e) => e.toJson()).toList());
+    final encrypted = encrypter.encrypt(plain, iv: iv);
+
+    // v3 MAC covers (version || iterations || salt || IV || ciphertext)
+    final aad = utf8.encode(
+        'pt:v=$_currentVersion|iter=$storedIter|salt=$saltB64');
+    final mac = Hmac(sha256, macKey)
+        .convert([...aad, ...iv.bytes, ...encrypted.bytes]).bytes;
+
     final out = {
-      'version':    2,
+      'version':    _currentVersion,
       'iterations': storedIter,
       'salt':       saltB64,
       'iv':         base64Encode(iv.bytes),
@@ -313,7 +338,12 @@ class VaultService {
       'data':       base64Encode(encrypted.bytes),
     };
 
-    (await _vaultFile()).writeAsStringSync(jsonEncode(out));
+    // Atomic write : tmp + rename to avoid corruption on crash mid-write
+    final target = await _vaultFile();
+    final tmp = File('${target.path}.tmp');
+    tmp.writeAsStringSync(jsonEncode(out), flush: true);
+    if (target.existsSync()) target.deleteSync();
+    tmp.renameSync(target.path);
   }
 
   // ── Brute-force protection ──────────────────────────────────────────────────

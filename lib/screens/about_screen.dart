@@ -9,7 +9,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.5.0';
+  static const _version = '1.6.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -38,7 +38,7 @@ class _AboutScreenState extends State<AboutScreen> {
     (icon: Icons.sticky_note_2_outlined, label: 'Notes sécurisées',
         desc: 'Texte confidentiel chiffré (RIB, codes, recovery keys)'),
     (icon: Icons.lock_outline,       label: 'Coffre-fort chiffré',
-        desc: 'AES-256-CBC + HMAC-SHA256, PBKDF2 250 000 itérations'),
+        desc: 'AES-256-CBC + HMAC-SHA256, PBKDF2 600 000 itérations (OWASP)'),
     (icon: Icons.fingerprint,        label: 'Biométrie',
         desc: 'Déverrouillage par empreinte ou Face ID'),
     (icon: Icons.gpp_good_outlined,  label: 'Anti-brute force',
