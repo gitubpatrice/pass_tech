@@ -20,9 +20,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String _search = '';
   String _filter = 'Tous';
   final _searchCtrl = TextEditingController();
-  bool _searchOpen  = false;
+  bool _searchOpen = false;
 
-  static const _chips = ['Tous', 'Favoris', ...categories];
+  static const _typeChips = ['Mots de passe', 'Notes', 'Cartes bancaires'];
+  static const _chips = [
+    'Tous', 'Favoris',
+    ..._typeChips,
+    ...categories,
+  ];
 
   @override
   void dispose() {
@@ -30,10 +35,22 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  EntryType? _typeFromFilter(String f) {
+    switch (f) {
+      case 'Mots de passe':    return EntryType.password;
+      case 'Notes':            return EntryType.note;
+      case 'Cartes bancaires': return EntryType.card;
+      default:                 return null;
+    }
+  }
+
   List<Entry> get _filtered {
     var list = VaultService().entries.toList();
     if (_filter == 'Favoris') {
       list = list.where((e) => e.isFavorite).toList();
+    } else if (_typeFromFilter(_filter) != null) {
+      final t = _typeFromFilter(_filter)!;
+      list = list.where((e) => e.type == t).toList();
     } else if (_filter != 'Tous') {
       list = list.where((e) => e.category == _filter).toList();
     }
@@ -42,13 +59,90 @@ class _HomeScreenState extends State<HomeScreen> {
       list = list.where((e) =>
           e.title.toLowerCase().contains(q) ||
           e.username.toLowerCase().contains(q) ||
-          e.url.toLowerCase().contains(q)).toList();
+          e.url.toLowerCase().contains(q) ||
+          e.notes.toLowerCase().contains(q)).toList();
     }
     list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return list;
   }
 
   void _refresh() => setState(() {});
+
+  Future<void> _addEntry() async {
+    final type = await showModalBottomSheet<EntryType>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                child: Text('Quel type d\'entrée ?',
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              _addOption(
+                context: context,
+                icon: Icons.key,
+                color: const Color(0xFF58A6FF),
+                title: 'Mot de passe',
+                subtitle: 'Identifiant et mot de passe d\'un compte',
+                onTap: () => Navigator.pop(context, EntryType.password),
+              ),
+              _addOption(
+                context: context,
+                icon: Icons.sticky_note_2_outlined,
+                color: const Color(0xFFFF7043),
+                title: 'Note sécurisée',
+                subtitle: 'Texte confidentiel chiffré',
+                onTap: () => Navigator.pop(context, EntryType.note),
+              ),
+              _addOption(
+                context: context,
+                icon: Icons.credit_card,
+                color: const Color(0xFF43A047),
+                title: 'Carte bancaire',
+                subtitle: 'Numéro, CVV, expiration, PIN',
+                onTap: () => Navigator.pop(context, EntryType.card),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (type == null || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EntryEditScreen(type: type, onSaved: _refresh),
+      ),
+    );
+  }
+
+  Widget _addOption({
+    required BuildContext context,
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) =>
+      ListTile(
+        leading: Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+        onTap: onTap,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +209,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Category filter chips
           SizedBox(
             height: 46,
             child: ListView.separated(
@@ -126,7 +219,10 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, i) {
                 final chip     = _chips[i];
                 final selected = _filter == chip;
+                final isType   = _typeChips.contains(chip);
                 return FilterChip(
+                  avatar: isType ? Icon(_chipIcon(chip), size: 14,
+                      color: selected ? cs.onPrimary : null) : null,
                   label: Text(chip, style: const TextStyle(fontSize: 12)),
                   selected: selected,
                   onSelected: (_) => setState(() => _filter = chip),
@@ -157,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       if (_search.isEmpty && _filter == 'Tous') ...[
                         const SizedBox(height: 6),
-                        Text('Appuie sur + pour ajouter un mot de passe',
+                        Text('Appuie sur + pour ajouter',
                             style: TextStyle(
                                 fontSize: 12, color: cs.onSurfaceVariant)),
                       ],
@@ -173,15 +269,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(context,
-              MaterialPageRoute(
-                  builder: (_) => EntryEditScreen(onSaved: _refresh)));
-        },
+        onPressed: _addEntry,
         icon: const Icon(Icons.add),
         label: const Text('Ajouter'),
       ),
     );
+  }
+
+  IconData _chipIcon(String chip) {
+    switch (chip) {
+      case 'Mots de passe':    return Icons.key;
+      case 'Notes':            return Icons.sticky_note_2_outlined;
+      case 'Cartes bancaires': return Icons.credit_card;
+      default:                 return Icons.folder_outlined;
+    }
   }
 }
 
@@ -190,10 +291,40 @@ class _EntryCard extends StatelessWidget {
   final VoidCallback onChanged;
   const _EntryCard({required this.entry, required this.onChanged});
 
+  IconData get _leadingIcon {
+    switch (entry.type) {
+      case EntryType.note: return Icons.sticky_note_2_outlined;
+      case EntryType.card: return Icons.credit_card;
+      case EntryType.password: return categoryIcon(entry.category);
+    }
+  }
+
+  Color _leadingColor() {
+    switch (entry.type) {
+      case EntryType.note: return const Color(0xFFFF7043);
+      case EntryType.card: return const Color(0xFF43A047);
+      case EntryType.password: return categoryColor(entry.category);
+    }
+  }
+
+  String get _subtitle {
+    switch (entry.type) {
+      case EntryType.password:
+        return entry.username;
+      case EntryType.note:
+        final preview = entry.notes.replaceAll('\n', ' ').trim();
+        return preview.length > 60 ? '${preview.substring(0, 60)}…' : preview;
+      case EntryType.card:
+        final n = entry.cardNumber.replaceAll(' ', '');
+        if (n.length >= 4) return '•••• ${n.substring(n.length - 4)}';
+        return entry.cardIssuer;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cs       = Theme.of(context).colorScheme;
-    final catColor = categoryColor(entry.category);
+    final cs = Theme.of(context).colorScheme;
+    final color = _leadingColor();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
@@ -212,22 +343,33 @@ class _EntryCard extends StatelessWidget {
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(
-                color: catColor.withValues(alpha: 0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(categoryIcon(entry.category), size: 20, color: catColor),
+              child: Icon(_leadingIcon, size: 20, color: color),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(entry.title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                  if (entry.username.isNotEmpty)
-                    Text(entry.username,
+                  Row(children: [
+                    Expanded(
+                      child: Text(entry.title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                    if (entry.type == EntryType.password &&
+                        entry.totpSecret.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Icon(Icons.shield_outlined,
+                            size: 14, color: cs.primary),
+                      ),
+                  ]),
+                  if (_subtitle.isNotEmpty)
+                    Text(_subtitle,
                         style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
@@ -240,12 +382,13 @@ class _EntryCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: catColor.withValues(alpha: 0.12),
+                color: categoryColor(entry.category).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(entry.category,
                   style: TextStyle(
-                      fontSize: 10, color: catColor,
+                      fontSize: 10,
+                      color: categoryColor(entry.category),
                       fontWeight: FontWeight.w600)),
             ),
           ]),

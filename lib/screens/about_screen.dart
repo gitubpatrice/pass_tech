@@ -9,17 +9,25 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.1.0';
+  static const _version = '1.2.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
 
   static const _features = [
+    (icon: Icons.key,                label: '3 types d\'entrées',
+        desc: 'Mots de passe, notes sécurisées, cartes bancaires'),
+    (icon: Icons.shield_outlined,    label: 'Codes 2FA intégrés (TOTP)',
+        desc: 'Génère les codes à 6 chiffres comme Google Authenticator'),
+    (icon: Icons.credit_card,        label: 'Cartes bancaires',
+        desc: 'Numéro, CVV, expiration, PIN — affichage carte 3D'),
+    (icon: Icons.sticky_note_2_outlined, label: 'Notes sécurisées',
+        desc: 'Texte confidentiel chiffré (RIB, codes, recovery keys)'),
     (icon: Icons.lock_outline,       label: 'Coffre-fort chiffré',
-        desc: 'AES-256-CBC + HMAC-SHA256, clé dérivée PBKDF2 (250 000 itérations)'),
+        desc: 'AES-256-CBC + HMAC-SHA256, PBKDF2 250 000 itérations'),
     (icon: Icons.fingerprint,        label: 'Biométrie',
         desc: 'Déverrouillage par empreinte ou Face ID'),
-    (icon: Icons.shield_outlined,    label: 'Anti-brute force',
+    (icon: Icons.gpp_good_outlined,  label: 'Anti-brute force',
         desc: 'Verrouillage progressif après 5 tentatives (30s → 30min)'),
     (icon: Icons.no_photography_outlined, label: 'Captures bloquées',
         desc: 'Aucune capture d\'écran ni aperçu dans le sélecteur récent'),
@@ -29,16 +37,10 @@ class _AboutScreenState extends State<AboutScreen> {
         desc: 'Immédiat, 1 / 5 / 15 / 30 minutes ou jamais'),
     (icon: Icons.password,           label: 'Générateur',
         desc: 'Longueur 8–64, majuscules, chiffres, symboles'),
-    (icon: Icons.folder_outlined,    label: 'Catégories',
-        desc: 'Web, Email, Banque, Réseaux sociaux, Apps, Cartes, Autres'),
     (icon: Icons.content_paste_off_outlined, label: 'Presse-papiers sécurisé',
         desc: 'Effacement automatique configurable (15s–60s)'),
-    (icon: Icons.star_border,        label: 'Favoris',
-        desc: 'Épingler vos entrées les plus utilisées'),
-    (icon: Icons.upload_outlined,    label: 'Export',
-        desc: 'Exporter vos données en JSON'),
     (icon: Icons.search,             label: 'Recherche',
-        desc: 'Par titre, identifiant ou URL'),
+        desc: 'Par titre, identifiant, URL ou contenu'),
   ];
 
   Future<void> _checkUpdate() async {
