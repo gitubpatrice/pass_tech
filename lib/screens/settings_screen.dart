@@ -6,6 +6,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/clipboard_service.dart';
 import '../services/vault_service.dart';
+import '../main.dart' show themeNotifier, parseThemeMode, themeModeToString;
+import 'audit_screen.dart';
 import 'setup_screen.dart';
 import 'unlock_screen.dart';
 
@@ -23,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _biometricAvailable = false;
   int  _clipboardClear     = 30;
   int  _autoLockSeconds    = 300;
+  ThemeMode _themeMode     = ThemeMode.system;
 
   static const _clipOptions = [
     (label: '15 secondes', value: 15),
@@ -52,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs    = await SharedPreferences.getInstance();
     final clip     = prefs.getInt('clipboard_clear')   ?? 30;
     final lock     = prefs.getInt('auto_lock_seconds') ?? 300;
+    final theme    = parseThemeMode(prefs.getString('theme_mode') ?? 'system');
     ClipboardService.clearAfterSeconds = clip;
     if (mounted) {
       setState(() {
@@ -59,7 +63,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _biometricEnabled   = canCheck && hasKey;
         _clipboardClear     = clip;
         _autoLockSeconds    = lock;
+        _themeMode          = theme;
       });
+    }
+  }
+
+  Future<void> _setTheme(ThemeMode m) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme_mode', themeModeToString(m));
+    themeNotifier.value = m;
+    if (mounted) setState(() => _themeMode = m);
+  }
+
+  String get _themeLabel {
+    switch (_themeMode) {
+      case ThemeMode.light:  return 'Clair';
+      case ThemeMode.dark:   return 'Sombre';
+      case ThemeMode.system: return 'Système';
     }
   }
 
@@ -221,6 +241,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.lock_outline),
             title: const Text('Verrouiller maintenant'),
             onTap: _lockNow,
+          ),
+          ListTile(
+            leading: const Icon(Icons.gpp_good_outlined),
+            title: const Text('Audit de sécurité'),
+            subtitle: const Text('Mots de passe faibles, doublons, fuites…'),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AuditScreen())),
+          ),
+
+          _section('Apparence'),
+          ListTile(
+            leading: const Icon(Icons.brightness_6_outlined),
+            title: const Text('Thème'),
+            subtitle: Text(_themeLabel),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () async {
+              final m = await showDialog<ThemeMode>(
+                context: context,
+                builder: (_) => SimpleDialog(
+                  title: const Text('Choisir le thème'),
+                  children: [
+                    ('Système', ThemeMode.system, Icons.settings_brightness),
+                    ('Clair',   ThemeMode.light,  Icons.light_mode_outlined),
+                    ('Sombre',  ThemeMode.dark,   Icons.dark_mode_outlined),
+                  ].map((t) {
+                    return ListTile(
+                      leading: Icon(t.$3, size: 20),
+                      title: Text(t.$1),
+                      trailing: _themeMode == t.$2
+                          ? const Icon(Icons.check)
+                          : null,
+                      onTap: () => Navigator.pop(context, t.$2),
+                    );
+                  }).toList(),
+                ),
+              );
+              if (m != null) _setTheme(m);
+            },
           ),
 
           _section('Presse-papiers'),

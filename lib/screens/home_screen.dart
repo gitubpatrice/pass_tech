@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/vault_service.dart';
@@ -21,6 +22,31 @@ class _HomeScreenState extends State<HomeScreen> {
   String _filter = 'Tous';
   final _searchCtrl = TextEditingController();
   bool _searchOpen = false;
+  String _sort = 'recent';
+
+  static const _sortOptions = [
+    (label: 'Récent',         value: 'recent',   icon: Icons.schedule),
+    (label: 'Plus ancien',    value: 'oldest',   icon: Icons.history),
+    (label: 'A → Z',          value: 'alpha',    icon: Icons.sort_by_alpha),
+    (label: 'Z → A',          value: 'alphaDesc',icon: Icons.sort_by_alpha),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSort();
+  }
+
+  Future<void> _loadSort() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _sort = prefs.getString('sort_mode') ?? 'recent');
+  }
+
+  Future<void> _setSort(String s) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('sort_mode', s);
+    if (mounted) setState(() => _sort = s);
+  }
 
   static const _typeChips = ['Mots de passe', 'Notes', 'Cartes bancaires'];
   static const _chips = [
@@ -62,7 +88,12 @@ class _HomeScreenState extends State<HomeScreen> {
           e.url.toLowerCase().contains(q) ||
           e.notes.toLowerCase().contains(q)).toList();
     }
-    list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    switch (_sort) {
+      case 'oldest':    list.sort((a, b) => a.updatedAt.compareTo(b.updatedAt)); break;
+      case 'alpha':     list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase())); break;
+      case 'alphaDesc': list.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase())); break;
+      default:          list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    }
     return list;
   }
 
@@ -176,6 +207,23 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Générateur',
             onPressed: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const GeneratorScreen())),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Trier',
+            itemBuilder: (_) => _sortOptions.map((o) => PopupMenuItem(
+              value: o.value,
+              child: Row(children: [
+                Icon(o.icon, size: 16),
+                const SizedBox(width: 10),
+                Text(o.label),
+                if (_sort == o.value) ...[
+                  const SizedBox(width: 8),
+                  const Icon(Icons.check, size: 14),
+                ],
+              ]),
+            )).toList(),
+            onSelected: _setSort,
           ),
           IconButton(
             icon: const Icon(Icons.lock_outline),

@@ -9,12 +9,22 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.2.0';
+  static const _version = '1.3.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
 
   static const _features = [
+    (icon: Icons.gpp_good_outlined,  label: 'Audit de sécurité',
+        desc: 'Score, mots de passe faibles, doublons, anciens, sans 2FA'),
+    (icon: Icons.travel_explore_outlined, label: 'Détection de fuites',
+        desc: 'Vérifie 800M+ fuites publiques (HaveIBeenPwned, k-anonymity)'),
+    (icon: Icons.qr_code_scanner,    label: 'Scanner QR pour 2FA',
+        desc: 'Scanne le QR code TOTP fourni par tout site'),
+    (icon: Icons.brightness_6_outlined, label: 'Thème clair / sombre',
+        desc: 'Au choix ou en suivant le système'),
+    (icon: Icons.sort,               label: 'Tri personnalisé',
+        desc: 'Récent, ancien, A → Z, Z → A'),
     (icon: Icons.key,                label: '3 types d\'entrées',
         desc: 'Mots de passe, notes sécurisées, cartes bancaires'),
     (icon: Icons.shield_outlined,    label: 'Codes 2FA intégrés (TOTP)',

@@ -9,6 +9,25 @@ import 'screens/unlock_screen.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
 
+/// Global theme mode notifier — listened by the app, updated by settings.
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+
+ThemeMode parseThemeMode(String s) {
+  switch (s) {
+    case 'light': return ThemeMode.light;
+    case 'dark':  return ThemeMode.dark;
+    default:      return ThemeMode.system;
+  }
+}
+
+String themeModeToString(ThemeMode m) {
+  switch (m) {
+    case ThemeMode.light:  return 'light';
+    case ThemeMode.dark:   return 'dark';
+    case ThemeMode.system: return 'system';
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
@@ -16,6 +35,7 @@ void main() async {
 
   final prefs       = await SharedPreferences.getInstance();
   ClipboardService.clearAfterSeconds = prefs.getInt('clipboard_clear') ?? 30;
+  themeNotifier.value = parseThemeMode(prefs.getString('theme_mode') ?? 'system');
 
   final vaultExists = await VaultService().vaultExists;
   runApp(PassTechApp(vaultExists: vaultExists));
@@ -93,14 +113,17 @@ class _PassTechAppState extends State<PassTechApp>
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pass Tech',
-      navigatorKey: _navigatorKey,
-      debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: _lightTheme(),
-      darkTheme: _darkTheme(),
-      home: widget.vaultExists ? const UnlockScreen() : const SetupScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, mode, __) => MaterialApp(
+        title: 'Pass Tech',
+        navigatorKey: _navigatorKey,
+        debugShowCheckedModeBanner: false,
+        themeMode: mode,
+        theme: _lightTheme(),
+        darkTheme: _darkTheme(),
+        home: widget.vaultExists ? const UnlockScreen() : const SetupScreen(),
+      ),
     );
   }
 }

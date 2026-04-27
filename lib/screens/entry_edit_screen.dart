@@ -5,6 +5,7 @@ import '../models/entry.dart';
 import '../services/totp_service.dart';
 import '../services/vault_service.dart';
 import 'generator_screen.dart';
+import 'qr_scanner_screen.dart';
 
 class EntryEditScreen extends StatefulWidget {
   final Entry? entry;
@@ -163,9 +164,39 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     if (pass != null) setState(() => _passCtrl.text = pass);
   }
 
-  Future<void> _pasteFromClipboard(TextEditingController ctrl) async {
-    final data = await Clipboard.getData('text/plain');
-    if (data?.text != null) setState(() => ctrl.text = data!.text!);
+  String? _extractTotpSecret(String raw) {
+    if (raw.startsWith('otpauth://')) {
+      try {
+        return Uri.parse(raw).queryParameters['secret'];
+      } catch (_) { return null; }
+    }
+    return raw.trim();
+  }
+
+  Future<void> _scanQrForTotp() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final raw = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+    if (raw == null || !mounted) return;
+    final secret = _extractTotpSecret(raw);
+    if (secret == null || secret.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('QR code invalide pour 2FA')));
+      return;
+    }
+    final err = TotpService.validate(secret);
+    if (err != null) {
+      messenger.showSnackBar(SnackBar(content: Text('Secret invalide : $err')));
+      return;
+    }
+    setState(() {
+      _totpCtrl.text = secret;
+      _totpError = null;
+    });
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Secret 2FA ajouté ✓')));
   }
 
   @override
@@ -333,7 +364,7 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
         if (_totpError != null) setState(() => _totpError = null);
       },
       decoration: InputDecoration(
-        hintText: 'Clé secrète Base32 (ex: JBSWY3DPEHPK3PXP)',
+        hintText: 'Clé secrète Base32 ou scanner QR',
         border: const OutlineInputBorder(),
         prefixIcon: const Icon(Icons.shield_outlined, size: 20),
         errorText: _totpError,
@@ -346,9 +377,9 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
               onPressed: () => setState(() => _showTotp = !_showTotp),
             ),
             IconButton(
-              icon: const Icon(Icons.content_paste, size: 20),
-              tooltip: 'Coller',
-              onPressed: () => _pasteFromClipboard(_totpCtrl),
+              icon: const Icon(Icons.qr_code_scanner, size: 20),
+              tooltip: 'Scanner QR',
+              onPressed: _scanQrForTotp,
             ),
           ],
         ),

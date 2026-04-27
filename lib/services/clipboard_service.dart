@@ -6,6 +6,7 @@ class ClipboardService {
   static int clearAfterSeconds = 30;
 
   static Future<void> copyWithAutoClear(String text, {VoidCallback? onCleared}) async {
+    HapticFeedback.lightImpact();
     await Clipboard.setData(ClipboardData(text: text));
     _timer?.cancel();
     if (clearAfterSeconds > 0) {
