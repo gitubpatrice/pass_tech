@@ -1,0 +1,30 @@
+name: pass_tech
+description: "Gestionnaire de mots de passe 100% local et sécurisé"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.3
+  encrypt: ^5.0.3
+  uuid: ^4.5.1
+  share_plus: ^10.0.3
+  shared_preferences: ^2.3.2
+  intl: ^0.19.0
+  http: ^1.2.0
+  path_provider: ^2.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

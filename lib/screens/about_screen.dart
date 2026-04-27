@@ -1,0 +1,316 @@
+import 'package:flutter/material.dart';
+import '../services/update_service.dart';
+
+class AboutScreen extends StatefulWidget {
+  const AboutScreen({super.key});
+
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  static const _version = '1.0.0';
+  static const _author  = 'Patrice Haltaya';
+
+  bool _checkingUpdate = false;
+
+  static const _features = [
+    (icon: Icons.lock_outline,       label: 'Coffre-fort chiffré',
+        desc: 'AES-256-CBC + HMAC-SHA256, clé dérivée PBKDF2 (100 000 itérations)'),
+    (icon: Icons.fingerprint,        label: 'Biométrie',
+        desc: 'Déverrouillage par empreinte ou Face ID'),
+    (icon: Icons.password,           label: 'Générateur',
+        desc: 'Longueur 8–64, majuscules, chiffres, symboles'),
+    (icon: Icons.folder_outlined,    label: 'Catégories',
+        desc: 'Web, Email, Banque, Réseaux sociaux, Apps, Cartes, Autres'),
+    (icon: Icons.content_paste_off_outlined, label: 'Presse-papiers sécurisé',
+        desc: 'Effacement automatique configurable (15s–60s)'),
+    (icon: Icons.star_border,        label: 'Favoris',
+        desc: 'Épingler vos entrées les plus utilisées'),
+    (icon: Icons.upload_outlined,    label: 'Export',
+        desc: 'Exporter vos données en JSON'),
+    (icon: Icons.search,             label: 'Recherche',
+        desc: 'Par titre, identifiant ou URL'),
+  ];
+
+  Future<void> _checkUpdate() async {
+    setState(() => _checkingUpdate = true);
+    final info = await UpdateService().checkForUpdate(force: true);
+    if (!mounted) return;
+    setState(() => _checkingUpdate = false);
+    if (info == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vous avez déjà la dernière version ✓')),
+      );
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('v${info.version} disponible'),
+        content: Text(
+            info.body.isNotEmpty ? info.body : 'Une nouvelle version est disponible.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Plus tard')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(title: const Text('À propos')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+        children: [
+
+          // ── Header ──────────────────────────────────────────────────────────
+          Center(
+            child: Column(children: [
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.lock, size: 44, color: cs.primary),
+              ),
+              const SizedBox(height: 14),
+              Text('Pass Tech',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text('v$_version',
+                    style: TextStyle(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13)),
+              ),
+              const SizedBox(height: 8),
+              Text('Gestionnaire de mots de passe 100 % local',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _checkingUpdate ? null : _checkUpdate,
+                icon: _checkingUpdate
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.system_update_outlined, size: 18),
+                label: Text(
+                    _checkingUpdate ? 'Vérification…' : 'Vérifier les mises à jour'),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 28),
+
+          // ── Confidentialité ─────────────────────────────────────────────────
+          _sectionTitle(context, 'Confidentialité'),
+          const SizedBox(height: 8),
+          const _PrivacyCard(),
+
+          const SizedBox(height: 24),
+
+          // ── Fonctionnalités ─────────────────────────────────────────────────
+          _sectionTitle(context, 'Fonctionnalités'),
+          const SizedBox(height: 8),
+          ..._features.map((f) =>
+              _FeatureRow(icon: f.icon, label: f.label, desc: f.desc)),
+
+          const SizedBox(height: 24),
+
+          // ── Auteur ──────────────────────────────────────────────────────────
+          _sectionTitle(context, 'Auteur'),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: cs.primaryContainer,
+                child: Icon(Icons.person_outline, color: cs.primary),
+              ),
+              title: const Text(_author),
+              subtitle: const Text('Développeur'),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Aide ────────────────────────────────────────────────────────────
+          _sectionTitle(context, 'Aide rapide'),
+          const SizedBox(height: 8),
+          _HelpCard(
+            title: 'Premier lancement',
+            steps: [
+              'Choisissez un mot de passe maître fort (min. 8 caractères)',
+              'Il chiffre toutes vos données — ne peut pas être récupéré',
+            ],
+          ),
+          _HelpCard(
+            title: 'Ajouter un mot de passe',
+            steps: [
+              'Bouton "+ Ajouter" en bas de l\'écran principal',
+              'Ou utilisez le générateur pour créer un mot de passe sécurisé',
+            ],
+          ),
+          _HelpCard(
+            title: 'Mise à jour',
+            steps: [
+              'L\'app vérifie automatiquement les mises à jour au lancement',
+              'Ou appuyez sur "Vérifier les mises à jour" ci-dessus',
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String title) => Padding(
+        padding: const EdgeInsets.only(left: 2),
+        child: Text(title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5)),
+      );
+}
+
+class _FeatureRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String desc;
+  const _FeatureRow({required this.icon, required this.label, required this.desc});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 6),
+        child: ListTile(
+          dense: true,
+          leading: Icon(icon, size: 20,
+              color: Theme.of(context).colorScheme.primary),
+          title: Text(label,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          subtitle: Text(desc, style: const TextStyle(fontSize: 11)),
+        ),
+      );
+}
+
+class _PrivacyCard extends StatelessWidget {
+  const _PrivacyCard();
+
+  static const _items = [
+    (icon: Icons.block,               color: Color(0xFFE53935), label: 'Aucune publicité'),
+    (icon: Icons.analytics_outlined,  color: Color(0xFFFF7043), label: 'Aucun tracker'),
+    (icon: Icons.wifi_off,            color: Color(0xFF43A047), label: 'Fonctionne hors ligne'),
+    (icon: Icons.visibility_off,      color: Color(0xFF1976D2), label: 'Aucune collecte de données'),
+    (icon: Icons.share_outlined,      color: Color(0xFF7B1FA2), label: 'Aucun partage de données'),
+    (icon: Icons.store_mall_directory_outlined, color: Color(0xFF00897B), label: 'Sans Play Store'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.shield_outlined,
+                  color: Color(0xFF43A047), size: 18),
+              const SizedBox(width: 6),
+              Text('100 % privé — zéro surveillance',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: Colors.grey.shade300)),
+            ]),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _items
+                  .map((item) =>
+                      _Badge(icon: item.icon, label: item.label, color: item.color))
+                  .toList(),
+            ),
+          ]),
+        ),
+      );
+}
+
+class _Badge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _Badge({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+        ]),
+      );
+}
+
+class _HelpCard extends StatelessWidget {
+  final String title;
+  final List<String> steps;
+  const _HelpCard({required this.title, required this.steps});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13)),
+            const SizedBox(height: 6),
+            ...steps.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${e.key + 1}. ',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color:
+                                    Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600)),
+                        Expanded(
+                          child: Text(e.value,
+                              style: const TextStyle(fontSize: 12)),
+                        ),
+                      ]),
+                )),
+          ]),
+        ),
+      );
+}
