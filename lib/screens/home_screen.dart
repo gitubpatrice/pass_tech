@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
@@ -374,7 +375,67 @@ class _EntryCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final color = _leadingColor();
 
-    return Card(
+    return Slidable(
+      key: ValueKey(entry.id),
+      startActionPane: ActionPane(
+        motion: const BehindMotion(),
+        extentRatio: 0.25,
+        children: [
+          SlidableAction(
+            onPressed: (_) async {
+              final updated = entry.copyWith(isFavorite: !entry.isFavorite);
+              await VaultService().updateEntry(updated);
+              onChanged();
+            },
+            backgroundColor: Colors.amber.shade600,
+            foregroundColor: Colors.white,
+            icon: entry.isFavorite ? Icons.star : Icons.star_border,
+            label: entry.isFavorite ? 'Retirer' : 'Favori',
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ],
+      ),
+      endActionPane: ActionPane(
+        motion: const BehindMotion(),
+        extentRatio: 0.25,
+        children: [
+          SlidableAction(
+            onPressed: (ctx) async {
+              final messenger = ScaffoldMessenger.of(ctx);
+              final confirm = await showDialog<bool>(
+                context: ctx,
+                builder: (dctx) => AlertDialog(
+                  title: const Text('Supprimer ?'),
+                  content: Text('Supprimer "${entry.title}" définitivement ?'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(dctx, false),
+                        child: const Text('Annuler')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(dctx, true),
+                        style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(ctx).colorScheme.error),
+                        child: const Text('Supprimer')),
+                  ],
+                ),
+              );
+              if (confirm != true) return;
+              await VaultService().deleteEntry(entry.id);
+              onChanged();
+              messenger.showSnackBar(SnackBar(
+                content: Text('"${entry.title}" supprimé'),
+                duration: const Duration(seconds: 2),
+              ));
+            },
+            backgroundColor: cs.error,
+            foregroundColor: Colors.white,
+            icon: Icons.delete_outline,
+            label: 'Supprimer',
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ],
+      ),
+      child: Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -442,6 +503,7 @@ class _EntryCard extends StatelessWidget {
           ]),
         ),
       ),
+    ),
     );
   }
 }
