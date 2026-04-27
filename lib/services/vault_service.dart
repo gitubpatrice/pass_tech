@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:biometric_storage/biometric_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/foundation.dart';
@@ -56,10 +57,32 @@ class VaultService {
   );
 
   // Secure storage keys
-  static const _saltKey         = 'pt_salt';
-  static const _biometricKeyKey = 'pt_biometric_key';
-  static const _failCountKey    = 'pt_fail_count';
-  static const _lockoutKey      = 'pt_lockout_until';
+  static const _saltKey               = 'pt_salt';
+  static const _legacyBiometricKeyKey = 'pt_biometric_key'; // pre-v1.6 storage
+  static const _biometricStorageName  = 'pt_biometric_key_v2';
+  static const _biometricFlagKey      = 'pt_biometric_enabled';
+  static const _failCountKey          = 'pt_fail_count';
+  static const _lockoutKey            = 'pt_lockout_until';
+
+  BiometricStorageFile? _bioFile;
+  Future<BiometricStorageFile> _bioStorage() async {
+    return _bioFile ??= await BiometricStorage().getStorage(
+      _biometricStorageName,
+      options: StorageFileInitOptions(
+        authenticationRequired: true,
+        authenticationValidityDurationSeconds: -1,
+        androidBiometricOnly: true,
+      ),
+      promptInfo: const PromptInfo(
+        androidPromptInfo: AndroidPromptInfo(
+          title: 'Pass Tech',
+          subtitle: 'Déverrouiller votre coffre-fort',
+          negativeButton: 'Annuler',
+          confirmationRequired: false,
+        ),
+      ),
+    );
+  }
 
   // Crypto parameters (OWASP 2023 PBKDF2-SHA256 ≥ 600 000)
   static const _currentIterations = 600000;
@@ -159,22 +182,42 @@ class VaultService {
     }
   }
 
+  /// True if a biometric-bound vault key has been registered. We check a
+  /// non-secret flag in flutter_secure_storage so we don't need to trigger
+  /// a biometric prompt just to know whether the feature is available.
   Future<bool> get hasBiometricKey async =>
-      _storage.containsKey(key: _biometricKeyKey);
+      (await _storage.read(key: _biometricFlagKey)) == '1';
 
   Future<void> saveBiometricKey() async {
     if (_key == null) return;
-    await _storage.write(key: _biometricKeyKey, value: base64Encode(_key!));
+    final store = await _bioStorage();
+    // .write() triggers BiometricPrompt the first time the underlying
+    // Keystore key is created on devices that require user-auth at creation;
+    // subsequent reads always require a biometric.
+    await store.write(base64Encode(_key!));
+    await _storage.write(key: _biometricFlagKey, value: '1');
+    // Wipe any pre-v1.6 biometric key (was stored in clear-readable form).
+    await _storage.delete(key: _legacyBiometricKeyKey);
   }
 
-  Future<void> deleteBiometricKey() async =>
-      _storage.delete(key: _biometricKeyKey);
+  Future<void> deleteBiometricKey() async {
+    try {
+      final store = await _bioStorage();
+      await store.delete();
+    } catch (_) {}
+    await _storage.delete(key: _biometricFlagKey);
+    await _storage.delete(key: _legacyBiometricKeyKey);
+    _bioFile = null;
+  }
 
   Future<UnlockResult> unlockWithBiometric() async {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     try {
-      final keyB64 = await _storage.read(key: _biometricKeyKey);
-      if (keyB64 == null) return UnlockResult.wrongPassword;
+      final store = await _bioStorage();
+      // This call presents the BiometricPrompt. If the user cancels or
+      // authentication fails, biometric_storage throws AuthException.
+      final keyB64 = await store.read();
+      if (keyB64 == null || keyB64.isEmpty) return UnlockResult.wrongPassword;
       _key = base64Decode(keyB64);
 
       final file = await _vaultFile();
@@ -241,8 +284,8 @@ class VaultService {
     lock();
     final file = await _vaultFile();
     if (file.existsSync()) file.deleteSync();
+    await deleteBiometricKey();
     await _storage.delete(key: _saltKey);
-    await _storage.delete(key: _biometricKeyKey);
     await _storage.delete(key: _failCountKey);
     await _storage.delete(key: _lockoutKey);
   }

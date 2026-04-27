@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'package:biometric_storage/biometric_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
 import '../services/vault_service.dart';
 import 'home_screen.dart';
 
@@ -13,7 +13,6 @@ class UnlockScreen extends StatefulWidget {
 
 class _UnlockScreenState extends State<UnlockScreen> {
   final _passCtrl = TextEditingController();
-  final _auth     = LocalAuthentication();
   bool _show    = false;
   bool _loading = false;
   String? _error;
@@ -51,39 +50,35 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   Future<void> _checkBiometric() async {
-    final canCheck = await _auth.canCheckBiometrics;
-    final hasKey   = await VaultService().hasBiometricKey;
-    final enabled  = canCheck && hasKey;
+    final canAuth = await BiometricStorage().canAuthenticate();
+    final hasKey  = await VaultService().hasBiometricKey;
+    final enabled = canAuth == CanAuthenticateResponse.success && hasKey;
     if (mounted) setState(() => _hasBiometric = enabled);
     if (enabled && _lockoutRemaining == null) _tryBiometric();
   }
 
   Future<void> _tryBiometric() async {
     if (_lockoutRemaining != null) return;
-    try {
-      final ok = await _auth.authenticate(
-        localizedReason: 'Déverrouillez votre coffre-fort',
-        options: const AuthenticationOptions(biometricOnly: true),
-      );
-      if (!ok || !mounted) return;
-      setState(() { _loading = true; _error = null; });
-      final result = await VaultService().unlockWithBiometric();
-      if (!mounted) return;
-      switch (result) {
-        case UnlockResult.success:
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-          break;
-        case UnlockResult.lockedOut:
-          setState(() { _loading = false; _error = null; });
-          _checkLockout();
-          break;
-        case UnlockResult.wrongPassword:
-          setState(() { _loading = false; _error = 'Échec biométrique'; });
-          break;
-      }
-    } catch (_) {}
+    setState(() { _loading = true; _error = null; });
+    // unlockWithBiometric() triggers BiometricPrompt via biometric_storage —
+    // the Keystore key is gated by setUserAuthenticationRequired(true), so a
+    // successful read implies a successful biometric authentication.
+    final result = await VaultService().unlockWithBiometric();
+    if (!mounted) return;
+    switch (result) {
+      case UnlockResult.success:
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+        break;
+      case UnlockResult.lockedOut:
+        setState(() { _loading = false; _error = null; });
+        _checkLockout();
+        break;
+      case UnlockResult.wrongPassword:
+        setState(() { _loading = false; _error = 'Échec biométrique'; });
+        break;
+    }
   }
 
   Future<void> _unlock() async {

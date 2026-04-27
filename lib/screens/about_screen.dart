@@ -9,7 +9,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.6.0';
+  static const _version = '1.7.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -39,8 +39,8 @@ class _AboutScreenState extends State<AboutScreen> {
         desc: 'Texte confidentiel chiffré (RIB, codes, recovery keys)'),
     (icon: Icons.lock_outline,       label: 'Coffre-fort chiffré',
         desc: 'AES-256-CBC + HMAC-SHA256, PBKDF2 600 000 itérations (OWASP)'),
-    (icon: Icons.fingerprint,        label: 'Biométrie',
-        desc: 'Déverrouillage par empreinte ou Face ID'),
+    (icon: Icons.fingerprint,        label: 'Biométrie hardware-bound',
+        desc: 'Clé liée à Android Keystore — la biométrie est obligatoire pour lire'),
     (icon: Icons.gpp_good_outlined,  label: 'Anti-brute force',
         desc: 'Verrouillage progressif après 5 tentatives (30s → 30min)'),
     (icon: Icons.no_photography_outlined, label: 'Captures bloquées',

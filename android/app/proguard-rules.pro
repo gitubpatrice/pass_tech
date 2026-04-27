@@ -6,7 +6,7 @@
 
 # Plugins natifs utilisés
 -keep class com.it_nomads.fluttersecurestorage.** { *; }
--keep class io.flutter.plugins.localauth.** { *; }
+-keep class design.codeux.biometric_storage.** { *; }
 -keep class dev.steenbakker.mobile_scanner.** { *; }
 -keep class com.mr.flutter.plugin.filepicker.** { *; }
 

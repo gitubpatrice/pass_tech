@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
+import 'package:biometric_storage/biometric_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,7 +23,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _auth = LocalAuthentication();
   bool _biometricEnabled   = false;
   bool _biometricAvailable = false;
   int  _clipboardClear     = 30;
@@ -53,7 +52,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final canCheck = await _auth.canCheckBiometrics;
+    final canAuth  = await BiometricStorage().canAuthenticate();
+    final canCheck = canAuth == CanAuthenticateResponse.success;
     final hasKey   = await VaultService().hasBiometricKey;
     final prefs    = await SharedPreferences.getInstance();
     final clip     = prefs.getInt('clipboard_clear')   ?? 30;
@@ -108,10 +108,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _toggleBiometric(bool v) async {
     if (v) {
       try {
-        final ok = await _auth.authenticate(
-          localizedReason: 'Activer le déverrouillage biométrique',
-        );
-        if (!ok) return;
+        // saveBiometricKey() writes to biometric_storage, which creates a
+        // Keystore key with setUserAuthenticationRequired(true). The first
+        // write — and every subsequent read — triggers BiometricPrompt.
         await VaultService().saveBiometricKey();
       } catch (_) { return; }
     } else {

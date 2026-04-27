@@ -85,7 +85,9 @@ class _PassTechAppState extends State<PassTechApp>
   Future<void> _handleLifecycle(AppLifecycleState state) async {
     if (state == AppLifecycleState.paused) {
       _pausedAt = DateTime.now();
-      ClipboardService.cancel();
+      // Wipe clipboard immediately on background : don't risk leaving secrets
+      // in the clipboard if the OS kills the process before the timer fires.
+      await ClipboardService.cancelAndClear();
       final prefs = await SharedPreferences.getInstance();
       final lockSec = prefs.getInt('auto_lock_seconds') ?? 300;
       // Immediate lock: wipe key now, navigate on resume
