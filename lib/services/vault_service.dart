@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/entry.dart';
 
 // Top-level function required by compute()
-Uint8List _pbkdf2Worker(List<dynamic> args) {
+Uint8List pbkdf2Worker(List<dynamic> args) {
   final password   = args[0] as List<int>;
   final salt       = args[1] as List<int>;
   final iterations = args[2] as int;
@@ -356,7 +356,7 @@ class VaultService {
 
   static Future<Uint8List> _deriveKey(
           String password, List<int> salt, int iterations) async =>
-      compute(_pbkdf2Worker, [utf8.encode(password), salt, iterations, 64]);
+      compute(pbkdf2Worker, [utf8.encode(password), salt, iterations, 64]);
 
   static Uint8List _randomBytes(int n) {
     final rng = Random.secure();

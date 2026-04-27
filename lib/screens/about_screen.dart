@@ -9,12 +9,16 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.3.0';
+  static const _version = '1.4.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
 
   static const _features = [
+    (icon: Icons.shield_outlined,    label: 'Sauvegarde chiffrée (.ptbak)',
+        desc: 'Export chiffré AES-256 + restaurable avec passphrase'),
+    (icon: Icons.download_outlined,  label: 'Import multi-format',
+        desc: 'Chrome, Edge, Bitwarden JSON, CSV générique'),
     (icon: Icons.gpp_good_outlined,  label: 'Audit de sécurité',
         desc: 'Score, mots de passe faibles, doublons, anciens, sans 2FA'),
     (icon: Icons.travel_explore_outlined, label: 'Détection de fuites',

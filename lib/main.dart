@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/clipboard_service.dart';
 import 'services/update_service.dart';
 import 'services/vault_service.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/unlock_screen.dart';
 
@@ -38,12 +39,18 @@ void main() async {
   themeNotifier.value = parseThemeMode(prefs.getString('theme_mode') ?? 'system');
 
   final vaultExists = await VaultService().vaultExists;
-  runApp(PassTechApp(vaultExists: vaultExists));
+  final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
+  runApp(PassTechApp(vaultExists: vaultExists, onboardingDone: onboardingDone));
 }
 
 class PassTechApp extends StatefulWidget {
   final bool vaultExists;
-  const PassTechApp({super.key, required this.vaultExists});
+  final bool onboardingDone;
+  const PassTechApp({
+    super.key,
+    required this.vaultExists,
+    required this.onboardingDone,
+  });
 
   @override
   State<PassTechApp> createState() => _PassTechAppState();
@@ -115,14 +122,16 @@ class _PassTechAppState extends State<PassTechApp>
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
-      builder: (_, mode, __) => MaterialApp(
+      builder: (_, mode, child) => MaterialApp(
         title: 'Pass Tech',
         navigatorKey: _navigatorKey,
         debugShowCheckedModeBanner: false,
         themeMode: mode,
         theme: _lightTheme(),
         darkTheme: _darkTheme(),
-        home: widget.vaultExists ? const UnlockScreen() : const SetupScreen(),
+        home: !widget.onboardingDone && !widget.vaultExists
+            ? const OnboardingScreen()
+            : (widget.vaultExists ? const UnlockScreen() : const SetupScreen()),
       ),
     );
   }

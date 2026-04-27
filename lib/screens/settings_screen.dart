@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/entry.dart';
 import '../services/clipboard_service.dart';
+import '../services/import_export_service.dart';
 import '../services/vault_service.dart';
 import '../main.dart' show themeNotifier, parseThemeMode, themeModeToString;
 import 'audit_screen.dart';
@@ -133,6 +136,166 @@ class _SettingsScreenState extends State<SettingsScreen> {
       [XFile(file.path, mimeType: 'application/json')],
       subject: 'Pass Tech — export',
     );
+  }
+
+  Future<void> _exportEncrypted() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final passphrase = await showDialog<String>(
+      context: context,
+      builder: (_) => const _PassphraseDialog(
+        title: 'Sauvegarde chiffrée',
+        confirm: true,
+      ),
+    );
+    if (passphrase == null || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final content = await ImportExportService.exportEncrypted(
+          VaultService().entries, passphrase);
+      final date = DateTime.now().toIso8601String().substring(0, 10);
+      final dir  = await getTemporaryDirectory();
+      final file = File('${dir.path}/pass_tech_$date.ptbak');
+      await file.writeAsString(content);
+      if (!mounted) return;
+      Navigator.of(context).pop(); // close progress
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/octet-stream')],
+        subject: 'Pass Tech — sauvegarde chiffrée',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
+  }
+
+  Future<void> _importFile() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty || !mounted) return;
+    final file = picked.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Lecture du fichier impossible')));
+      return;
+    }
+
+    String content;
+    try {
+      content = String.fromCharCodes(bytes);
+    } catch (_) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Fichier non texte')));
+      return;
+    }
+
+    List<Entry>? imported;
+    String formatLabel = '';
+
+    // Detect .ptbak
+    final isPtbak = file.name.toLowerCase().endsWith('.ptbak') ||
+        content.contains('"magic":"PTBAK"') ||
+        content.contains('"magic": "PTBAK"');
+
+    if (isPtbak) {
+      final passphrase = await showDialog<String>(
+        context: context,
+        builder: (_) => const _PassphraseDialog(
+          title: 'Restaurer la sauvegarde',
+          confirm: false,
+        ),
+      );
+      if (passphrase == null || !mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      imported = await ImportExportService.importEncrypted(content, passphrase);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      if (imported == null) {
+        messenger.showSnackBar(const SnackBar(
+            content: Text('Mot de passe incorrect ou fichier corrompu')));
+        return;
+      }
+      formatLabel = 'Sauvegarde chiffrée';
+    } else {
+      final result = ImportExportService.parse(content);
+      if (result.error != null) {
+        messenger.showSnackBar(SnackBar(content: Text(result.error!)));
+        return;
+      }
+      imported = result.entries;
+      formatLabel = _formatLabel(result.format);
+    }
+
+    if (imported.isEmpty) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Aucune entrée détectée')));
+      return;
+    }
+
+    if (!mounted) return;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirmer l\'import'),
+        content: Text(
+            '${imported!.length} entrée${imported.length > 1 ? 's' : ''} détectée${imported.length > 1 ? 's' : ''}\n'
+            'Format : $formatLabel\n\n'
+            'Les doublons (même titre + identifiant) seront ignorés.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Importer')),
+        ],
+      ),
+    );
+    if (go != true) return;
+
+    final existing = VaultService().entries;
+    int added = 0;
+    int skipped = 0;
+    for (final e in imported) {
+      final dup = existing.any((x) =>
+          x.title.toLowerCase() == e.title.toLowerCase() &&
+          x.username.toLowerCase() == e.username.toLowerCase());
+      if (dup) {
+        skipped++;
+      } else {
+        await VaultService().addEntry(e);
+        added++;
+      }
+    }
+    widget.onChanged();
+    if (mounted) {
+      messenger.showSnackBar(SnackBar(content: Text(
+          '$added entrée${added > 1 ? 's' : ''} importée${added > 1 ? 's' : ''}'
+          '${skipped > 0 ? ' • $skipped doublon${skipped > 1 ? 's' : ''} ignoré${skipped > 1 ? 's' : ''}' : ''}')));
+    }
+  }
+
+  String _formatLabel(String f) {
+    switch (f) {
+      case 'bitwarden': return 'Bitwarden JSON';
+      case 'pass_tech': return 'Pass Tech JSON';
+      case 'csv':       return 'CSV (Chrome / Edge / autre)';
+      default:          return 'Format inconnu';
+    }
   }
 
   Future<void> _changePassword() async {
@@ -310,9 +473,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           _section('Données'),
           ListTile(
+            leading: const Icon(Icons.shield_outlined),
+            title: const Text('Sauvegarde chiffrée (.ptbak)'),
+            subtitle: const Text('Recommandé — restaurable avec votre passphrase'),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: _exportEncrypted,
+          ),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Importer un fichier'),
+            subtitle: const Text('CSV, Bitwarden JSON ou .ptbak'),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: _importFile,
+          ),
+          ListTile(
             leading: const Icon(Icons.upload_outlined),
             title: const Text('Exporter (JSON non chiffré)'),
-            subtitle: const Text('Partager vos entrées en clair'),
+            subtitle: const Text('⚠️ mots de passe en clair'),
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: _exportVault,
           ),
@@ -340,6 +517,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: Theme.of(context).colorScheme.primary,
                 letterSpacing: 0.5)),
       );
+}
+
+class _PassphraseDialog extends StatefulWidget {
+  final String title;
+  final bool confirm;
+  const _PassphraseDialog({required this.title, required this.confirm});
+
+  @override
+  State<_PassphraseDialog> createState() => _PassphraseDialogState();
+}
+
+class _PassphraseDialogState extends State<_PassphraseDialog> {
+  final _ctrl1 = TextEditingController();
+  final _ctrl2 = TextEditingController();
+  bool _show = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl1.dispose();
+    _ctrl2.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nav = Navigator.of(context);
+    final cs  = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(
+          widget.confirm
+              ? 'Choisissez une passphrase pour chiffrer la sauvegarde. Vous en aurez besoin pour restaurer.'
+              : 'Entrez la passphrase utilisée lors de la sauvegarde.',
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _ctrl1,
+          obscureText: !_show,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Passphrase',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              icon: Icon(_show ? Icons.visibility_off : Icons.visibility, size: 20),
+              onPressed: () => setState(() => _show = !_show),
+            ),
+          ),
+        ),
+        if (widget.confirm) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl2,
+            obscureText: !_show,
+            decoration: const InputDecoration(
+              labelText: 'Confirmer',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+        ],
+      ]),
+      actions: [
+        TextButton(onPressed: () => nav.pop(), child: const Text('Annuler')),
+        FilledButton(
+          onPressed: () {
+            if (_ctrl1.text.isEmpty) {
+              setState(() => _error = 'Passphrase vide');
+              return;
+            }
+            if (widget.confirm) {
+              if (_ctrl1.text.length < 8) {
+                setState(() => _error = 'Minimum 8 caractères');
+                return;
+              }
+              if (_ctrl1.text != _ctrl2.text) {
+                setState(() => _error = 'Les passphrases ne correspondent pas');
+                return;
+              }
+            }
+            nav.pop(_ctrl1.text);
+          },
+          child: Text(widget.confirm ? 'Chiffrer' : 'Déchiffrer'),
+        ),
+      ],
+    );
+  }
 }
 
 class _ChangePasswordDialog extends StatefulWidget {

@@ -10,7 +10,7 @@ class UpdateInfo {
 
 class UpdateService {
   static const _repo    = 'gitubpatrice/pass_tech';
-  static const _current = '1.3.0';
+  static const _current = '1.4.0';
   static const _checkKey = 'last_update_check';
 
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
