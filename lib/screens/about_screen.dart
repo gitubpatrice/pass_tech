@@ -9,7 +9,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.7.0';
+  static const _version = '1.8.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -43,6 +43,8 @@ class _AboutScreenState extends State<AboutScreen> {
         desc: 'Clé liée à Android Keystore — la biométrie est obligatoire pour lire'),
     (icon: Icons.gpp_good_outlined,  label: 'Anti-brute force',
         desc: 'Verrouillage progressif après 5 tentatives (30s → 30min)'),
+    (icon: Icons.verified_user_outlined, label: 'Détection d\'environnement',
+        desc: 'Avertit en cas de root, émulateur ou debugger détecté'),
     (icon: Icons.no_photography_outlined, label: 'Captures bloquées',
         desc: 'Aucune capture d\'écran ni aperçu dans le sélecteur récent'),
     (icon: Icons.cloud_off_outlined, label: 'Backup désactivé',
@@ -70,19 +72,71 @@ class _AboutScreenState extends State<AboutScreen> {
     }
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('v${info.version} disponible'),
-        content: Text(
-            info.body.isNotEmpty ? info.body : 'Une nouvelle version est disponible.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Plus tard')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK')),
-        ],
-      ),
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: Text('v${info.version} disponible'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(info.body.isNotEmpty
+                    ? info.body
+                    : 'Une nouvelle version est disponible.'),
+                if (info.expectedSha256 != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: cs.outline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Icon(Icons.verified_outlined,
+                              size: 14, color: cs.primary),
+                          const SizedBox(width: 6),
+                          const Text('SHA-256 attendu (APK arm64-v8a)',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w600)),
+                        ]),
+                        const SizedBox(height: 6),
+                        SelectableText(
+                          info.expectedSha256!,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Avant install, vérifiez ce hash : '
+                          'sha256sum app-arm64-v8a-release.apk',
+                          style: TextStyle(
+                              fontSize: 10, color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Plus tard')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK')),
+          ],
+        );
+      },
     );
   }
 
