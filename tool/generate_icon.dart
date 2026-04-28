@@ -34,16 +34,18 @@ const _shHalfW    = 290;
 const _shStraight = 540;
 const _shTopRad   = 56;
 
-// Lock geometry (à l'intérieur du bouclier)
+// Lock geometry (centré visuellement dans le bouclier — partie haute, le
+// bouclier ayant son "poids visuel" dans la moitié supérieure à cause du
+// pointu en bas).
 const _lockBodyX1 = 392, _lockBodyX2 = 632;
-const _lockBodyY1 = 540, _lockBodyY2 = 800;
+const _lockBodyY1 = 460, _lockBodyY2 = 720;
 const _lockBodyRadius = 40;
-const _shackleCx = 512, _shackleCy = 480;
+const _shackleCx = 512, _shackleCy = 400;
 const _shackleOuter = 100;
 const _shackleInner = 58;
-const _khCx = 512, _khCy = 640;
+const _khCx = 512, _khCy = 560;
 const _khRadius = 22;
-const _khStemX1 = 500, _khStemX2 = 524, _khStemY2 = 728;
+const _khStemX1 = 500, _khStemX2 = 524, _khStemY2 = 648;
 
 img.Color _quadrantAt(int x, int y) {
   final isBlue = (x < _half) == (y < _half);
