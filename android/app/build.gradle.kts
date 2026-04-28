@@ -45,6 +45,11 @@ android {
                 storePassword = keystoreProperties["storePassword"] as String?
                 keyAlias = keystoreProperties["keyAlias"] as String?
                 keyPassword = keystoreProperties["keyPassword"] as String?
+                // APK Signing Scheme v1 + v2 + v3 : v3 permet la rotation
+                // de clé en cas de compromission (Android 9+).
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
