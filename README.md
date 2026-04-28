@@ -1,11 +1,19 @@
-# Pass Tech
+<p align="center">
+  <img src="assets/icon.png" alt="Pass Tech" width="160" height="160">
+</p>
 
-**Gestionnaire de mots de passe Android 100 % local.**
-Aucun cloud. Aucun tracker. Aucun compte.
+<h1 align="center">Pass Tech</h1>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Platform: Android](https://img.shields.io/badge/platform-Android-green.svg)](https://github.com/gitubpatrice/pass_tech/releases/latest)
-[![Built with Flutter](https://img.shields.io/badge/built%20with-Flutter-02569B.svg)](https://flutter.dev)
+<p align="center">
+  <strong>Gestionnaire de mots de passe Android 100 % local.</strong><br>
+  Aucun cloud. Aucun tracker. Aucun compte.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
+  <a href="https://github.com/gitubpatrice/pass_tech/releases/latest"><img src="https://img.shields.io/github/v/release/gitubpatrice/pass_tech?color=green&label=release" alt="Latest release"></a>
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/built%20with-Flutter-02569B.svg" alt="Built with Flutter"></a>
+</p>
 
 > Vos secrets ne quittent jamais votre téléphone.
 
@@ -47,6 +55,19 @@ Voir [SECURITY.md](SECURITY.md) pour le signalement de vulnérabilités.
 - Vérification de fuites HIBP (k-anonymity, optionnelle)
 - Export / import du coffre chiffré
 - Mises à jour vérifiables via GitHub Releases
+
+## Captures d'écran
+
+<!-- Placez les captures dans `docs/screenshots/` et décommentez ci-dessous -->
+<!--
+<p align="center">
+  <img src="docs/screenshots/01-unlock.png"  width="220" alt="Écran de déverrouillage">
+  <img src="docs/screenshots/02-vault.png"   width="220" alt="Coffre">
+  <img src="docs/screenshots/03-entry.png"   width="220" alt="Détail d'une entrée">
+</p>
+-->
+
+*Captures à venir.*
 
 ## Installation
 
