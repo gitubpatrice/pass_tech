@@ -62,9 +62,10 @@ class VaultService {
   factory VaultService() => _instance;
   VaultService._();
 
-  static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  // flutter_secure_storage v10+ : EncryptedSharedPreferences (Jetpack Security)
+  // est déprécié. La lib v10 utilise désormais ses propres ciphers en
+  // interne. Migration automatique des données existantes au 1er accès.
+  static const _storage = FlutterSecureStorage();
 
   // Secure storage keys
   // Le slot "primary" est le coffre historique (existait avant le decoy).
