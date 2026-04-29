@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/update_service.dart';
+import '../widgets/legal_support_sections.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -9,7 +10,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.8.2';
+  static const _version = '1.9.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -256,6 +257,11 @@ class _AboutScreenState extends State<AboutScreen> {
               'Ou appuyez sur "Vérifier les mises à jour" ci-dessus',
             ],
           ),
+
+          const SizedBox(height: 24),
+
+          // ── Sections partagées Files Tech (support + légal) ─────────────────
+          const LegalSupportSections(appName: 'Pass Tech', version: _version),
         ],
       ),
     );
