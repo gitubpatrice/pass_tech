@@ -3,8 +3,10 @@ import 'package:biometric_storage/biometric_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/heritage_service.dart';
 import '../services/integrity_service.dart';
 import '../services/vault_service.dart';
+import 'heir_view_screen.dart';
 import 'home_screen.dart';
 
 class UnlockScreen extends StatefulWidget {
@@ -164,6 +166,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
+        // Bio = forcément primary (cf. saveBiometricKey), markActive OK
+        await HeritageService().markActive();
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
@@ -187,6 +192,13 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
+        // Marque l'utilisateur comme actif uniquement si on est sur PRIMARY.
+        // Le decoy ne reset pas le timer héritage (sinon un attaquant qui
+        // force l'ouverture du leurre prolongerait la vie du dead-man).
+        if (!VaultService().isDecoyActive) {
+          await HeritageService().markActive();
+        }
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
@@ -200,6 +212,40 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _checkLockout(); // may have just hit threshold
         break;
     }
+  }
+
+  /// Délai progressif après échec heir (anti-brute-force complémentaire à
+  /// PBKDF2 600k qui limite déjà à ~2 essais/sec).
+  int _heirFailCount = 0;
+
+  /// Affiche un dialog avec champ heir password. Si succès, ouvre un écran
+  /// HeirView en lecture seule avec les entries de l'héritage.
+  Future<void> _unlockAsHeir() async {
+    final pwd = await showDialog<String>(
+      context: context,
+      builder: (_) => const _HeirPasswordDialog(),
+    );
+    if (pwd == null || pwd.isEmpty || !mounted) return;
+    // Délai progressif : 0 / 2 / 4 / 8 / 16 secondes selon l'historique
+    if (_heirFailCount > 0) {
+      final delay = (1 << (_heirFailCount - 1)) * 1000;
+      setState(() => _loading = true);
+      await Future.delayed(Duration(milliseconds: delay.clamp(1000, 16000)));
+      if (!mounted) return;
+    }
+    final entries = await HeritageService().unlockAsHeir(pwd);
+    if (!mounted) return;
+    if (entries == null) {
+      _heirFailCount++;
+      setState(() {
+        _loading = false;
+        _error = 'Mot de passe héritier incorrect';
+      });
+      return;
+    }
+    _heirFailCount = 0;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => HeirViewScreen(entries: entries)));
   }
 
   String _formatLockout(int seconds) {
@@ -318,6 +364,24 @@ class _UnlockScreenState extends State<UnlockScreen> {
                               minimumSize: const Size.fromHeight(44)),
                         ),
                       ],
+                      // Accès héritier : visible uniquement si l'inactivité du
+                      // propriétaire dépasse le seuil + grâce expirée. Le
+                      // FutureBuilder ne renvoie l'option qu'après le check
+                      // crypto, pas de leak temporel.
+                      FutureBuilder<bool>(
+                        future: HeritageService().shouldShowHeirOption(),
+                        builder: (_, snap) {
+                          if (snap.data != true) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: TextButton.icon(
+                              onPressed: _unlockAsHeir,
+                              icon: const Icon(Icons.family_restroom, size: 18),
+                              label: const Text('Accès héritier'),
+                            ),
+                          );
+                        },
+                      ),
                     ]),
                 ],
               ],
@@ -325,6 +389,68 @@ class _UnlockScreenState extends State<UnlockScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Dialog dédié pour saisie du heir password. StatefulWidget pour disposer
+/// proprement le TextEditingController (pas de leak du password en clair en
+/// RAM jusqu'au GC, contrairement à un Builder inline).
+class _HeirPasswordDialog extends StatefulWidget {
+  const _HeirPasswordDialog();
+
+  @override
+  State<_HeirPasswordDialog> createState() => _HeirPasswordDialogState();
+}
+
+class _HeirPasswordDialogState extends State<_HeirPasswordDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    // Wipe le contenu du buffer avant dispose (anti-trace mémoire).
+    _ctrl.clear();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _ctrl.text;
+    _ctrl.clear();
+    Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.family_restroom, size: 36),
+      title: const Text('Accès héritier'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text(
+            'Période d\'inactivité du propriétaire dépassée.\n'
+            'Saisissez le mot de passe héritier qui vous a été confié.',
+            style: TextStyle(fontSize: 12),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _ctrl,
+          obscureText: true,
+          autofocus: true,
+          onSubmitted: (_) => _submit(),
+          decoration: const InputDecoration(
+            labelText: 'Mot de passe héritier',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ]),
+      actions: [
+        TextButton(
+            onPressed: () { _ctrl.clear(); Navigator.pop(context); },
+            child: const Text('Annuler')),
+        FilledButton(
+            onPressed: _submit,
+            child: const Text('Déverrouiller')),
+      ],
     );
   }
 }

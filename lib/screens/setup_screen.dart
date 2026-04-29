@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/heritage_service.dart';
 import '../services/vault_service.dart';
 import 'home_screen.dart';
 
@@ -67,6 +68,9 @@ class _SetupScreenState extends State<SetupScreen> {
     }
     setState(() { _loading = true; _error = null; });
     await VaultService().createVault(p1);
+    // Initialise le timestamp dead-man : le compteur d'inactivité commence
+    // à 0 dès la création du vault.
+    await HeritageService().markActive();
     _pass1.clear();
     _pass2.clear();
     if (!mounted) return;

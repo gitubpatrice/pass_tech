@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import '../services/clipboard_service.dart';
+import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
 import '../services/panic_service.dart';
 import '../services/vault_service.dart';
@@ -91,6 +92,188 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('auto_lock_seconds', v);
     if (mounted) setState(() => _autoLockSeconds = v);
+  }
+
+  /// Retourne [enabled, thresholdDays, inactivityDays] pour l'UI Héritage.
+  Future<List<dynamic>> _loadHeritageState() async {
+    final h = HeritageService();
+    return [
+      await h.isEnabled,
+      await h.getThresholdDays(),
+      await h.getInactivityDays(),
+    ];
+  }
+
+  Future<void> _setupHeritage() async {
+    final messenger = ScaffoldMessenger.of(context);
+    // Avertissement explicatif
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        icon: const Icon(Icons.family_restroom, size: 36),
+        title: const Text('Configurer un héritier'),
+        content: const Text(
+          'Un mot de passe distinct du vôtre permettra à un proche '
+          '(conjoint, enfant, exécuteur testamentaire) d\'accéder au '
+          'contenu du coffre **après une période d\'inactivité prolongée** '
+          'de votre part (90 jours par défaut + 7 jours de grâce).\n\n'
+          'À retenir :\n'
+          '• Le mot de passe héritier doit être différent de votre mot '
+          'de passe principal\n'
+          '• Communiquez-le à votre héritier de manière sûre (oralement, '
+          'testament, coffre bancaire) — il n\'est jamais stocké et ne '
+          'peut pas être récupéré\n'
+          '• L\'héritier accédera à un instantané (snapshot) du coffre. '
+          'Pensez à le mettre à jour régulièrement.\n'
+          '• Si vous vous reconnectez avant la fin de la grâce, le compte '
+          'à rebours est réinitialisé.\n'
+          '• L\'existence d\'un snapshot héritage est détectable par '
+          'analyse forensique du téléphone (pas de déni plausible — '
+          'pour ça, voir le coffre leurre).\n\n'
+          'Ce système fonctionne 100 % localement, sans cloud ni tiers '
+          'de confiance.',
+          style: TextStyle(fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Configurer')),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+
+    // Refus si pas dans le primary (l'héritage doit refléter le vrai coffre)
+    if (VaultService().isDecoyActive) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('L\'héritage n\'est disponible que sur le coffre principal'),
+      ));
+      return;
+    }
+
+    final pwd = await showDialog<String>(
+      context: context,
+      builder: (_) => const _PassphraseDialog(
+        title: 'Mot de passe de l\'héritier',
+        confirm: true,
+      ),
+    );
+    if (pwd == null || pwd.isEmpty || !mounted) return;
+
+    // Vérifie que le password diffère du primary
+    final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
+    if (matchesPrimary) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Le mot de passe héritier doit différer du principal'),
+      ));
+      return;
+    }
+
+    try {
+      await HeritageService().setupOrUpdateSnapshot(heirPassword: pwd);
+      if (!mounted) return;
+      setState(() {});
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Héritage configuré ✓ Snapshot du coffre chiffré.'),
+      ));
+    } on StateError catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } on ArgumentError catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('${e.message}')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
+  }
+
+  Future<void> _manageHeritage() async {
+    final action = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gérer l\'héritage'),
+        content: const Text(
+          'L\'héritier accède à un instantané du coffre. Vous pouvez :\n\n'
+          '• Mettre à jour le snapshot (avec le mot de passe héritier)\n'
+          '• Désactiver l\'héritage et supprimer le snapshot',
+          style: TextStyle(fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'disable'),
+              child: const Text('Désactiver',
+                  style: TextStyle(color: Colors.red))),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, 'update'),
+              child: const Text('Mettre à jour')),
+        ],
+      ),
+    );
+    if (!mounted || action == null || action == 'cancel') return;
+    if (action == 'disable') {
+      await HeritageService().disable();
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Héritage désactivé, snapshot supprimé')),
+      );
+    } else if (action == 'update') {
+      // Re-prompt heir password pour confirmer + sauvegarder
+      final pwd = await showDialog<String>(
+        context: context,
+        builder: (_) => const _PassphraseDialog(
+          title: 'Mot de passe héritier (re-saisie)',
+          confirm: true,
+        ),
+      );
+      if (pwd == null || pwd.isEmpty || !mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
+      if (matchesPrimary) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Doit différer du mot de passe principal'),
+        ));
+        return;
+      }
+      try {
+        await HeritageService().setupOrUpdateSnapshot(heirPassword: pwd);
+        if (!mounted) return;
+        setState(() {});
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Snapshot mis à jour ✓'),
+        ));
+      } catch (e) {
+        messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      }
+    }
+  }
+
+  Future<void> _changeHeritageThreshold(int current) async {
+    final v = await showDialog<int>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('Période d\'inactivité avant accès héritier'),
+        children: [30, 60, 90, 180, 365].map((d) => ListTile(
+              title: Text('$d jours'),
+              trailing: current == d ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(context, d),
+            )).toList(),
+      ),
+    );
+    if (v == null || !mounted) return;
+    try {
+      await HeritageService().setThresholdDays(v);
+      if (!mounted) return;
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : $e')),
+      );
+    }
   }
 
   Future<void> _setupDecoy() async {
@@ -612,6 +795,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: _revealApp,
               );
+            },
+          ),
+
+          _section('Héritage (dead man\'s switch)'),
+          FutureBuilder<List<dynamic>>(
+            future: _loadHeritageState(),
+            builder: (_, snap) {
+              final enabled = snap.hasData ? snap.data![0] as bool : false;
+              final threshold = snap.hasData ? snap.data![1] as int : 90;
+              final inactivity = snap.hasData ? snap.data![2] as int : -1;
+              return Column(children: [
+                ListTile(
+                  leading: Icon(Icons.family_restroom,
+                      color: enabled ? Colors.green : null),
+                  title: Text(enabled
+                      ? 'Héritier configuré'
+                      : 'Configurer un héritier'),
+                  subtitle: Text(
+                    enabled
+                        ? 'Toucher pour mettre à jour le snapshot ou désactiver'
+                        : 'Un proche pourra accéder au coffre après une période '
+                          'd\'inactivité prolongée. Aucun cloud, aucun tiers.',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: enabled ? _manageHeritage : _setupHeritage,
+                ),
+                if (enabled)
+                  ListTile(
+                    leading: const Icon(Icons.timer_outlined),
+                    title: const Text('Période d\'inactivité avant accès'),
+                    subtitle: Text(
+                        'Seuil : $threshold jours · '
+                        'inactivité actuelle : ${inactivity < 0 ? "—" : "$inactivity j"}',
+                        style: const TextStyle(fontSize: 11)),
+                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    onTap: () => _changeHeritageThreshold(threshold),
+                  ),
+              ]);
             },
           ),
 

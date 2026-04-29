@@ -10,7 +10,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.10.1';
+  static const _version = '1.11.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -53,7 +53,13 @@ class _AboutScreenState extends State<AboutScreen> {
     (icon: Icons.timer_outlined,     label: 'Auto-lock configurable',
         desc: 'Immédiat, 1 / 5 / 15 / 30 minutes ou jamais'),
     (icon: Icons.password,           label: 'Générateur',
-        desc: 'Longueur 8–64, majuscules, chiffres, symboles'),
+        desc: 'Caractères 8–64 OU phrases de passe FR (Diceware) mémorables'),
+    (icon: Icons.shield_moon_outlined, label: 'Coffre leurre',
+        desc: 'Un 2e mot de passe ouvre un faux coffre — déni plausible'),
+    (icon: Icons.warning_amber_rounded, label: 'Mode panique',
+        desc: 'Lock + clipboard wipe + camouflage icône en « Calculatrice »'),
+    (icon: Icons.family_restroom,    label: 'Héritage',
+        desc: 'Un proche accède au coffre après inactivité prolongée — local, sans cloud'),
     (icon: Icons.content_paste_off_outlined, label: 'Presse-papiers sécurisé',
         desc: 'Effacement automatique configurable (15s–60s)'),
     (icon: Icons.search,             label: 'Recherche',
