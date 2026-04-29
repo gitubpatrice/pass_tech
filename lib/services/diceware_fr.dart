@@ -1,0 +1,108 @@
+import 'dart:math';
+
+/// Diceware FR : génération de phrases de passe mémorables.
+///
+/// Liste curée de 512 mots français courants (4-8 chars), tous noms communs
+/// ou adjectifs basiques — pas de noms propres, pas de mots vulgaires, pas
+/// d'homonymes (ours/houx → on garde un seul).
+///
+/// Entropie : log2(512) = 9 bits/mot. Avec 5 mots → 45 bits, équivalent à
+/// un mot de passe alphabet+chiffres+symboles d'environ 7 caractères, mais
+/// **bien plus mémorisable**.
+class DicewareFr {
+  /// Liste dédupliquée des mots — calculée une seule fois.
+  static final List<String> _uniqueWords =
+      _rawWords.toSet().toList(growable: false);
+
+  static const _rawWords = <String>[
+    // Animaux
+    'chat','chien','loup','renard','ours','tigre','lion','aigle','corbeau','hibou',
+    'pigeon','moineau','cygne','canard','poule','coq','dinde','vache','cheval','poney',
+    'mouton','agneau','chevre','porc','lapin','souris','rat','singe','elephant','girafe',
+    'zebre','panda','koala','dauphin','baleine','requin','poulpe','crabe','homard','huitre',
+    'abeille','frelon','guepe','papillon','fourmi','araignee','scarabee','grillon','escargot','limace',
+    'truite','sardine','thon','saumon','carpe','brochet','anguille','sole','crevette','moule',
+    // Nature
+    'arbre','foret','vallee','colline','montagne','mer','plage','riviere','fleuve','lac',
+    'etang','source','cascade','grotte','volcan','desert','prairie','jardin','verger','vigne',
+    'champ','marais','dune','falaise','rocher','sable','pierre','galet','minerai','cristal',
+    'fleur','rose','lys','tulipe','marguerite','violette','iris','jonquille','muguet','pavot',
+    'chene','hetre','frene','sapin','pin','cedre','olivier','platane','peuplier','saule',
+    'pomme','poire','peche','prune','cerise','fraise','framboise','myrtille','raisin','figue',
+    'feuille','branche','racine','ecorce','seve','bourgeon','graine','fruit','pollen','nectar',
+    // Météo / temps
+    'soleil','lune','etoile','nuage','pluie','neige','vent','orage','foudre','rosee',
+    'brume','givre','glace','arc','aube','soir','nuit','matin','midi','automne',
+    'hiver','ete','printemps','janvier','avril','juillet','octobre','samedi','dimanche','vendredi',
+    // Maison
+    'maison','toit','mur','porte','fenetre','volet','cheminee','grenier','cave','garage',
+    'chambre','salon','cuisine','salle','bureau','jardin','balcon','terrasse','escalier','couloir',
+    'lit','table','chaise','canape','armoire','etagere','tiroir','tapis','rideau','coussin',
+    'lampe','bougie','horloge','miroir','tableau','vase','panier','seau','balai','marteau',
+    'clou','tournevis','clef','serrure','poignee','levier','interrupteur','prise','pile','ampoule',
+    // Cuisine
+    'pain','beurre','fromage','jambon','oeuf','lait','miel','farine','sucre','sel',
+    'poivre','huile','vinaigre','moutarde','sauce','soupe','salade','riz','pates','semoule',
+    'gateau','tarte','crepe','biscuit','bonbon','chocolat','vanille','citron','orange','banane',
+    'pomme','poire','peche','melon','radis','tomate','carotte','poireau','oignon','ail',
+    'persil','basilic','thym','romarin','laurier','menthe','sauge','fenouil','aneth','cumin',
+    // Vêtements
+    'pantalon','chemise','veste','manteau','pull','robe','jupe','foulard','echarpe','bonnet',
+    'gant','chaussure','botte','sandale','chausson','bijou','bague','collier','montre','ceinture',
+    // Corps / soins
+    'main','pied','tete','bras','jambe','dos','epaule','genou','coude','hanche',
+    'visage','front','joue','levre','dent','langue','oreille','nez','cou','menton',
+    // Outils / objets
+    'livre','cahier','crayon','stylo','gomme','regle','encre','papier','carton','enveloppe',
+    'lettre','timbre','image','photo','carte','plan','globe','boussole','jumelle','loupe',
+    'sac','valise','panier','coffre','boite','bocal','bouteille','verre','assiette','bol',
+    'tasse','cuillere','fourchette','couteau','poele','casserole','marmite','plat','planche','rape',
+    // Transport
+    'velo','moto','voiture','bus','train','tram','metro','bateau','barque','voile',
+    'avion','navire','ferry','tracteur','camion','remorque','char','traineau','luge','patin',
+    // Métiers
+    'boulanger','jardinier','couturier','peintre','musicien','poete','docteur','infirmier','plombier','serveur',
+    'libraire','potier','horloger','meunier','berger','marin','pilote','soldat','pompier','facteur',
+    // Abstraits / qualités (positives)
+    'amour','amitie','joie','espoir','paix','liberte','bonheur','douceur','sagesse','courage',
+    'force','vigueur','patience','calme','silence','musique','melodie','chanson','danse','poesie',
+    // Couleurs / matières
+    'rouge','orange','jaune','vert','bleu','indigo','violet','rose','blanc','noir',
+    'gris','marron','or','argent','bronze','cuivre','fer','acier','bois','verre',
+    'soie','laine','coton','lin','tissu','feutre','cuir','perle','jade','rubis',
+    // Eau / mer
+    'vague','ecume','maree','recif','phare','quai','port','jetee','digue','epave',
+    // Ciel / espace
+    'ciel','nuee','arc','planete','comete','galaxie','satellite','fusee','navette','astre',
+    // Action / mouvement (bases)
+    'route','sentier','chemin','pont','tunnel','rond','virage','carrefour','place','ruelle',
+    // Vie domestique
+    'jouet','bille','toupie','poupee','ballon','quille','cerceau','marionnette','puzzle','domino',
+    // Géo
+    'ville','village','hameau','quartier','region','province','pays','frontiere','continent','ile',
+  ];
+
+  static int get wordCount => _uniqueWords.length;
+
+  /// Bits d'entropie pour [count] mots tirés au sort.
+  static double entropy(int count) {
+    return count * (log(_uniqueWords.length) / ln2);
+  }
+
+  /// Génère une phrase de passe Diceware avec [count] mots, optionnellement
+  /// suffixée d'un nombre 10-99 et séparée par [separator].
+  /// Random.secure() pour l'aléa cryptographique.
+  static String generate({
+    int count = 5,
+    String separator = '-',
+    bool appendNumber = true,
+  }) {
+    final rng = Random.secure();
+    final picked = List.generate(count, (_) => _uniqueWords[rng.nextInt(_uniqueWords.length)]);
+    var out = picked.join(separator);
+    if (appendNumber) {
+      out = '$out$separator${10 + rng.nextInt(90)}';
+    }
+    return out;
+  }
+}

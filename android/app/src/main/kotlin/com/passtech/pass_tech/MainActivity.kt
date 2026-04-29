@@ -3,7 +3,9 @@ package com.passtech.pass_tech
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
@@ -16,6 +18,7 @@ import java.io.File
 class MainActivity : FlutterFragmentActivity() {
     private val secureClipboardChannel = "com.passtech.pass_tech/secure_clipboard"
     private val raspChannel = "com.passtech.pass_tech/rasp"
+    private val disguiseChannel = "com.passtech.pass_tech/disguise"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +52,49 @@ class MainActivity : FlutterFragmentActivity() {
                 when (call.method) {
                     "checkIntegrity" -> {
                         result.success(checkIntegrity())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // Camouflage : bascule entre l'icône Pass Tech et l'alias "Calculatrice".
+        // setComponentEnabledSetting est instantané sur l'utilisateur (l'icône
+        // disparaît / réapparaît sur le launcher dans la seconde).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, disguiseChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setDisguised" -> {
+                        val disguised = call.argument<Boolean>("disguised") ?: false
+                        try {
+                            val pm = packageManager
+                            val normalAlias = ComponentName(packageName,
+                                "$packageName.MainAliasNormal")
+                            val decoyAlias  = ComponentName(packageName,
+                                "$packageName.MainAliasDecoy")
+                            // Active l'alias désiré, désactive l'autre.
+                            pm.setComponentEnabledSetting(
+                                if (disguised) decoyAlias else normalAlias,
+                                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                                PackageManager.DONT_KILL_APP)
+                            pm.setComponentEnabledSetting(
+                                if (disguised) normalAlias else decoyAlias,
+                                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                PackageManager.DONT_KILL_APP)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error("DISGUISE_ERROR", e.message, null)
+                        }
+                    }
+                    "isDisguised" -> {
+                        try {
+                            val decoyAlias = ComponentName(packageName,
+                                "$packageName.MainAliasDecoy")
+                            val state = packageManager.getComponentEnabledSetting(decoyAlias)
+                            // ENABLED ou (DEFAULT && manifest enabled=true). Manifest = false.
+                            result.success(state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
                     }
                     else -> result.notImplemented()
                 }

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import '../services/clipboard_service.dart';
 import '../services/import_export_service.dart';
+import '../services/panic_service.dart';
 import '../services/vault_service.dart';
 import '../main.dart' show themeNotifier, parseThemeMode, themeModeToString;
 import 'audit_screen.dart';
@@ -92,6 +93,154 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _autoLockSeconds = v);
   }
 
+  Future<void> _setupDecoy() async {
+    // Avertissement explicatif avant la configuration.
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        icon: const Icon(Icons.shield_moon_outlined, size: 36),
+        title: const Text('Coffre leurre'),
+        content: const Text(
+          'Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec '
+          'un mot de passe différent.\n\n'
+          'Usage : si quelqu\'un vous force à ouvrir Pass Tech (frontière, '
+          'agression, contrôle), vous donnez le mot de passe du leurre. '
+          'L\'app affiche alors un faux coffre — il est cryptographiquement '
+          'impossible de prouver l\'existence du vrai.\n\n'
+          'À retenir :\n'
+          '• Le mot de passe du leurre doit être différent du vrai\n'
+          '• Remplissez le leurre avec quelques entrées crédibles\n'
+          '• Vous ne pourrez pas activer la biométrique sur le leurre',
+          style: TextStyle(fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Configurer')),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+
+    final pwd = await showDialog<String>(
+      context: context,
+      builder: (_) => const _PassphraseDialog(
+        title: 'Mot de passe du coffre leurre',
+        confirm: true,
+      ),
+    );
+    if (pwd == null || pwd.isEmpty || !mounted) return;
+
+    // Vérifie qu'il diffère du primary : on tente l'unlock contre primary
+    // et s'il réussit, on refuse le setup (sinon les 2 slots seraient ouverts
+    // par le même password).
+    final messenger = ScaffoldMessenger.of(context);
+    final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
+    if (matchesPrimary) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Ce mot de passe est déjà celui du coffre principal — '
+            'choisissez-en un différent.'),
+      ));
+      return;
+    }
+
+    // Le slot va changer pendant setupDecoy → on lock après pour forcer
+    // le user à se reconnecter sur le primary s'il veut continuer.
+    try {
+      await VaultService().setupDecoyVault(pwd);
+      VaultService().lock();
+      if (!mounted) return;
+      setState(() {});
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Coffre leurre configuré — déverrouillez à nouveau pour continuer'),
+      ));
+      // Retour au unlock screen
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
+  }
+
+  Future<void> _manageDecoy() async {
+    final action = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Coffre leurre'),
+        content: const Text(
+          'Le coffre leurre est actif.\n\n'
+          'Vous pouvez le supprimer (action visible et silencieuse pour '
+          'l\'attaquant — il pensera juste qu\'il s\'est trompé de mot de passe).',
+          style: TextStyle(fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'delete'),
+              child: const Text('Supprimer le leurre',
+                  style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (action != 'delete' || !mounted) return;
+    await VaultService().deleteDecoyVault();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coffre leurre supprimé')),
+    );
+  }
+
+  Future<void> _triggerPanic() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded,
+            size: 36, color: Colors.red),
+        title: const Text('Mode panique ?'),
+        content: const Text(
+          'Cette action effectue immédiatement :\n\n'
+          '• Verrouillage du coffre\n'
+          '• Vidage du presse-papiers\n'
+          '• Camouflage de l\'icône en « Calculatrice » sur le launcher\n\n'
+          'Vous pourrez restaurer l\'icône depuis les Réglages quand vous '
+          'serez en sécurité.',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Activer'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    await PanicService.panic();
+    if (!mounted) return;
+    // Retour à l'écran de déverrouillage (vault est lock).
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  Future<void> _revealApp() async {
+    await PanicService.revealApp();
+    if (!mounted) return;
+    setState(() {}); // Rafraîchit le FutureBuilder
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Icône Pass Tech restaurée — relancez le launcher si elle n\'apparaît pas'),
+      duration: Duration(seconds: 5),
+    ));
+  }
+
   void _lockNow() {
     VaultService().lock();
     Navigator.of(context).pushAndRemoveUntil(
@@ -108,9 +257,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _toggleBiometric(bool v) async {
     if (v) {
       try {
-        // saveBiometricKey() writes to biometric_storage, which creates a
-        // Keystore key with setUserAuthenticationRequired(true). The first
-        // write — and every subsequent read — triggers BiometricPrompt.
+        // saveBiometricKey() écrit dans biometric_storage, qui crée une
+        // clé Keystore avec setUserAuthenticationRequired(true). La première
+        // écriture — et chaque lecture suivante — déclenche BiometricPrompt.
+        // Lance StateError si le slot actif n'est pas primary (sécurité
+        // dual-vault). On absorbe silencieusement pour ne pas trahir
+        // l'existence du decoy à un attaquant attentif.
         await VaultService().saveBiometricKey();
       } catch (_) { return; }
     } else {
@@ -411,6 +563,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const AuditScreen())),
+          ),
+
+          _section('Coffre leurre (anti-coercition)'),
+          FutureBuilder<bool>(
+            future: VaultService().hasDecoyVault,
+            builder: (_, snap) {
+              final hasDecoy = snap.data == true;
+              return Column(children: [
+                ListTile(
+                  leading: Icon(Icons.shield_moon_outlined,
+                      color: hasDecoy ? Colors.green : null),
+                  title: Text(hasDecoy
+                      ? 'Coffre leurre configuré'
+                      : 'Configurer un coffre leurre'),
+                  subtitle: const Text(
+                      'Un 2e mot de passe ouvre un faux coffre. Si quelqu\'un '
+                      'vous force à ouvrir l\'app, donnez le faux.',
+                      style: TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: hasDecoy ? _manageDecoy : _setupDecoy,
+                ),
+              ]);
+            },
+          ),
+
+          _section('Mode panique'),
+          ListTile(
+            leading: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
+            title: const Text('Activer le mode panique'),
+            subtitle: const Text(
+                'Verrouille immédiatement, vide le presse-papiers et '
+                'camoufle l\'icône en "Calculatrice"',
+                style: TextStyle(fontSize: 11)),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: _triggerPanic,
+          ),
+          FutureBuilder<bool>(
+            future: PanicService.isDisguised(),
+            builder: (_, snap) {
+              if (snap.data != true) return const SizedBox.shrink();
+              return ListTile(
+                leading: Icon(Icons.visibility, color: Colors.green.shade700),
+                title: const Text('Restaurer l\'icône Pass Tech'),
+                subtitle: const Text(
+                    'L\'app est actuellement camouflée en "Calculatrice"',
+                    style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: _revealApp,
+              );
+            },
           ),
 
           _section('Apparence'),
