@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/update_service.dart';
-import '../widgets/legal_support_sections.dart';
+import '../services/app_update.dart';
+import 'package:files_tech_core/files_tech_core.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -70,7 +70,7 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _checkUpdate() async {
     setState(() => _checkingUpdate = true);
-    final info = await UpdateService().checkForUpdate(force: true);
+    final info = await appUpdateService.checkForUpdate(force: true);
     if (!mounted) return;
     setState(() => _checkingUpdate = false);
     if (info == null) {

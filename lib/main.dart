@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/clipboard_service.dart';
-import 'services/update_service.dart';
+import 'services/app_update.dart';
 import 'services/vault_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/setup_screen.dart';
@@ -74,7 +74,7 @@ class _PassTechAppState extends State<PassTechApp>
   }
 
   Future<void> _checkForUpdate() async {
-    await UpdateService().checkForUpdate();
+    await appUpdateService.checkForUpdate();
   }
 
   @override
