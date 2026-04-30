@@ -10,7 +10,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.11.0';
+  static const _version = '1.12.0';
   static const _author  = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -60,6 +60,8 @@ class _AboutScreenState extends State<AboutScreen> {
         desc: 'Lock + clipboard wipe + camouflage icône en « Calculatrice »'),
     (icon: Icons.family_restroom,    label: 'Héritage',
         desc: 'Un proche accède au coffre après inactivité prolongée — local, sans cloud'),
+    (icon: Icons.verified_user_outlined, label: 'Anti-phishing',
+        desc: 'Vérifie le domaine du navigateur avant de copier — alerte typosquatting'),
     (icon: Icons.content_paste_off_outlined, label: 'Presse-papiers sécurisé',
         desc: 'Effacement automatique configurable (15s–60s)'),
     (icon: Icons.search,             label: 'Recherche',

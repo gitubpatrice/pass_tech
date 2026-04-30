@@ -1,15 +1,19 @@
 package com.passtech.pass_tech
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
+import android.provider.Settings
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -19,6 +23,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val secureClipboardChannel = "com.passtech.pass_tech/secure_clipboard"
     private val raspChannel = "com.passtech.pass_tech/rasp"
     private val disguiseChannel = "com.passtech.pass_tech/disguise"
+    private val antiPhishingChannel = "com.passtech.pass_tech/antiphishing"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +57,33 @@ class MainActivity : FlutterFragmentActivity() {
                 when (call.method) {
                     "checkIntegrity" -> {
                         result.success(checkIntegrity())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // Anti-phishing : expose à Dart le domaine courant détecté par
+        // l'AccessibilityService + l'état d'activation du service système.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, antiPhishingChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getCurrentDomain" -> {
+                        // Lit la valeur volatile maintenue par PhishingDetectorService.
+                        // Retourne null si AS désactivée ou aucun domaine détecté.
+                        result.success(PhishingDetectorService.lastDomain)
+                    }
+                    "isAccessibilityServiceEnabled" -> {
+                        result.success(isPhishingServiceEnabled())
+                    }
+                    "openAccessibilitySettings" -> {
+                        try {
+                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            startActivity(intent)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error("OPEN_ERROR", e.message, null)
+                        }
                     }
                     else -> result.notImplemented()
                 }
@@ -162,6 +194,30 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun isDebuggable(): Boolean {
         return (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    }
+
+    /**
+     * True si PhishingDetectorService est activé dans Réglages > Accessibilité.
+     * On parcourt la liste des AS activés et on vérifie le component name.
+     * Le user doit grant manuellement (sécurité Android) → l'app ne peut pas
+     * activer l'AS programmatiquement.
+     */
+    private fun isPhishingServiceEnabled(): Boolean {
+        return try {
+            val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+            val expectedComponent = ComponentName(this, PhishingDetectorService::class.java)
+            val enabled = am.getEnabledAccessibilityServiceList(
+                AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            enabled.any { svc ->
+                svc.id?.contains(expectedComponent.flattenToString(), ignoreCase = true) == true
+                || svc.resolveInfo?.serviceInfo?.let { si ->
+                    si.packageName == packageName
+                    && si.name == PhishingDetectorService::class.java.name
+                } == true
+            }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun copySensitive(text: String) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
+import '../services/anti_phishing_service.dart';
 import '../services/clipboard_service.dart';
 import '../services/totp_service.dart';
 import '../services/vault_service.dart';
@@ -30,14 +31,87 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     _entry = widget.entry;
   }
 
-  Future<void> _copy(String text, String label) async {
+  Future<void> _copy(String text, String label, {bool sensitive = false}) async {
     final messenger = ScaffoldMessenger.of(context);
+
+    // Anti-phishing : sur les champs sensibles (mot de passe, 2FA), on vérifie
+    // que le navigateur frontal est bien sur le bon domaine avant de copier.
+    if (sensitive && _entry.url.isNotEmpty) {
+      final check = await AntiPhishingService().check(_entry.url);
+      if (!mounted) return;
+      if (check.verdict == PhishingVerdict.typosquatting ||
+          check.verdict == PhishingVerdict.mismatch) {
+        final proceed = await _showPhishingDialog(check);
+        if (proceed != true) return;
+      }
+    }
+
     await ClipboardService.copyWithAutoClear(text);
     messenger.showSnackBar(SnackBar(
       content: Text('$label copié — effacé dans ${ClipboardService.clearAfterSeconds}s'),
       duration: const Duration(seconds: 3),
     ));
   }
+
+  Future<bool?> _showPhishingDialog(PhishingCheck check) {
+    final isTypo = check.verdict == PhishingVerdict.typosquatting;
+    final cs = Theme.of(context).colorScheme;
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, size: 40, color: cs.error),
+        title: Text(isTypo ? 'Domaine suspect' : 'Domaine ne correspond pas'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isTypo
+                ? 'Le domaine actif ressemble au vôtre — typosquatting probable.'
+                : 'Le navigateur est sur un domaine totalement différent.'),
+            const SizedBox(height: 12),
+            _domainRow('Attendu', check.expectedDomain ?? '—', cs.primary),
+            const SizedBox(height: 4),
+            _domainRow('Actif', check.activeDomain ?? '—', cs.error),
+            if (check.distance != null) ...[
+              const SizedBox(height: 8),
+              Text('Distance : ${check.distance}',
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: cs.error),
+            child: const Text('Copier quand même'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _domainRow(String label, String value, Color color) => Row(
+    children: [
+      SizedBox(
+        width: 64,
+        child: Text(label,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+      ),
+      Expanded(
+        child: Text(value,
+            style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w600)),
+      ),
+    ],
+  );
 
   Future<void> _toggleFav() async {
     final updated = _entry.copyWith(isFavorite: !_entry.isFavorite);
@@ -163,14 +237,14 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       password: _entry.password,
       show: _showPassword,
       onToggle: () => setState(() => _showPassword = !_showPassword),
-      onCopy: () => _copy(_entry.password, 'Mot de passe'),
+      onCopy: () => _copy(_entry.password, 'Mot de passe', sensitive: true),
     ),
     const SizedBox(height: 10),
 
     if (_entry.totpSecret.isNotEmpty) ...[
       _TotpCard(
         secret: _entry.totpSecret,
-        onCopy: (code) => _copy(code, 'Code 2FA'),
+        onCopy: (code) => _copy(code, 'Code 2FA', sensitive: true),
       ),
       const SizedBox(height: 10),
     ],

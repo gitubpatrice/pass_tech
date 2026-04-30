@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phishing_detector_description">Détecte le domaine du navigateur frontal pour vérifier qu\'il correspond bien à l\'entrée Pass Tech avant de copier un mot de passe. Aucune donnée n\'est stockée ni transmise — seul le domaine racine est lu en mémoire volatile, uniquement sur les navigateurs reconnus. Cette protection s\'active à votre demande et reste désactivable à tout moment.</string>
+</resources>

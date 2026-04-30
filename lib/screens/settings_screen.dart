@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
+import '../services/anti_phishing_service.dart';
 import '../services/clipboard_service.dart';
 import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
@@ -30,6 +31,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int  _clipboardClear     = 30;
   int  _autoLockSeconds    = 300;
   ThemeMode _themeMode     = ThemeMode.system;
+  bool _antiPhishingEnabled = false;
+  bool _antiPhishingASActive = false;
 
   static const _clipOptions = [
     (label: '15 secondes', value: 15),
@@ -61,6 +64,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final clip     = prefs.getInt('clipboard_clear')   ?? 30;
     final lock     = prefs.getInt('auto_lock_seconds') ?? 300;
     final theme    = parseThemeMode(prefs.getString('theme_mode') ?? 'system');
+    final apSvc    = AntiPhishingService();
+    final apEnabled = await apSvc.isEnabled;
+    final apASActive = await apSvc.isAccessibilityServiceActive;
     ClipboardService.clearAfterSeconds = clip;
     if (mounted) {
       setState(() {
@@ -69,6 +75,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _clipboardClear     = clip;
         _autoLockSeconds    = lock;
         _themeMode          = theme;
+        _antiPhishingEnabled = apEnabled;
+        _antiPhishingASActive = apASActive;
+      });
+    }
+  }
+
+  Future<void> _toggleAntiPhishing(bool v) async {
+    if (v) {
+      // Consent flow : explique le service d'accessibilité et ouvre les
+      // Réglages Android (l'utilisateur DOIT activer manuellement).
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          icon: const Icon(Icons.verified_user_outlined, size: 36),
+          title: const Text('Anti-phishing par domaine'),
+          content: const Text(
+            'Pass Tech peut vérifier que le navigateur frontal affiche bien le '
+            'domaine de l\'entrée AVANT de copier votre mot de passe. Si le '
+            'domaine ne correspond pas (typosquatting, faux site), une alerte '
+            's\'affiche.\n\n'
+            'Pour cela, l\'app utilise un service d\'accessibilité Android :\n'
+            '• Lit uniquement le domaine racine de la barre d\'URL\n'
+            '• Uniquement sur les navigateurs reconnus (Chrome, Firefox, '
+            'Brave, Edge, Opera, Vivaldi, Samsung, DuckDuckGo)\n'
+            '• Aucune donnée stockée ni transmise — mémoire volatile\n'
+            '• Désactivable à tout moment dans les Réglages Android\n\n'
+            'Sur l\'écran suivant, activez "Pass Tech — anti-phishing".',
+            style: TextStyle(fontSize: 12),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuler')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Continuer')),
+          ],
+        ),
+      );
+      if (go != true || !mounted) return;
+      await AntiPhishingService().setEnabled(true);
+      await AntiPhishingService().openAccessibilitySettings();
+    } else {
+      await AntiPhishingService().setEnabled(false);
+    }
+    // Re-checke l'état (l'utilisateur peut être revenu sans avoir activé l'AS)
+    final apASActive = await AntiPhishingService().isAccessibilityServiceActive;
+    if (mounted) {
+      setState(() {
+        _antiPhishingEnabled = v;
+        _antiPhishingASActive = apASActive;
       });
     }
   }
@@ -770,6 +827,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ]);
             },
           ),
+
+          _section('Anti-phishing par domaine'),
+          SwitchListTile(
+            title: const Text('Vérifier le domaine avant copie'),
+            subtitle: Text(
+              _antiPhishingEnabled
+                  ? (_antiPhishingASActive
+                      ? 'Actif — alerte si le navigateur n\'est pas sur le bon domaine'
+                      : '⚠ Activez "Pass Tech — anti-phishing" dans Accessibilité')
+                  : 'Compare le domaine du navigateur à celui de l\'entrée',
+              style: const TextStyle(fontSize: 11),
+            ),
+            secondary: Icon(
+              Icons.verified_user_outlined,
+              color: _antiPhishingEnabled && _antiPhishingASActive
+                  ? Colors.green
+                  : null,
+            ),
+            value: _antiPhishingEnabled,
+            onChanged: _toggleAntiPhishing,
+          ),
+          if (_antiPhishingEnabled && !_antiPhishingASActive)
+            ListTile(
+              leading: const Icon(Icons.settings_accessibility_outlined),
+              title: const Text('Ouvrir Réglages > Accessibilité'),
+              subtitle: const Text(
+                  'Activez "Pass Tech — anti-phishing" dans la liste',
+                  style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () async {
+                await AntiPhishingService().openAccessibilitySettings();
+                final active = await AntiPhishingService().isAccessibilityServiceActive;
+                if (mounted) setState(() => _antiPhishingASActive = active);
+              },
+            ),
 
           _section('Mode panique'),
           ListTile(

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Configuration de PhishingDetectorService.
+
+  Privacy / sécurité :
+  - canRetrieveWindowContent="true" : nécessaire pour lire le widget URL bar.
+  - packageNames : limite l'AS aux navigateurs supportés UNIQUEMENT. Pas
+    d'écoute des autres apps (banking, messageries, etc.). Liste
+    correspond exactement à urlBarResourceIds dans le service Kotlin.
+  - eventTypes : minimaux (state + content changed). Pas de scroll, click, etc.
+  - flags : pas de FLAG_REPORT_VIEW_IDS (on cherche par resourceId, donc
+    Android le requiert), pas d'autres permissions étendues.
+  - notificationTimeout 200 ms : throttle pour éviter de spam le service.
+  - description : texte affiché sous le toggle dans Réglages Android.
+-->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFlags="flagDefault|flagReportViewIds"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="200"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/phishing_detector_description"
+    android:settingsActivity="com.passtech.pass_tech.MainActivity"
+    android:packageNames="com.android.chrome,com.brave.browser,com.vivaldi.browser,com.microsoft.emmx,com.opera.browser,org.mozilla.firefox,org.mozilla.fenix,com.sec.android.app.sbrowser,com.duckduckgo.mobile.android" />
