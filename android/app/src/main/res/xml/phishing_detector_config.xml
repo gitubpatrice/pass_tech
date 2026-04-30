@@ -21,5 +21,4 @@
     android:notificationTimeout="200"
     android:canRetrieveWindowContent="true"
     android:description="@string/phishing_detector_description"
-    android:settingsActivity="com.passtech.pass_tech.MainActivity"
     android:packageNames="com.android.chrome,com.brave.browser,com.vivaldi.browser,com.microsoft.emmx,com.opera.browser,org.mozilla.firefox,org.mozilla.fenix,com.sec.android.app.sbrowser,com.duckduckgo.mobile.android" />

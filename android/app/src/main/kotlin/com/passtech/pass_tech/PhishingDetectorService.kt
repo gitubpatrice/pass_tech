@@ -1,8 +1,10 @@
 package com.passtech.pass_tech
 
+import android.os.Build
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import java.net.IDN
 
 /**
  * AccessibilityService qui détecte le DOMAINE actif dans le navigateur frontal.
@@ -10,7 +12,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * Approche : à chaque WINDOW_STATE_CHANGED ou WINDOW_CONTENT_CHANGED d'un
  * package navigateur connu, on cherche le widget de la barre d'URL via son
  * resourceId (mapping browser-spécifique), on en extrait l'URL, on stocke
- * SEULEMENT le domaine (host) dans une variable statique partagée.
+ * SEULEMENT le domaine (host) dans un snapshot atomique partagé.
  *
  * **Privacy** :
  * - On ne stocke JAMAIS le path complet ni les paramètres de l'URL.
@@ -21,20 +23,20 @@ import android.view.accessibility.AccessibilityNodeInfo
  *
  * **Sécurité** : l'AS est désactivable à tout moment depuis Réglages Android.
  * Dart vérifie via [getCurrentDomain] et reçoit null si AS désactivée ou
- * domaine introuvable.
+ * domaine introuvable / périmé.
  */
 class PhishingDetectorService : AccessibilityService() {
 
+    /**
+     * Snapshot atomique : domaine + timestamp couplés dans une référence unique
+     * @Volatile pour garantir une lecture cohérente sur le main thread (Dart)
+     * pendant que l'AS écrit depuis son propre thread.
+     */
+    private data class Snapshot(val domain: String, val atMs: Long)
+
     companion object {
-        /**
-         * Dernier domaine détecté (host uniquement, sans path ni query).
-         * Volatile pour visibility cross-thread (l'AS tourne sur son propre
-         * thread, Dart lit depuis le main isolate via channel).
-         */
         @Volatile
-        private var _lastDomain: String? = null
-        @Volatile
-        private var _lastDomainAtMs: Long = 0L
+        private var _snapshot: Snapshot? = null
 
         /**
          * Fenêtre de fraîcheur. Au-delà, on considère le domaine comme stale
@@ -44,15 +46,22 @@ class PhishingDetectorService : AccessibilityService() {
         private const val FRESHNESS_MS = 60_000L
 
         /**
+         * Validation TLD stricte : refuse les titres de page (ex. "LeMonde.fr"
+         * peut apparaître dans la barre Firefox quand non focus). On exige un
+         * TLD plausible en fin de host (avant '/' ou '?').
+         */
+        private val TLD_REGEX = Regex("\\.[a-z]{2,24}$")
+
+        /**
          * Dernier domaine détecté, valide uniquement pendant FRESHNESS_MS.
          * Au-delà, retourne null pour éviter de "valider" un domaine périmé
          * lorsque l'utilisateur n'est plus dans le navigateur.
          */
         val lastDomain: String?
             get() {
-                val d = _lastDomain ?: return null
-                if (System.currentTimeMillis() - _lastDomainAtMs > FRESHNESS_MS) return null
-                return d
+                val s = _snapshot ?: return null
+                if (System.currentTimeMillis() - s.atMs > FRESHNESS_MS) return null
+                return s.domain
             }
 
         /**
@@ -108,33 +117,41 @@ class PhishingDetectorService : AccessibilityService() {
         }
 
         val root = rootInActiveWindow ?: return
+        // Sur API < 34, AccessibilityNodeInfo doit être recyclé pour libérer
+        // la mémoire système. Sans ça, l'AS peut être throttlé après usage
+        // prolongé.
+        val collected = mutableListOf<AccessibilityNodeInfo>()
         try {
             for (rid in resourceIds) {
-                val nodes = root.findAccessibilityNodeInfosByViewId(rid)
-                if (nodes.isNullOrEmpty()) continue
+                val nodes = root.findAccessibilityNodeInfosByViewId(rid) ?: continue
+                collected.addAll(nodes)
                 for (node in nodes) {
                     val raw = node.text?.toString() ?: continue
                     val domain = extractDomain(raw)
                     if (domain != null) {
-                        _lastDomain = domain
-                        _lastDomainAtMs = System.currentTimeMillis()
+                        _snapshot = Snapshot(domain, System.currentTimeMillis())
                         return
                     }
                 }
             }
         } catch (_: Exception) {
             // Ne rien faire : l'erreur ne doit pas crasher le service.
+        } finally {
+            if (Build.VERSION.SDK_INT < 34) {
+                collected.forEach { try { it.recycle() } catch (_: Throwable) {} }
+                try { root.recycle() } catch (_: Throwable) {}
+            }
         }
     }
 
     override fun onInterrupt() {
         // Service interrompu (pas de l'app). Reset par sécurité.
-        _lastDomain = null
+        _snapshot = null
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        _lastDomain = null
+        _snapshot = null
     }
 
     /**
@@ -144,13 +161,21 @@ class PhishingDetectorService : AccessibilityService() {
      * - URLs sans schéma : example.com/path
      * - Recherches Google ne contenant pas d'URL : retourne null
      * - Champs vides : null
+     * - Titres de page (validation TLD)
+     * - IDN / homographs : forcé en ASCII Punycode
      */
     private fun extractDomain(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
-        // Si c'est une recherche (pas un domaine), retourne null
-        if (!trimmed.contains('.')) return null
         if (trimmed.contains(' ')) return null
+        if (!trimmed.contains('.')) return null
+
+        // Validation TLD stricte sur la partie avant '/' ou '?'
+        val hostPart = trimmed
+            .substringBefore('/')
+            .substringBefore('?')
+            .lowercase()
+        if (!TLD_REGEX.containsMatchIn(hostPart)) return null
 
         // Ajoute schéma si absent pour parser
         val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
@@ -161,9 +186,15 @@ class PhishingDetectorService : AccessibilityService() {
 
         return try {
             val uri = android.net.Uri.parse(withScheme)
-            val host = uri.host?.lowercase() ?: return null
-            // Retire un éventuel "www." pour normaliser
-            if (host.startsWith("www.")) host.substring(4) else host
+            val rawHost = uri.host?.lowercase() ?: return null
+            // Force forme ASCII (Punycode) pour neutraliser homographs IDN.
+            val asciiHost = try {
+                IDN.toASCII(rawHost, IDN.ALLOW_UNASSIGNED)
+            } catch (_: Exception) {
+                rawHost
+            }
+            val host = if (asciiHost.startsWith("www.")) asciiHost.substring(4) else asciiHost
+            if (host.isEmpty() || !TLD_REGEX.containsMatchIn(host)) null else host
         } catch (_: Exception) {
             null
         }

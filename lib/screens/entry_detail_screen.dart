@@ -37,12 +37,29 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     // Anti-phishing : sur les champs sensibles (mot de passe, 2FA), on vérifie
     // que le navigateur frontal est bien sur le bon domaine avant de copier.
     if (sensitive && _entry.url.isNotEmpty) {
-      final check = await AntiPhishingService().check(_entry.url);
+      final svc = AntiPhishingService();
+      final check = await svc.check(_entry.url);
       if (!mounted) return;
       if (check.verdict == PhishingVerdict.typosquatting ||
           check.verdict == PhishingVerdict.mismatch) {
         final proceed = await _showPhishingDialog(check);
         if (proceed != true) return;
+      } else if (check.verdict == PhishingVerdict.unknown &&
+          await svc.isEnabled) {
+        // L'utilisateur a activé l'anti-phishing mais l'AS n'a pas pu lire
+        // un domaine (AS désactivée, navigateur non supporté, domaine
+        // périmé > 60s). On copie mais on prévient — pour éviter le faux
+        // sentiment de sécurité.
+        if (!mounted) return;
+        messenger.showSnackBar(SnackBar(
+          content: const Text(
+              '⚠ Anti-phishing inactif — vérifiez l\'accessibilité dans Réglages'),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Réglages',
+            onPressed: () => svc.openAccessibilitySettings(),
+          ),
+        ));
       }
     }
 
@@ -67,8 +84,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(isTypo
-                ? 'Le domaine actif ressemble au vôtre — typosquatting probable.'
-                : 'Le navigateur est sur un domaine totalement différent.'),
+                ? 'Le domaine actif ressemble au vôtre — typosquatting probable. '
+                  'Cela peut être un faux positif, mais soyez prudent(e).'
+                : 'Le navigateur est sur un domaine totalement différent. '
+                  'La copie a été bloquée pour votre sécurité.'),
             const SizedBox(height: 12),
             _domainRow('Attendu', check.expectedDomain ?? '—', cs.primary),
             const SizedBox(height: 4),
@@ -83,13 +102,17 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
+            child: Text(isTypo ? 'Annuler' : 'Fermer'),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: const Text('Copier quand même'),
-          ),
+          // Sur typosquatting, on garde l'override (peut être un faux positif).
+          // Sur mismatch sévère, on retire le bouton — l'utilisateur doit
+          // changer de page ou désactiver l'anti-phishing dans Réglages.
+          if (isTypo)
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(foregroundColor: cs.error),
+              child: const Text('Copier quand même'),
+            ),
         ],
       ),
     );

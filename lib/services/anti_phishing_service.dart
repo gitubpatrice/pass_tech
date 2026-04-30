@@ -179,17 +179,38 @@ class AntiPhishingService {
     }
   }
 
-  /// True si [a] et [b] partagent le même domaine racine (eTLD+1 approximatif :
-  /// les 2 derniers segments). Permet à `login.example.com` de matcher
-  /// `example.com`. Imparfait pour les TLD composés (.co.uk) mais suffisant
-  /// pour 95% des cas courants.
+  /// True si [a] et [b] partagent le même domaine racine (eTLD+1).
+  /// Permet à `login.example.com` de matcher `example.com`.
+  /// Gère les TLDs composés courants (.co.uk, .com.au, etc.) sans dépendre
+  /// d'une PSL externe.
   static bool _sameRootDomain(String a, String b) {
-    final partsA = a.split('.');
-    final partsB = b.split('.');
-    if (partsA.length < 2 || partsB.length < 2) return false;
-    final rootA = '${partsA[partsA.length - 2]}.${partsA.last}';
-    final rootB = '${partsB[partsB.length - 2]}.${partsB.last}';
-    return rootA == rootB;
+    final rootA = _eTldPlusOne(a);
+    final rootB = _eTldPlusOne(b);
+    return rootA != null && rootA == rootB;
+  }
+
+  /// Second-level generics combinés à un country-code 2 chars pour former
+  /// un TLD composé (ex. `co.uk`, `com.au`, `gov.uk`, `org.uk`, `ac.uk`,
+  /// `com.br`, `co.jp`, `co.za`, `co.in`, `net.au`, etc.).
+  static const _composedSecondLevels = {
+    'co', 'com', 'gov', 'org', 'net', 'ac', 'edu', 'mil',
+  };
+
+  /// Extrait l'eTLD+1 d'un host. Retourne null si le host est trop court.
+  /// Heuristique : si l'avant-dernier segment est un second-level générique
+  /// (co/com/gov/...) ET que le TLD fait 2 caractères (country-code), on
+  /// considère que le TLD est composé et on prend les 3 derniers segments.
+  static String? _eTldPlusOne(String host) {
+    final parts = host.split('.');
+    if (parts.length < 2) return null;
+    if (parts.length >= 3) {
+      final secondLevel = parts[parts.length - 2];
+      final tld = parts.last;
+      if (tld.length == 2 && _composedSecondLevels.contains(secondLevel)) {
+        return '${parts[parts.length - 3]}.$secondLevel.$tld';
+      }
+    }
+    return '${parts[parts.length - 2]}.${parts.last}';
   }
 
   /// Distance d'édition de Levenshtein entre 2 chaînes (insertion / suppression

@@ -25,7 +25,8 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   bool _biometricEnabled   = false;
   bool _biometricAvailable = false;
   int  _clipboardClear     = 30;
@@ -53,7 +54,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Au retour des Réglages d'accessibilité Android, l'utilisateur peut
+      // avoir activé/désactivé l'AS — on rafraîchit l'état.
+      _refreshAntiPhishingASState();
+    }
+  }
+
+  Future<void> _refreshAntiPhishingASState() async {
+    final active = await AntiPhishingService().isAccessibilityServiceActive;
+    if (mounted && active != _antiPhishingASActive) {
+      setState(() => _antiPhishingASActive = active);
+    }
   }
 
   Future<void> _loadSettings() async {
