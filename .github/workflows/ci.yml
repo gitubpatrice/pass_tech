@@ -61,7 +61,7 @@ jobs:
 
       - name: Upload APK artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pass_tech-debug-${{ github.sha }}
           path: pass_tech/build/app/outputs/flutter-apk/app-debug.apk
