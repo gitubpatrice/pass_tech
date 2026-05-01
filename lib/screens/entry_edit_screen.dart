@@ -207,6 +207,22 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final base = Theme.of(context);
+    // Réduit globalement la hauteur de tous les TextField de ce formulaire
+    // (~56dp → ~44dp), gain ~10dp × N fields.
+    final dense = base.copyWith(
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+      ),
+    );
+    return Theme(data: dense, child: _build(context));
+  }
+
+  Widget _build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -291,18 +307,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
             if (_type == EntryType.note) ..._buildNoteFields(),
             if (_type == EntryType.card) ..._buildCardFields(),
 
-            // Favori est désormais dans l'AppBar (icône étoile toggleable)
-            // → libère ~50dp dans le form, bouton Enregistrer remonte d'autant.
-            const SizedBox(height: 8),
-
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.save_outlined, size: 18),
-              label: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
-            ),
+            // Favori et Enregistrer sont tous deux dans l'AppBar (haut).
+            // Pas de bouton dupliqué en bas du form — gain ~70dp.
             const SizedBox(height: 8),
           ],
         ),
