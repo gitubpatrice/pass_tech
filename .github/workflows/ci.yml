@@ -14,14 +14,14 @@ jobs:
 
     steps:
       - name: Checkout app
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: pass_tech
 
       # Le pubspec référence files_tech_core via `path: ../files_tech_core`.
       # On le checkout en sibling pour que `flutter pub get` résolve la dep.
       - name: Checkout files_tech_core (path dependency)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: gitubpatrice/files_tech_core
           path: files_tech_core
