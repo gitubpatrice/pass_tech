@@ -243,21 +243,37 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
                 : 'Ajouter aux favoris',
             onPressed: () => setState(() => _isFavorite = !_isFavorite),
           ),
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: Text(
-              _saving ? 'Enregistrement…' : 'Enregistrer',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
         ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Category
-            _label('Catégorie'),
+            // Ligne "Catégorie" + bouton Enregistrer aligné à droite
+            // (fond bleu clair primaryContainer + bordure, bien visible).
+            Row(
+              children: [
+                _label('Catégorie'),
+                const Spacer(),
+                FilledButton.tonal(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    side: BorderSide(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    minimumSize: const Size(0, 38),
+                  ),
+                  child: Text(
+                    _saving ? 'Enregistrement…' : 'Enregistrer',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             SizedBox(
               height: 48,
