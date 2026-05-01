@@ -23,27 +23,27 @@ class EntryEditScreen extends StatefulWidget {
 }
 
 class _EntryEditScreenState extends State<EntryEditScreen> {
-  final _titleCtrl    = TextEditingController();
-  final _userCtrl     = TextEditingController();
-  final _passCtrl     = TextEditingController();
-  final _urlCtrl      = TextEditingController();
-  final _totpCtrl     = TextEditingController();
-  final _notesCtrl    = TextEditingController();
-  final _holderCtrl   = TextEditingController();
-  final _numberCtrl   = TextEditingController();
-  final _expiryCtrl   = TextEditingController();
-  final _cvvCtrl      = TextEditingController();
-  final _pinCtrl      = TextEditingController();
-  final _issuerCtrl   = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _userCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _urlCtrl = TextEditingController();
+  final _totpCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  final _holderCtrl = TextEditingController();
+  final _numberCtrl = TextEditingController();
+  final _expiryCtrl = TextEditingController();
+  final _cvvCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
+  final _issuerCtrl = TextEditingController();
 
   late EntryType _type;
-  String _category    = 'Autres';
-  bool _showPass      = false;
-  bool _showCvv       = false;
-  bool _showPin       = false;
-  bool _showTotp      = false;
-  bool _isFavorite    = false;
-  bool _saving        = false;
+  String _category = 'Autres';
+  bool _showPass = false;
+  bool _showCvv = false;
+  bool _showPin = false;
+  bool _showTotp = false;
+  bool _isFavorite = false;
+  bool _saving = false;
   String? _totpError;
 
   bool get _isEdit => widget.entry != null;
@@ -54,20 +54,20 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     final e = widget.entry;
     if (e != null) {
       _type = e.type;
-      _titleCtrl.text  = e.title;
-      _userCtrl.text   = e.username;
-      _passCtrl.text   = e.password;
-      _urlCtrl.text    = e.url;
-      _totpCtrl.text   = e.totpSecret;
-      _notesCtrl.text  = e.notes;
+      _titleCtrl.text = e.title;
+      _userCtrl.text = e.username;
+      _passCtrl.text = e.password;
+      _urlCtrl.text = e.url;
+      _totpCtrl.text = e.totpSecret;
+      _notesCtrl.text = e.notes;
       _holderCtrl.text = e.cardholderName;
       _numberCtrl.text = e.cardNumber;
       _expiryCtrl.text = e.cardExpiry;
-      _cvvCtrl.text    = e.cardCvv;
-      _pinCtrl.text    = e.cardPin;
+      _cvvCtrl.text = e.cardCvv;
+      _pinCtrl.text = e.cardPin;
       _issuerCtrl.text = e.cardIssuer;
-      _category        = e.category;
-      _isFavorite      = e.isFavorite;
+      _category = e.category;
+      _isFavorite = e.isFavorite;
     } else {
       _type = widget.type;
       // Sensible default categories per type
@@ -94,8 +94,9 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
   Future<void> _save() async {
     if (_titleCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Le titre est obligatoire')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Le titre est obligatoire')));
       return;
     }
 
@@ -113,40 +114,40 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     Entry entry;
     if (_isEdit) {
       entry = widget.entry!.copyWith(
-        type:           _type,
-        title:          _titleCtrl.text.trim(),
-        category:       _category,
-        username:       _userCtrl.text.trim(),
-        password:       _passCtrl.text,
-        url:            _urlCtrl.text.trim(),
-        totpSecret:     _totpCtrl.text.trim(),
-        notes:          _notesCtrl.text.trim(),
-        isFavorite:     _isFavorite,
+        type: _type,
+        title: _titleCtrl.text.trim(),
+        category: _category,
+        username: _userCtrl.text.trim(),
+        password: _passCtrl.text,
+        url: _urlCtrl.text.trim(),
+        totpSecret: _totpCtrl.text.trim(),
+        notes: _notesCtrl.text.trim(),
+        isFavorite: _isFavorite,
         cardholderName: _holderCtrl.text.trim(),
-        cardNumber:     _numberCtrl.text.replaceAll(' ', '').trim(),
-        cardExpiry:     _expiryCtrl.text.trim(),
-        cardCvv:        _cvvCtrl.text.trim(),
-        cardPin:        _pinCtrl.text.trim(),
-        cardIssuer:     _issuerCtrl.text.trim(),
+        cardNumber: _numberCtrl.text.replaceAll(' ', '').trim(),
+        cardExpiry: _expiryCtrl.text.trim(),
+        cardCvv: _cvvCtrl.text.trim(),
+        cardPin: _pinCtrl.text.trim(),
+        cardIssuer: _issuerCtrl.text.trim(),
       );
       await VaultService().updateEntry(entry);
     } else {
       entry = Entry(
-        type:           _type,
-        title:          _titleCtrl.text.trim(),
-        category:       _category,
-        username:       _userCtrl.text.trim(),
-        password:       _passCtrl.text,
-        url:            _urlCtrl.text.trim(),
-        totpSecret:     _totpCtrl.text.trim(),
-        notes:          _notesCtrl.text.trim(),
-        isFavorite:     _isFavorite,
+        type: _type,
+        title: _titleCtrl.text.trim(),
+        category: _category,
+        username: _userCtrl.text.trim(),
+        password: _passCtrl.text,
+        url: _urlCtrl.text.trim(),
+        totpSecret: _totpCtrl.text.trim(),
+        notes: _notesCtrl.text.trim(),
+        isFavorite: _isFavorite,
         cardholderName: _holderCtrl.text.trim(),
-        cardNumber:     _numberCtrl.text.replaceAll(' ', '').trim(),
-        cardExpiry:     _expiryCtrl.text.trim(),
-        cardCvv:        _cvvCtrl.text.trim(),
-        cardPin:        _pinCtrl.text.trim(),
-        cardIssuer:     _issuerCtrl.text.trim(),
+        cardNumber: _numberCtrl.text.replaceAll(' ', '').trim(),
+        cardExpiry: _expiryCtrl.text.trim(),
+        cardCvv: _cvvCtrl.text.trim(),
+        cardPin: _pinCtrl.text.trim(),
+        cardIssuer: _issuerCtrl.text.trim(),
       );
       await VaultService().addEntry(entry);
     }
@@ -159,7 +160,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     final pass = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-          builder: (_) => const GeneratorScreen(returnPassword: true)),
+        builder: (_) => const GeneratorScreen(returnPassword: true),
+      ),
     );
     if (pass != null) setState(() => _passCtrl.text = pass);
   }
@@ -168,7 +170,9 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     if (raw.startsWith('otpauth://')) {
       try {
         return Uri.parse(raw).queryParameters['secret'];
-      } catch (_) { return null; }
+      } catch (_) {
+        return null;
+      }
     }
     return raw.trim();
   }
@@ -183,7 +187,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     final secret = _extractTotpSecret(raw);
     if (secret == null || secret.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('QR code invalide pour 2FA')));
+        const SnackBar(content: Text('QR code invalide pour 2FA')),
+      );
       return;
     }
     final err = TotpService.validate(secret);
@@ -196,14 +201,19 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       _totpError = null;
     });
     messenger.showSnackBar(
-      const SnackBar(content: Text('Secret 2FA ajouté ✓')));
+      const SnackBar(content: Text('Secret 2FA ajouté ✓')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Modifier' : 'Nouveau ${entryTypeLabel(_type).toLowerCase()}'),
+        title: Text(
+          _isEdit
+              ? 'Modifier'
+              : 'Nouveau ${entryTypeLabel(_type).toLowerCase()}',
+        ),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -216,87 +226,100 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(children: [
-
-          // Category
-          _label('Catégorie'),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 48,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: categories.length,
-              separatorBuilder: (_, i) => const SizedBox(width: 6),
-              itemBuilder: (context, i) {
-                final cat      = categories[i];
-                final selected = _category == cat;
-                final color    = categoryColor(cat);
-                return ChoiceChip(
-                  label: Text(cat, style: const TextStyle(fontSize: 12)),
-                  avatar: Icon(categoryIcon(cat), size: 14,
+        child: Column(
+          children: [
+            // Category
+            _label('Catégorie'),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 48,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: categories.length,
+                separatorBuilder: (_, i) => const SizedBox(width: 6),
+                itemBuilder: (context, i) {
+                  final cat = categories[i];
+                  final selected = _category == cat;
+                  final color = categoryColor(cat);
+                  return ChoiceChip(
+                    label: Text(cat, style: const TextStyle(fontSize: 12)),
+                    avatar: Icon(
+                      categoryIcon(cat),
+                      size: 14,
                       color: selected
                           ? Theme.of(context).colorScheme.onPrimary
-                          : color),
-                  selected: selected,
-                  selectedColor: color,
-                  onSelected: (_) => setState(() => _category = cat),
-                  showCheckmark: false,
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Title
-          _label('Titre *'),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _titleCtrl,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              hintText: _hintForTitle(),
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.title, size: 20),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Type-specific fields
-          if (_type == EntryType.password) ..._buildPasswordFields(),
-          if (_type == EntryType.note)     ..._buildNoteFields(),
-          if (_type == EntryType.card)     ..._buildCardFields(),
-
-          // Favorite
-          Card(
-            child: SwitchListTile(
-              title: const Text('Favori'),
-              secondary: Icon(
-                _isFavorite ? Icons.star : Icons.star_border,
-                color: _isFavorite ? Colors.amber : null,
+                          : color,
+                    ),
+                    selected: selected,
+                    selectedColor: color,
+                    onSelected: (_) => setState(() => _category = cat),
+                    showCheckmark: false,
+                  );
+                },
               ),
-              value: _isFavorite,
-              onChanged: (v) => setState(() => _isFavorite = v),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-          FilledButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: const Icon(Icons.save_outlined, size: 18),
-            label: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
-            style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48)),
-          ),
-        ]),
+            // Title
+            _label('Titre *'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _titleCtrl,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: _hintForTitle(),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.title, size: 20),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Type-specific fields
+            if (_type == EntryType.password) ..._buildPasswordFields(),
+            if (_type == EntryType.note) ..._buildNoteFields(),
+            if (_type == EntryType.card) ..._buildCardFields(),
+
+            // Favorite — compact, ne pas écraser le bouton Enregistrer
+            Card(
+              margin: EdgeInsets.zero,
+              child: SwitchListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                title: const Text('Favori', style: TextStyle(fontSize: 14)),
+                secondary: Icon(
+                  _isFavorite ? Icons.star : Icons.star_border,
+                  color: _isFavorite ? Colors.amber : null,
+                  size: 22,
+                ),
+                value: _isFavorite,
+                onChanged: (v) => setState(() => _isFavorite = v),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            FilledButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: const Icon(Icons.save_outlined, size: 18),
+              label: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+            const SizedBox(height: 16), // padding bottom pour respiration
+          ],
+        ),
       ),
     );
   }
 
   String _hintForTitle() {
     switch (_type) {
-      case EntryType.password: return 'ex: Google, Netflix, BNP…';
-      case EntryType.note:     return 'ex: Code Wi-Fi, RIB, recovery key…';
-      case EntryType.card:     return 'ex: Visa BNP, Mastercard pro…';
+      case EntryType.password:
+        return 'ex: Google, Netflix, BNP…';
+      case EntryType.note:
+        return 'ex: Code Wi-Fi, RIB, recovery key…';
+      case EntryType.card:
+        return 'ex: Visa BNP, Mastercard pro…';
     }
   }
 
@@ -330,7 +353,10 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(_showPass ? Icons.visibility_off : Icons.visibility, size: 20),
+              icon: Icon(
+                _showPass ? Icons.visibility_off : Icons.visibility,
+                size: 20,
+              ),
               onPressed: () => setState(() => _showPass = !_showPass),
             ),
             IconButton(
@@ -378,7 +404,10 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(_showTotp ? Icons.visibility_off : Icons.visibility, size: 20),
+              icon: Icon(
+                _showTotp ? Icons.visibility_off : Icons.visibility,
+                size: 20,
+              ),
               onPressed: () => setState(() => _showTotp = !_showTotp),
             ),
             IconButton(
@@ -455,52 +484,63 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     ),
     const SizedBox(height: 16),
 
-    Row(children: [
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _label('Expiration'),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _expiryCtrl,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(4),
-              _ExpiryFormatter(),
-            ],
-            decoration: const InputDecoration(
-              hintText: 'MM/AA',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.calendar_today, size: 18),
-            ),
-          ),
-        ]),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _label('CVV'),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _cvvCtrl,
-            obscureText: !_showCvv,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(4),
-            ],
-            decoration: InputDecoration(
-              hintText: '000',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: Icon(_showCvv ? Icons.visibility_off : Icons.visibility, size: 20),
-                onPressed: () => setState(() => _showCvv = !_showCvv),
+    Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('Expiration'),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _expiryCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                  _ExpiryFormatter(),
+                ],
+                decoration: const InputDecoration(
+                  hintText: 'MM/AA',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_today, size: 18),
+                ),
               ),
-            ),
+            ],
           ),
-        ]),
-      ),
-    ]),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('CVV'),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _cvvCtrl,
+                obscureText: !_showCvv,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                ],
+                decoration: InputDecoration(
+                  hintText: '000',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showCvv ? Icons.visibility_off : Icons.visibility,
+                      size: 20,
+                    ),
+                    onPressed: () => setState(() => _showCvv = !_showCvv),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
     const SizedBox(height: 16),
 
     _label('Code PIN (optionnel)'),
@@ -518,7 +558,10 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
         border: const OutlineInputBorder(),
         prefixIcon: const Icon(Icons.pin_outlined, size: 20),
         suffixIcon: IconButton(
-          icon: Icon(_showPin ? Icons.visibility_off : Icons.visibility, size: 20),
+          icon: Icon(
+            _showPin ? Icons.visibility_off : Icons.visibility,
+            size: 20,
+          ),
           onPressed: () => setState(() => _showPin = !_showPin),
         ),
       ),
@@ -551,21 +594,26 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
   ];
 
   Widget _label(String text) => Align(
-        alignment: Alignment.centerLeft,
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                letterSpacing: 0.4)),
-      );
+    alignment: Alignment.centerLeft,
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        letterSpacing: 0.4,
+      ),
+    ),
+  );
 }
 
 /// Formats card number as "1234 5678 9012 3456" while typing.
 class _CardNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final digits = newValue.text.replaceAll(' ', '');
     final buf = StringBuffer();
     for (int i = 0; i < digits.length; i++) {
@@ -583,7 +631,9 @@ class _CardNumberFormatter extends TextInputFormatter {
 class _ExpiryFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final digits = newValue.text.replaceAll('/', '');
     String out;
     if (digits.length <= 2) {

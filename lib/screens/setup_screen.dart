@@ -30,10 +30,10 @@ class _SetupScreenState extends State<SetupScreen> {
     if (p.length >= 12) s += 0.25;
     if (p.length >= 16) s += 0.20;
     if (p.length >= 20) s += 0.10;
-    if (p.contains(RegExp(r'[A-Z]')))       s += 0.10;
-    if (p.contains(RegExp(r'[a-z]')))       s += 0.10;
-    if (p.contains(RegExp(r'[0-9]')))       s += 0.10;
-    if (p.contains(RegExp(r'[^A-Za-z0-9]')))s += 0.15;
+    if (p.contains(RegExp(r'[A-Z]'))) s += 0.10;
+    if (p.contains(RegExp(r'[a-z]'))) s += 0.10;
+    if (p.contains(RegExp(r'[0-9]'))) s += 0.10;
+    if (p.contains(RegExp(r'[^A-Za-z0-9]'))) s += 0.15;
     return s.clamp(0.0, 1.0);
   }
 
@@ -59,14 +59,20 @@ class _SetupScreenState extends State<SetupScreen> {
       return;
     }
     if (_strength(p1) < 0.6) {
-      setState(() => _error = 'Mot de passe trop faible — variez majuscules, chiffres, symboles');
+      setState(
+        () => _error =
+            'Mot de passe trop faible — variez majuscules, chiffres, symboles',
+      );
       return;
     }
     if (p1 != p2) {
       setState(() => _error = 'Les mots de passe ne correspondent pas');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     await VaultService().createVault(p1);
     // Initialise le timestamp dead-man : le compteur d'inactivité commence
     // à 0 dès la création du vault.
@@ -74,15 +80,15 @@ class _SetupScreenState extends State<SetupScreen> {
     _pass1.clear();
     _pass2.clear();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final s  = _strength(_pass1.text);
+    final s = _strength(_pass1.text);
 
     return Scaffold(
       body: SafeArea(
@@ -93,7 +99,8 @@ class _SetupScreenState extends State<SetupScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 80, height: 80,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(20),
@@ -101,9 +108,12 @@ class _SetupScreenState extends State<SetupScreen> {
                   child: Icon(Icons.lock_outline, size: 44, color: cs.primary),
                 ),
                 const SizedBox(height: 24),
-                Text('Créer votre coffre-fort',
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  'Créer votre coffre-fort',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Choisissez un mot de passe maître fort.\nIl chiffre toutes vos données en local.',
@@ -120,10 +130,14 @@ class _SetupScreenState extends State<SetupScreen> {
                   keyboardType: TextInputType.visiblePassword,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    labelText: 'Mot de passe maître (min. 12)',
+                    labelText: 'Mot de passe maître',
+                    helperText: 'Minimum 12 caractères',
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
-                      icon: Icon(_show1 ? Icons.visibility_off : Icons.visibility, size: 20),
+                      icon: Icon(
+                        _show1 ? Icons.visibility_off : Icons.visibility,
+                        size: 20,
+                      ),
                       onPressed: () => setState(() => _show1 = !_show1),
                     ),
                     border: const OutlineInputBorder(),
@@ -132,25 +146,32 @@ class _SetupScreenState extends State<SetupScreen> {
 
                 if (_pass1.text.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Row(children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: s,
-                          minHeight: 6,
-                          backgroundColor: cs.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation(_strengthColor(s)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: s,
+                            minHeight: 6,
+                            backgroundColor: cs.surfaceContainerHighest,
+                            valueColor: AlwaysStoppedAnimation(
+                              _strengthColor(s),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(_strengthLabel(s),
+                      const SizedBox(width: 10),
+                      Text(
+                        _strengthLabel(s),
                         style: TextStyle(
-                            fontSize: 12,
-                            color: _strengthColor(s),
-                            fontWeight: FontWeight.w600)),
-                  ]),
+                          fontSize: 12,
+                          color: _strengthColor(s),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
 
                 const SizedBox(height: 16),
@@ -166,7 +187,10 @@ class _SetupScreenState extends State<SetupScreen> {
                     labelText: 'Confirmer le mot de passe',
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
-                      icon: Icon(_show2 ? Icons.visibility_off : Icons.visibility, size: 20),
+                      icon: Icon(
+                        _show2 ? Icons.visibility_off : Icons.visibility,
+                        size: 20,
+                      ),
                       onPressed: () => setState(() => _show2 = !_show2),
                     ),
                     border: const OutlineInputBorder(),
@@ -175,25 +199,33 @@ class _SetupScreenState extends State<SetupScreen> {
 
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: TextStyle(color: cs.error, fontSize: 13)),
+                  Text(
+                    _error!,
+                    style: TextStyle(color: cs.error, fontSize: 13),
+                  ),
                 ],
 
                 const SizedBox(height: 24),
 
                 if (_loading)
-                  Column(children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(height: 12),
-                    Text('Chiffrement en cours…',
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ])
+                  Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Chiffrement en cours…',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  )
                 else
                   FilledButton.icon(
                     onPressed: _create,
                     icon: const Icon(Icons.shield_outlined, size: 18),
                     label: const Text('Créer le coffre-fort'),
                     style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48)),
+                      minimumSize: const Size.fromHeight(48),
+                    ),
                   ),
 
                 const SizedBox(height: 24),
@@ -203,16 +235,26 @@ class _SetupScreenState extends State<SetupScreen> {
                     color: cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Icon(Icons.info_outline, size: 16, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Ce mot de passe ne peut pas être récupéré. Si vous l\'oubliez, vos données seront inaccessibles.',
-                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: cs.onSurfaceVariant,
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Ce mot de passe ne peut pas être récupéré. Si vous l\'oubliez, vos données seront inaccessibles.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
