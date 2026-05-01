@@ -215,6 +215,18 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
               : 'Nouveau ${entryTypeLabel(_type).toLowerCase()}',
         ),
         actions: [
+          // Toggle favori dans l'AppBar — gain d'espace dans le form,
+          // toujours visible quel que soit le scroll.
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.star : Icons.star_border,
+              color: _isFavorite ? Colors.amber : null,
+            ),
+            tooltip: _isFavorite
+                ? 'Retirer des favoris'
+                : 'Ajouter aux favoris',
+            onPressed: () => setState(() => _isFavorite = !_isFavorite),
+          ),
           TextButton(
             onPressed: _saving ? null : _save,
             child: Text(
@@ -279,35 +291,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
             if (_type == EntryType.note) ..._buildNoteFields(),
             if (_type == EntryType.card) ..._buildCardFields(),
 
-            // Favorite — Row ultra-compact (~36dp au lieu de ~72dp SwitchListTile)
-            const SizedBox(height: 8),
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => setState(() => _isFavorite = !_isFavorite),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isFavorite ? Icons.star : Icons.star_border,
-                      color: _isFavorite ? Colors.amber : null,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Favori', style: TextStyle(fontSize: 14)),
-                    ),
-                    Transform.scale(
-                      scale: 0.85,
-                      child: Switch(
-                        value: _isFavorite,
-                        onChanged: (v) => setState(() => _isFavorite = v),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // Favori est désormais dans l'AppBar (icône étoile toggleable)
+            // → libère ~50dp dans le form, bouton Enregistrer remonte d'autant.
             const SizedBox(height: 8),
 
             FilledButton.icon(
