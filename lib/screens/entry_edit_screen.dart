@@ -279,23 +279,36 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
             if (_type == EntryType.note) ..._buildNoteFields(),
             if (_type == EntryType.card) ..._buildCardFields(),
 
-            // Favorite — compact, ne pas écraser le bouton Enregistrer
-            Card(
-              margin: EdgeInsets.zero,
-              child: SwitchListTile(
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                title: const Text('Favori', style: TextStyle(fontSize: 14)),
-                secondary: Icon(
-                  _isFavorite ? Icons.star : Icons.star_border,
-                  color: _isFavorite ? Colors.amber : null,
-                  size: 22,
+            // Favorite — Row ultra-compact (~36dp au lieu de ~72dp SwitchListTile)
+            const SizedBox(height: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => setState(() => _isFavorite = !_isFavorite),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isFavorite ? Icons.star : Icons.star_border,
+                      color: _isFavorite ? Colors.amber : null,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('Favori', style: TextStyle(fontSize: 14)),
+                    ),
+                    Transform.scale(
+                      scale: 0.85,
+                      child: Switch(
+                        value: _isFavorite,
+                        onChanged: (v) => setState(() => _isFavorite = v),
+                      ),
+                    ),
+                  ],
                 ),
-                value: _isFavorite,
-                onChanged: (v) => setState(() => _isFavorite = v),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -305,7 +318,7 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
                 minimumSize: const Size.fromHeight(48),
               ),
             ),
-            const SizedBox(height: 16), // padding bottom pour respiration
+            const SizedBox(height: 8),
           ],
         ),
       ),
