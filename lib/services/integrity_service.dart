@@ -11,13 +11,15 @@ class IntegrityService {
   static Future<IntegrityStatus> check() async {
     if (!Platform.isAndroid) return const IntegrityStatus();
     try {
-      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('checkIntegrity');
+      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'checkIntegrity',
+      );
       if (res == null) return const IntegrityStatus();
       return IntegrityStatus(
-        rooted:     res['rooted']     as bool? ?? false,
-        emulator:   res['emulator']   as bool? ?? false,
+        rooted: res['rooted'] as bool? ?? false,
+        emulator: res['emulator'] as bool? ?? false,
         debuggable: res['debuggable'] as bool? ?? false,
-        debugger:   res['debugger']   as bool? ?? false,
+        debugger: res['debugger'] as bool? ?? false,
       );
     } catch (_) {
       return const IntegrityStatus();
@@ -42,10 +44,10 @@ class IntegrityStatus {
   /// Liste des problèmes détectés en français pour affichage UI.
   List<String> get issues {
     final list = <String>[];
-    if (rooted)     list.add('Appareil rooté détecté');
-    if (debugger)   list.add('Debugger attaché');
+    if (rooted) list.add('Appareil rooté détecté');
+    if (debugger) list.add('Debugger attaché');
     if (debuggable) list.add('App en mode debug');
-    if (emulator)   list.add('Émulateur détecté');
+    if (emulator) list.add('Émulateur détecté');
     return list;
   }
 }

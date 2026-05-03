@@ -17,10 +17,7 @@ class BreachService {
       final resp = await http
           .get(
             Uri.parse('https://api.pwnedpasswords.com/range/$prefix'),
-            headers: const {
-              'User-Agent': 'PassTech',
-              'Add-Padding': 'true',
-            },
+            headers: const {'User-Agent': 'PassTech', 'Add-Padding': 'true'},
           )
           .timeout(const Duration(seconds: 8));
 

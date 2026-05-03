@@ -15,28 +15,37 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 ThemeMode parseThemeMode(String s) {
   switch (s) {
-    case 'light': return ThemeMode.light;
-    case 'dark':  return ThemeMode.dark;
-    default:      return ThemeMode.system;
+    case 'light':
+      return ThemeMode.light;
+    case 'dark':
+      return ThemeMode.dark;
+    default:
+      return ThemeMode.system;
   }
 }
 
 String themeModeToString(ThemeMode m) {
   switch (m) {
-    case ThemeMode.light:  return 'light';
-    case ThemeMode.dark:   return 'dark';
-    case ThemeMode.system: return 'system';
+    case ThemeMode.light:
+      return 'light';
+    case ThemeMode.dark:
+      return 'dark';
+    case ThemeMode.system:
+      return 'system';
   }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
+    const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
+  );
 
-  final prefs       = await SharedPreferences.getInstance();
+  final prefs = await SharedPreferences.getInstance();
   ClipboardService.clearAfterSeconds = prefs.getInt('clipboard_clear') ?? 30;
-  themeNotifier.value = parseThemeMode(prefs.getString('theme_mode') ?? 'system');
+  themeNotifier.value = parseThemeMode(
+    prefs.getString('theme_mode') ?? 'system',
+  );
 
   final vaultExists = await VaultService().vaultExists;
   final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
@@ -56,8 +65,7 @@ class PassTechApp extends StatefulWidget {
   State<PassTechApp> createState() => _PassTechAppState();
 }
 
-class _PassTechAppState extends State<PassTechApp>
-    with WidgetsBindingObserver {
+class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   DateTime? _pausedAt;
 
   @override
@@ -140,35 +148,35 @@ class _PassTechAppState extends State<PassTechApp>
 }
 
 ThemeData _lightTheme() => ThemeData(
-      useMaterial3: true,
-      colorSchemeSeed: const Color(0xFF1F6FEB),
-      brightness: Brightness.light,
-    );
+  useMaterial3: true,
+  colorSchemeSeed: const Color(0xFF1F6FEB),
+  brightness: Brightness.light,
+);
 
 ThemeData _darkTheme() {
-  const bg       = Color(0xFF0D1117);
-  const surface  = Color(0xFF161B22);
+  const bg = Color(0xFF0D1117);
+  const surface = Color(0xFF161B22);
   const surface2 = Color(0xFF21262D);
-  const border   = Color(0xFF30363D);
-  const textPri  = Color(0xFFE6EDF3);
-  const textSec  = Color(0xFF8B949E);
-  const blue     = Color(0xFF58A6FF);
+  const border = Color(0xFF30363D);
+  const textPri = Color(0xFFE6EDF3);
+  const textSec = Color(0xFF8B949E);
+  const blue = Color(0xFF58A6FF);
   const blueCont = Color(0xFF1F6FEB);
 
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: const ColorScheme.dark(
-      surface:                surface,
-      onSurface:              textPri,
-      onSurfaceVariant:       textSec,
-      primary:                blue,
-      onPrimary:              Color(0xFF0D1117),
-      primaryContainer:       blueCont,
-      onPrimaryContainer:     textPri,
+      surface: surface,
+      onSurface: textPri,
+      onSurfaceVariant: textSec,
+      primary: blue,
+      onPrimary: Color(0xFF0D1117),
+      primaryContainer: blueCont,
+      onPrimaryContainer: textPri,
       surfaceContainerHighest: surface2,
-      outline:                border,
-      error:                  Color(0xFFFF7B72),
+      outline: border,
+      error: Color(0xFFFF7B72),
     ),
     scaffoldBackgroundColor: bg,
     cardTheme: CardThemeData(

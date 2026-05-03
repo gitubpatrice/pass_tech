@@ -71,7 +71,9 @@ class AntiPhishingService {
   /// L'utilisateur DOIT l'activer manuellement (sécurité système).
   Future<bool> get isAccessibilityServiceActive async {
     try {
-      final r = await _channel.invokeMethod<bool>('isAccessibilityServiceEnabled');
+      final r = await _channel.invokeMethod<bool>(
+        'isAccessibilityServiceEnabled',
+      );
       return r ?? false;
     } catch (_) {
       return false;
@@ -82,7 +84,9 @@ class AntiPhishingService {
   Future<void> openAccessibilitySettings() async {
     try {
       await _channel.invokeMethod('openAccessibilitySettings');
-    } catch (_) {/* silent */}
+    } catch (_) {
+      /* silent */
+    }
   }
 
   /// Lit le dernier domaine détecté par PhishingDetectorService.
@@ -166,7 +170,8 @@ class AntiPhishingService {
     if (trimmed.isEmpty) return null;
     if (!trimmed.contains('.')) return null;
     if (trimmed.contains(' ')) return null;
-    final withScheme = trimmed.startsWith('http://') || trimmed.startsWith('https://')
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
         ? trimmed
         : 'https://$trimmed';
     try {
@@ -193,7 +198,14 @@ class AntiPhishingService {
   /// un TLD composé (ex. `co.uk`, `com.au`, `gov.uk`, `org.uk`, `ac.uk`,
   /// `com.br`, `co.jp`, `co.za`, `co.in`, `net.au`, etc.).
   static const _composedSecondLevels = {
-    'co', 'com', 'gov', 'org', 'net', 'ac', 'edu', 'mil',
+    'co',
+    'com',
+    'gov',
+    'org',
+    'net',
+    'ac',
+    'edu',
+    'mil',
   };
 
   /// Extrait l'eTLD+1 d'un host. Retourne null si le host est trop court.
@@ -230,9 +242,9 @@ class AntiPhishingService {
       for (var j = 1; j <= n; j++) {
         final cost = s.codeUnitAt(i - 1) == t.codeUnitAt(j - 1) ? 0 : 1;
         curr[j] = [
-          curr[j - 1] + 1,      // insertion
-          prev[j] + 1,          // suppression
-          prev[j - 1] + cost,   // substitution
+          curr[j - 1] + 1, // insertion
+          prev[j] + 1, // suppression
+          prev[j - 1] + cost, // substitution
         ].reduce((a, b) => a < b ? a : b);
       }
       final tmp = prev;

@@ -5,8 +5,9 @@ class ClipboardService {
   static Timer? _timer;
   static int clearAfterSeconds = 30;
 
-  static const _channel =
-      MethodChannel('com.passtech.pass_tech/secure_clipboard');
+  static const _channel = MethodChannel(
+    'com.passtech.pass_tech/secure_clipboard',
+  );
 
   static Future<void> _copySensitive(String text) async {
     try {
@@ -25,7 +26,10 @@ class ClipboardService {
     }
   }
 
-  static Future<void> copyWithAutoClear(String text, {VoidCallback? onCleared}) async {
+  static Future<void> copyWithAutoClear(
+    String text, {
+    VoidCallback? onCleared,
+  }) async {
     HapticFeedback.lightImpact();
     await _copySensitive(text);
     _timer?.cancel();

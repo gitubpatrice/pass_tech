@@ -1,7 +1,7 @@
 name: pass_tech
 description: "Gestionnaire de mots de passe 100% local et sécurisé"
 publish_to: 'none'
-version: 1.12.6+2025
+version: 2.0.0+1
 
 environment:
   sdk: ^3.11.5
@@ -15,6 +15,9 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   crypto: ^3.0.3
   encrypt: ^5.0.3
+  # v4 hardening : Argon2id + AES-GCM (Dart pur + accélération native FFI)
+  cryptography: ^2.7.0
+  cryptography_flutter: ^2.3.2
   uuid: ^4.5.1
   share_plus: ^10.0.3
   shared_preferences: ^2.3.2

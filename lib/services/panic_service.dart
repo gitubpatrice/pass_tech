@@ -21,9 +21,13 @@ class PanicService {
   /// Best-effort sur chaque étape — un échec n'empêche pas les autres.
   static Future<void> panic({bool disguise = true}) async {
     // 1. Lock vault (synchrone, garanti)
-    try { VaultService().lock(); } catch (_) {}
+    try {
+      VaultService().lock();
+    } catch (_) {}
     // 2. Clear clipboard (synchrone via channel)
-    try { await ClipboardService.cancelAndClear(); } catch (_) {}
+    try {
+      await ClipboardService.cancelAndClear();
+    } catch (_) {}
     // 3. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
     if (disguise) {
       try {

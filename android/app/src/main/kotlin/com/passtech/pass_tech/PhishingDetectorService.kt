@@ -42,8 +42,13 @@ class PhishingDetectorService : AccessibilityService() {
          * Fenêtre de fraîcheur. Au-delà, on considère le domaine comme stale
          * (l'utilisateur a peut-être quitté le navigateur). Le getter retourne
          * null après expiration → côté Dart : verdict `unknown` (fail-safe).
+         *
+         * M-7 : réduit de 60 s → 15 s. Une fenêtre trop large laisse
+         * passer une race-condition où l'utilisateur copie un mot de passe
+         * juste après avoir changé d'onglet (le domaine périmé serait
+         * considéré comme valide).
          */
-        private const val FRESHNESS_MS = 60_000L
+        private const val FRESHNESS_MS = 15_000L
 
         /**
          * Validation TLD stricte : refuse les titres de page (ex. "LeMonde.fr"

@@ -24,6 +24,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val raspChannel = "com.passtech.pass_tech/rasp"
     private val disguiseChannel = "com.passtech.pass_tech/disguise"
     private val antiPhishingChannel = "com.passtech.pass_tech/antiphishing"
+    // v4 hardening : KeystoreBridge enregistré via registerKeystoreBridge()
+    // (constante CHANNEL_NAME = "com.passtech.pass_tech/keystore").
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +38,11 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // v4 hardening : MethodChannel "com.passtech.pass_tech/keystore" pour
+        // enveloppe AES/GCM Keystore-bound (KEK 256 bits, AndroidKeyStore).
+        registerKeystoreBridge(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, secureClipboardChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {

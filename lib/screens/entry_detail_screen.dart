@@ -12,7 +12,11 @@ import 'entry_edit_screen.dart';
 class EntryDetailScreen extends StatefulWidget {
   final Entry entry;
   final VoidCallback onChanged;
-  const EntryDetailScreen({super.key, required this.entry, required this.onChanged});
+  const EntryDetailScreen({
+    super.key,
+    required this.entry,
+    required this.onChanged,
+  });
 
   @override
   State<EntryDetailScreen> createState() => _EntryDetailScreenState();
@@ -31,7 +35,11 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     _entry = widget.entry;
   }
 
-  Future<void> _copy(String text, String label, {bool sensitive = false}) async {
+  Future<void> _copy(
+    String text,
+    String label, {
+    bool sensitive = false,
+  }) async {
     final messenger = ScaffoldMessenger.of(context);
 
     // Anti-phishing : sur les champs sensibles (mot de passe, 2FA), on vérifie
@@ -51,23 +59,30 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         // périmé > 60s). On copie mais on prévient — pour éviter le faux
         // sentiment de sécurité.
         if (!mounted) return;
-        messenger.showSnackBar(SnackBar(
-          content: const Text(
-              '⚠ Anti-phishing inactif — vérifiez l\'accessibilité dans Réglages'),
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'Réglages',
-            onPressed: () => svc.openAccessibilitySettings(),
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text(
+              '⚠ Anti-phishing inactif — vérifiez l\'accessibilité dans Réglages',
+            ),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Réglages',
+              onPressed: () => svc.openAccessibilitySettings(),
+            ),
           ),
-        ));
+        );
       }
     }
 
     await ClipboardService.copyWithAutoClear(text);
-    messenger.showSnackBar(SnackBar(
-      content: Text('$label copié — effacé dans ${ClipboardService.clearAfterSeconds}s'),
-      duration: const Duration(seconds: 3),
-    ));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '$label copié — effacé dans ${ClipboardService.clearAfterSeconds}s',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<bool?> _showPhishingDialog(PhishingCheck check) {
@@ -83,19 +98,23 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(isTypo
-                ? 'Le domaine actif ressemble au vôtre — typosquatting probable. '
-                  'Cela peut être un faux positif, mais soyez prudent(e).'
-                : 'Le navigateur est sur un domaine totalement différent. '
-                  'La copie a été bloquée pour votre sécurité.'),
+            Text(
+              isTypo
+                  ? 'Le domaine actif ressemble au vôtre — typosquatting probable. '
+                        'Cela peut être un faux positif, mais soyez prudent(e).'
+                  : 'Le navigateur est sur un domaine totalement différent. '
+                        'La copie a été bloquée pour votre sécurité.',
+            ),
             const SizedBox(height: 12),
             _domainRow('Attendu', check.expectedDomain ?? '—', cs.primary),
             const SizedBox(height: 4),
             _domainRow('Actif', check.activeDomain ?? '—', cs.error),
             if (check.distance != null) ...[
               const SizedBox(height: 8),
-              Text('Distance : ${check.distance}',
-                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+              Text(
+                'Distance : ${check.distance}',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
             ],
           ],
         ),
@@ -122,16 +141,21 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     children: [
       SizedBox(
         width: 64,
-        child: Text(label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        ),
       ),
       Expanded(
-        child: Text(value,
-            style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: color,
-                fontWeight: FontWeight.w600)),
+        child: Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 13,
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     ],
   );
@@ -145,14 +169,17 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
 
   Future<void> _delete() async {
     final nav = Navigator.of(context);
-    final cs  = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Supprimer ?'),
         content: Text('Supprimer "${_entry.title}" définitivement ?'),
         actions: [
-          TextButton(onPressed: () => nav.pop(false), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => nav.pop(false),
+            child: const Text('Annuler'),
+          ),
           TextButton(
             onPressed: () => nav.pop(true),
             style: TextButton.styleFrom(foregroundColor: cs.error),
@@ -180,9 +207,9 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs       = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final catColor = categoryColor(_entry.category);
-    final fmt      = DateFormat('dd/MM/yyyy HH:mm');
+    final fmt = DateFormat('dd/MM/yyyy HH:mm');
 
     return Scaffold(
       appBar: AppBar(
@@ -207,34 +234,49 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         children: [
           // Header
           Center(
-            child: Column(children: [
-              Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(
-                  color: catColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: catColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    _typeIcon(_entry.type),
+                    size: 32,
+                    color: catColor,
+                  ),
                 ),
-                child: Icon(_typeIcon(_entry.type), size: 32, color: catColor),
-              ),
-              const SizedBox(height: 8),
-              Wrap(spacing: 6, alignment: WrapAlignment.center, children: [
-                _badge(entryTypeLabel(_entry.type), catColor),
-                _badge(_entry.category, cs.onSurfaceVariant),
-              ]),
-            ]),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _badge(entryTypeLabel(_entry.type), catColor),
+                    _badge(_entry.category, cs.onSurfaceVariant),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
 
           if (_entry.type == EntryType.password) ..._buildPasswordView(),
-          if (_entry.type == EntryType.note)     ..._buildNoteView(),
-          if (_entry.type == EntryType.card)     ..._buildCardView(),
+          if (_entry.type == EntryType.note) ..._buildNoteView(),
+          if (_entry.type == EntryType.card) ..._buildCardView(),
 
           const Divider(),
           const SizedBox(height: 6),
-          Text('Créé le ${fmt.format(_entry.createdAt)}',
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-          Text('Modifié le ${fmt.format(_entry.updatedAt)}',
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+          Text(
+            'Créé le ${fmt.format(_entry.createdAt)}',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+          Text(
+            'Modifié le ${fmt.format(_entry.updatedAt)}',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
         ],
       ),
     );
@@ -242,9 +284,12 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
 
   IconData _typeIcon(EntryType t) {
     switch (t) {
-      case EntryType.password: return categoryIcon(_entry.category);
-      case EntryType.note:     return Icons.sticky_note_2_outlined;
-      case EntryType.card:     return Icons.credit_card;
+      case EntryType.password:
+        return categoryIcon(_entry.category);
+      case EntryType.note:
+        return Icons.sticky_note_2_outlined;
+      case EntryType.card:
+        return Icons.credit_card;
     }
   }
 
@@ -252,7 +297,9 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     _Field(
       label: 'Identifiant',
       value: _entry.username.isEmpty ? '—' : _entry.username,
-      onCopy: _entry.username.isEmpty ? null : () => _copy(_entry.username, 'Identifiant'),
+      onCopy: _entry.username.isEmpty
+          ? null
+          : () => _copy(_entry.username, 'Identifiant'),
     ),
     const SizedBox(height: 10),
 
@@ -291,29 +338,37 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Expanded(
-              child: Text('Contenu',
-                  style: TextStyle(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Contenu',
+                    style: TextStyle(
                       fontSize: 11,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4)),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: _entry.notes.isEmpty
+                      ? null
+                      : () => _copy(_entry.notes, 'Contenu'),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.copy, size: 18),
-              onPressed: _entry.notes.isEmpty
-                  ? null
-                  : () => _copy(_entry.notes, 'Contenu'),
+            const SizedBox(height: 6),
+            SelectableText(
+              _entry.notes.isEmpty ? '(vide)' : _entry.notes,
+              style: const TextStyle(fontSize: 14, height: 1.4),
             ),
-          ]),
-          const SizedBox(height: 6),
-          SelectableText(
-            _entry.notes.isEmpty ? '(vide)' : _entry.notes,
-            style: const TextStyle(fontSize: 14, height: 1.4),
-          ),
-        ]),
+          ],
+        ),
       ),
     ),
     const SizedBox(height: 10),
@@ -343,26 +398,32 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     ),
     const SizedBox(height: 10),
 
-    Row(children: [
-      if (_entry.cardExpiry.isNotEmpty)
-        Expanded(child: _Field(
-          label: 'Expiration',
-          value: _entry.cardExpiry,
-          onCopy: () => _copy(_entry.cardExpiry, 'Expiration'),
-        )),
-      if (_entry.cardExpiry.isNotEmpty && _entry.cardCvv.isNotEmpty)
-        const SizedBox(width: 10),
-      if (_entry.cardCvv.isNotEmpty)
-        Expanded(child: _MaskableField(
-          label: 'CVV',
-          value: _entry.cardCvv,
-          formattedValue: _entry.cardCvv,
-          maskedValue: '•' * _entry.cardCvv.length,
-          show: _showCvv,
-          onToggle: () => setState(() => _showCvv = !_showCvv),
-          onCopy: () => _copy(_entry.cardCvv, 'CVV'),
-        )),
-    ]),
+    Row(
+      children: [
+        if (_entry.cardExpiry.isNotEmpty)
+          Expanded(
+            child: _Field(
+              label: 'Expiration',
+              value: _entry.cardExpiry,
+              onCopy: () => _copy(_entry.cardExpiry, 'Expiration'),
+            ),
+          ),
+        if (_entry.cardExpiry.isNotEmpty && _entry.cardCvv.isNotEmpty)
+          const SizedBox(width: 10),
+        if (_entry.cardCvv.isNotEmpty)
+          Expanded(
+            child: _MaskableField(
+              label: 'CVV',
+              value: _entry.cardCvv,
+              formattedValue: _entry.cardCvv,
+              maskedValue: '•' * _entry.cardCvv.length,
+              show: _showCvv,
+              onToggle: () => setState(() => _showCvv = !_showCvv),
+              onCopy: () => _copy(_entry.cardCvv, 'CVV'),
+            ),
+          ),
+      ],
+    ),
     const SizedBox(height: 10),
 
     if (_entry.cardPin.isNotEmpty) ...[
@@ -395,8 +456,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       color: color.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(text,
-        style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
+    ),
   );
 
   static String _formatCardNumber(String n) {
@@ -429,23 +492,34 @@ class _Field extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 11, color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600, letterSpacing: 0.4)),
-              const SizedBox(height: 3),
-              SelectableText(value, style: const TextStyle(fontSize: 14)),
-            ]),
-          ),
-          if (onCopy != null)
-            IconButton(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  SelectableText(value, style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+            if (onCopy != null)
+              IconButton(
                 icon: const Icon(Icons.copy, size: 18),
                 onPressed: onCopy,
-                tooltip: 'Copier'),
-        ]),
+                tooltip: 'Copier',
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -469,34 +543,47 @@ class _PasswordField extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Mot de passe',
-                  style: TextStyle(
-                      fontSize: 11, color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600, letterSpacing: 0.4)),
-              const SizedBox(height: 3),
-              Text(
-                show ? password : '•' * 12,
-                style: TextStyle(
-                  fontSize: 14,
-                  letterSpacing: show ? 0.5 : 2,
-                  fontFamily: show ? 'monospace' : null,
-                ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Mot de passe',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    show ? password : '•' * 12,
+                    style: TextStyle(
+                      fontSize: 14,
+                      letterSpacing: show ? 0.5 : 2,
+                      fontFamily: show ? 'monospace' : null,
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          ),
-          IconButton(
-            icon: Icon(show ? Icons.visibility_off : Icons.visibility, size: 18),
-            onPressed: onToggle,
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy, size: 18),
-            onPressed: onCopy,
-            tooltip: 'Copier',
-          ),
-        ]),
+            ),
+            IconButton(
+              icon: Icon(
+                show ? Icons.visibility_off : Icons.visibility,
+                size: 18,
+              ),
+              onPressed: onToggle,
+            ),
+            IconButton(
+              icon: const Icon(Icons.copy, size: 18),
+              onPressed: onCopy,
+              tooltip: 'Copier',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -528,33 +615,46 @@ class _MaskableField extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 11, color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600, letterSpacing: 0.4)),
-              const SizedBox(height: 3),
-              Text(
-                show ? formattedValue : maskedValue,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontFamily: monospace ? 'monospace' : null,
-                  letterSpacing: monospace ? 1.5 : 0.5,
-                ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    show ? formattedValue : maskedValue,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: monospace ? 'monospace' : null,
+                      letterSpacing: monospace ? 1.5 : 0.5,
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          ),
-          IconButton(
-            icon: Icon(show ? Icons.visibility_off : Icons.visibility, size: 18),
-            onPressed: onToggle,
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy, size: 18),
-            onPressed: onCopy,
-          ),
-        ]),
+            ),
+            IconButton(
+              icon: Icon(
+                show ? Icons.visibility_off : Icons.visibility,
+                size: 18,
+              ),
+              onPressed: onToggle,
+            ),
+            IconButton(
+              icon: const Icon(Icons.copy, size: 18),
+              onPressed: onCopy,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -597,50 +697,71 @@ class _TotpCardState extends State<_TotpCard> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-        child: Row(children: [
-          // Countdown ring
-          SizedBox(
-            width: 42, height: 42,
-            child: Stack(alignment: Alignment.center, children: [
-              SizedBox(
-                width: 42, height: 42,
-                child: CircularProgressIndicator(
-                  value: remaining / 30,
-                  strokeWidth: 3,
-                  backgroundColor: cs.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation(ringColor),
-                ),
+        child: Row(
+          children: [
+            // Countdown ring
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: CircularProgressIndicator(
+                      value: remaining / 30,
+                      strokeWidth: 3,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation(ringColor),
+                    ),
+                  ),
+                  Text(
+                    '$remaining',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: ringColor,
+                    ),
+                  ),
+                ],
               ),
-              Text('$remaining',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w700, color: ringColor)),
-            ]),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Code 2FA — TOTP',
-                  style: TextStyle(
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Code 2FA — TOTP',
+                    style: TextStyle(
                       fontSize: 11,
                       color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4)),
-              const SizedBox(height: 2),
-              Text(code,
-                  style: TextStyle(
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    code,
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 3,
-                      color: ringColor)),
-            ]),
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy, size: 18),
-            onPressed: () => widget.onCopy(code.replaceAll(' ', '')),
-            tooltip: 'Copier',
-          ),
-        ]),
+                      color: ringColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.copy, size: 18),
+              onPressed: () => widget.onCopy(code.replaceAll(' ', '')),
+              tooltip: 'Copier',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -689,7 +810,9 @@ class _CardVisual extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                entry.cardIssuer.isEmpty ? 'CARTE' : entry.cardIssuer.toUpperCase(),
+                entry.cardIssuer.isEmpty
+                    ? 'CARTE'
+                    : entry.cardIssuer.toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -714,32 +837,52 @@ class _CardVisual extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('TITULAIRE',
-                    style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1)),
-                Text(
-                  entry.cardholderName.isEmpty
-                      ? '—'
-                      : entry.cardholderName.toUpperCase(),
-                  style: const TextStyle(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TITULAIRE',
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 9,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  Text(
+                    entry.cardholderName.isEmpty
+                        ? '—'
+                        : entry.cardholderName.toUpperCase(),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5),
-                ),
-              ]),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('EXPIRE',
-                    style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1)),
-                Text(
-                  entry.cardExpiry.isEmpty ? '—' : entry.cardExpiry,
-                  style: const TextStyle(
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'EXPIRE',
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 9,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  Text(
+                    entry.cardExpiry.isEmpty ? '—' : entry.cardExpiry,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5),
-                ),
-              ]),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ],

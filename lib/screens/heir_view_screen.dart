@@ -37,29 +37,31 @@ class HeirViewScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: Column(children: [
-          Container(
-            width: double.infinity,
-            color: cs.errorContainer.withValues(alpha: 0.40),
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              'Vous accédez au snapshot du coffre transmis par son '
-              'propriétaire. Les modifications ne sont pas possibles. '
-              '${entries.length} entrée${entries.length > 1 ? "s" : ""}.',
-              style: TextStyle(fontSize: 12, color: cs.onErrorContainer),
-              textAlign: TextAlign.center,
+        body: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: cs.errorContainer.withValues(alpha: 0.40),
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Vous accédez au snapshot du coffre transmis par son '
+                'propriétaire. Les modifications ne sont pas possibles. '
+                '${entries.length} entrée${entries.length > 1 ? "s" : ""}.',
+                style: TextStyle(fontSize: 12, color: cs.onErrorContainer),
+                textAlign: TextAlign.center,
+              ),
             ),
-          ),
-          Expanded(
-            child: entries.isEmpty
-                ? const Center(child: Text('Snapshot vide'))
-                : ListView.separated(
-                    itemCount: entries.length,
-                    separatorBuilder: (_, i) => const Divider(height: 1),
-                    itemBuilder: (_, i) => _EntryTile(entry: entries[i]),
-                  ),
-          ),
-        ]),
+            Expanded(
+              child: entries.isEmpty
+                  ? const Center(child: Text('Snapshot vide'))
+                  : ListView.separated(
+                      itemCount: entries.length,
+                      separatorBuilder: (_, i) => const Divider(height: 1),
+                      itemBuilder: (_, i) => _EntryTile(entry: entries[i]),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -73,31 +75,39 @@ class _EntryTile extends StatelessWidget {
     if (value.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
     await ClipboardService.copyWithAutoClear(value);
-    messenger.showSnackBar(SnackBar(
-      content: Text('$label copié (effacement auto)'),
-      duration: const Duration(seconds: 2),
-    ));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('$label copié (effacement auto)'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
       leading: const Icon(Icons.lock_outline),
-      title: Text(entry.title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      title: Text(
+        entry.title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      ),
       subtitle: entry.username.isEmpty
           ? null
-          : Text(entry.username,
+          : Text(
+              entry.username,
               style: const TextStyle(fontSize: 12, color: Colors.grey),
-              overflow: TextOverflow.ellipsis),
+              overflow: TextOverflow.ellipsis,
+            ),
       children: [
         if (entry.username.isNotEmpty)
           ListTile(
             dense: true,
             leading: const Icon(Icons.person_outline, size: 18),
             title: const Text('Identifiant', style: TextStyle(fontSize: 12)),
-            subtitle: SelectableText(entry.username,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            subtitle: SelectableText(
+              entry.username,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
               onPressed: () => _copy(context, 'Identifiant', entry.username),
@@ -108,8 +118,10 @@ class _EntryTile extends StatelessWidget {
             dense: true,
             leading: const Icon(Icons.key_outlined, size: 18),
             title: const Text('Mot de passe', style: TextStyle(fontSize: 12)),
-            subtitle: SelectableText(entry.password,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            subtitle: SelectableText(
+              entry.password,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
               onPressed: () => _copy(context, 'Mot de passe', entry.password),
@@ -120,17 +132,28 @@ class _EntryTile extends StatelessWidget {
             dense: true,
             leading: const Icon(Icons.link, size: 18),
             title: const Text('URL', style: TextStyle(fontSize: 12)),
-            subtitle: SelectableText(entry.url,
-                style: const TextStyle(fontSize: 12)),
+            subtitle: SelectableText(
+              entry.url,
+              style: const TextStyle(fontSize: 12),
+            ),
           ),
         if (entry.notes.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Notes', style: TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 4),
-              SelectableText(entry.notes, style: const TextStyle(fontSize: 12)),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Notes',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 4),
+                SelectableText(
+                  entry.notes,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
           ),
       ],
     );

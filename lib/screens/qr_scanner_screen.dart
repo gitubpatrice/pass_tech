@@ -15,7 +15,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   bool _handled = false;
-  bool _torch   = false;
+  bool _torch = false;
 
   @override
   void initState() {
@@ -91,20 +91,27 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.no_photography_outlined,
-                        color: Colors.white70, size: 64),
+                    const Icon(
+                      Icons.no_photography_outlined,
+                      color: Colors.white70,
+                      size: 64,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Caméra non disponible',
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(color: Colors.white),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       error.errorDetails?.message ??
                           'Vérifiez les autorisations dans les paramètres.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -115,7 +122,8 @@ class _QrScannerScreenState extends State<QrScannerScreen>
           IgnorePointer(
             child: Center(
               child: Container(
-                width: 240, height: 240,
+                width: 240,
+                height: 240,
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.85),
@@ -127,10 +135,15 @@ class _QrScannerScreenState extends State<QrScannerScreen>
             ),
           ),
           Positioned(
-            left: 0, right: 0, bottom: 30,
+            left: 0,
+            right: 0,
+            bottom: 30,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),

@@ -40,10 +40,10 @@ import 'vault_service.dart';
 /// dans un endroit sûr) avec son héritier hors-bande.
 class HeritageService {
   static const _storage = FlutterSecureStorage();
-  static const _saltKey       = 'pt_heir_salt';
-  static const _enabledKey    = 'pt_heir_enabled';
+  static const _saltKey = 'pt_heir_salt';
+  static const _enabledKey = 'pt_heir_enabled';
   static const _lastActiveKey = 'pt_last_active_ts';
-  static const _thresholdKey  = 'pt_heir_threshold_days';
+  static const _thresholdKey = 'pt_heir_threshold_days';
   static const _graceStartKey = 'pt_heir_grace_start_ts';
 
   static const _iterations = 600000;
@@ -152,7 +152,7 @@ class HeritageService {
       throw StateError('Le coffre est vide — rien à transmettre');
     }
     final salt = _randomBytes(32);
-    final key  = await _deriveKey(heirPassword, salt, _iterations);
+    final key = await _deriveKey(heirPassword, salt, _iterations);
     try {
       // Ordre critique : salt AVANT le fichier. Si crash après salt et
       // avant fichier, le prochain setup réécrasera salt sans état corrompu.
@@ -221,75 +221,111 @@ class HeritageService {
   }
 
   void _wipe(Uint8List k) {
-    for (var i = 0; i < k.length; i++) { k[i] = 0; }
+    for (var i = 0; i < k.length; i++) {
+      k[i] = 0;
+    }
   }
 
+  // M-2 : retour précoce sur length mismatch — inoffensif uniquement parce
+  // qu'on compare des HMAC-SHA256 de longueur fixe (32 octets). Ne pas
+  // réutiliser pour des secrets de longueur variable.
   bool _constEq(List<int> a, List<int> b) {
     if (a.length != b.length) return false;
     var diff = 0;
-    for (var i = 0; i < a.length; i++) { diff |= a[i] ^ b[i]; }
+    for (var i = 0; i < a.length; i++) {
+      diff |= a[i] ^ b[i];
+    }
     return diff == 0;
   }
 
   Future<void> _writeSnapshot(
-      List<Entry> entries, Uint8List key, Uint8List salt) async {
-    final iv        = enc.IV.fromSecureRandom(16);
-    final encKey    = enc.Key(key.sublist(0, 32));
-    final macKey    = key.sublist(32);
-    final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
+    List<Entry> entries,
+    Uint8List key,
+    Uint8List salt,
+  ) async {
+    final iv = enc.IV.fromSecureRandom(16);
+    // M-3 : sublist crée des copies. Zéroïser en finally pour éviter de
+    // laisser des fragments de la heir key en RAM jusqu'au GC.
+    final encKeyBytes = key.sublist(0, 32);
+    final macKey = key.sublist(32);
+    try {
+      final encKey = enc.Key(encKeyBytes);
+      final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
 
-    final plain     = jsonEncode(entries.map((e) => e.toJson()).toList());
-    final encrypted = encrypter.encrypt(plain, iv: iv);
+      final plain = jsonEncode(entries.map((e) => e.toJson()).toList());
+      final encrypted = encrypter.encrypt(plain, iv: iv);
 
-    final saltB64 = base64Encode(salt);
-    final aad = utf8.encode(
-        'pt-heir:v=$_heirVersion|iter=$_iterations|salt=$saltB64');
-    final mac = Hmac(sha256, macKey)
-        .convert([...aad, ...iv.bytes, ...encrypted.bytes]).bytes;
+      final saltB64 = base64Encode(salt);
+      final aad = utf8.encode(
+        'pt-heir:v=$_heirVersion|iter=$_iterations|salt=$saltB64',
+      );
+      final mac = Hmac(
+        sha256,
+        macKey,
+      ).convert([...aad, ...iv.bytes, ...encrypted.bytes]).bytes;
 
-    final out = {
-      'version':    _heirVersion,
-      'iterations': _iterations,
-      'salt':       saltB64,
-      'iv':         base64Encode(iv.bytes),
-      'mac':        base64Encode(mac),
-      'data':       base64Encode(encrypted.bytes),
-    };
+      final out = {
+        'version': _heirVersion,
+        'iterations': _iterations,
+        'salt': saltB64,
+        'iv': base64Encode(iv.bytes),
+        'mac': base64Encode(mac),
+        'data': base64Encode(encrypted.bytes),
+      };
 
-    // Écriture atomique : tmp + rename (anti corruption sur crash mid-write)
-    final target = await _heirFile();
-    final tmp = File('${target.path}.tmp');
-    tmp.writeAsStringSync(jsonEncode(out), flush: true);
-    if (target.existsSync()) target.deleteSync();
-    tmp.renameSync(target.path);
+      // Écriture atomique : tmp + rename (anti corruption sur crash mid-write)
+      final target = await _heirFile();
+      final tmp = File('${target.path}.tmp');
+      tmp.writeAsStringSync(jsonEncode(out), flush: true);
+      if (target.existsSync()) target.deleteSync();
+      tmp.renameSync(target.path);
+    } finally {
+      _wipe(encKeyBytes);
+      _wipe(macKey);
+    }
   }
 
   List<Entry>? _readSnapshot(Map<String, dynamic> raw, Uint8List key) {
+    Uint8List? macKey;
+    Uint8List? encKeyBytes;
     try {
-      final ivBytes     = base64Decode(raw['iv']   as String);
-      final macBytes    = base64Decode(raw['mac']  as String);
+      final ivBytes = base64Decode(raw['iv'] as String);
+      final macBytes = base64Decode(raw['mac'] as String);
       final cipherBytes = base64Decode(raw['data'] as String);
-      final saltB64     = raw['salt'] as String? ?? '';
-      final version     = raw['version'] as int? ?? 1;
-      final iterations  = raw['iterations'] as int? ?? _iterations;
+      final saltB64 = raw['salt'] as String? ?? '';
+      final version = raw['version'] as int? ?? 1;
+      // M-9 : version bornée
+      if (version < 1 || version > _heirVersion) return null;
+      final iterations = raw['iterations'] as int? ?? _iterations;
 
-      final macKey = key.sublist(32);
+      macKey = key.sublist(32);
       final aad = utf8.encode(
-          'pt-heir:v=$version|iter=$iterations|salt=$saltB64');
-      final computed = Hmac(sha256, macKey)
-          .convert([...aad, ...ivBytes, ...cipherBytes]).bytes;
+        'pt-heir:v=$version|iter=$iterations|salt=$saltB64',
+      );
+      final computed = Hmac(
+        sha256,
+        macKey,
+      ).convert([...aad, ...ivBytes, ...cipherBytes]).bytes;
       if (!_constEq(computed, macBytes)) return null;
 
-      final encKey    = enc.Key(key.sublist(0, 32));
-      final iv        = enc.IV(Uint8List.fromList(ivBytes));
+      encKeyBytes = key.sublist(0, 32);
+      final encKey = enc.Key(encKeyBytes);
+      final iv = enc.IV(Uint8List.fromList(ivBytes));
       final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-      final plain     = encrypter.decrypt(
-          enc.Encrypted(Uint8List.fromList(cipherBytes)),
-          iv: iv);
+      final plain = encrypter.decrypt(
+        enc.Encrypted(Uint8List.fromList(cipherBytes)),
+        iv: iv,
+      );
       final list = jsonDecode(plain) as List;
-      return list.map((e) => Entry.fromJson(e as Map<String, dynamic>)).toList();
+      return list
+          .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+          .toList();
     } catch (_) {
       return null;
+    } finally {
+      // M-3 : zéroïser les sous-buffers dérivés de la heir key
+      if (macKey != null) _wipe(macKey);
+      if (encKeyBytes != null) _wipe(encKeyBytes);
     }
   }
 }

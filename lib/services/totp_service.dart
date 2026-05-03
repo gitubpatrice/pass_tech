@@ -4,14 +4,14 @@ import 'package:crypto/crypto.dart';
 /// RFC 6238 TOTP-SHA1 / 30-second period / 6 digits.
 class TotpService {
   static const _stepSeconds = 30;
-  static const _digits      = 6;
+  static const _digits = 6;
 
   /// Returns formatted code "123 456" or "------" on invalid secret.
   static String generateCode(String secret) {
     try {
       final key = _decodeBase32(secret);
       if (key.isEmpty) return '------';
-      final time    = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final time = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       final counter = time ~/ _stepSeconds;
       final cb = Uint8List(8);
       var c = counter;
@@ -21,10 +21,11 @@ class TotpService {
       }
       final h = Hmac(sha1, key).convert(cb).bytes;
       final offset = h[h.length - 1] & 0x0F;
-      final code = ((h[offset] & 0x7F) << 24)
-                 | ((h[offset + 1] & 0xFF) << 16)
-                 | ((h[offset + 2] & 0xFF) << 8)
-                 |  (h[offset + 3] & 0xFF);
+      final code =
+          ((h[offset] & 0x7F) << 24) |
+          ((h[offset + 1] & 0xFF) << 16) |
+          ((h[offset + 2] & 0xFF) << 8) |
+          (h[offset + 3] & 0xFF);
       final mod = _powInt(10, _digits);
       final otp = (code % mod).toString().padLeft(_digits, '0');
       return '${otp.substring(0, 3)} ${otp.substring(3)}';
@@ -54,7 +55,9 @@ class TotpService {
 
   static int _powInt(int base, int exp) {
     int r = 1;
-    for (int i = 0; i < exp; i++) { r *= base; }
+    for (int i = 0; i < exp; i++) {
+      r *= base;
+    }
     return r;
   }
 
