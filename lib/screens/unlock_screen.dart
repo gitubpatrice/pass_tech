@@ -432,8 +432,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         FutureBuilder<bool>(
                           future: HeritageService().shouldShowHeirOption(),
                           builder: (_, snap) {
-                            if (snap.data != true)
+                            if (snap.data != true) {
                               return const SizedBox.shrink();
+                            }
                             return Padding(
                               padding: const EdgeInsets.only(top: 12),
                               child: TextButton.icon(

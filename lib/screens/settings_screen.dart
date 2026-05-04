@@ -715,7 +715,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _importFile() async {
     final messenger = ScaffoldMessenger.of(context);
-    final picked = await FilePicker.platform.pickFiles(
+    final picked = await FilePicker.pickFiles(
       type: FileType.any,
       withData: true,
     );

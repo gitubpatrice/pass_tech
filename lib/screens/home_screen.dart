@@ -40,8 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadSort() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted)
+    if (mounted) {
       setState(() => _sort = prefs.getString('sort_mode') ?? 'recent');
+    }
   }
 
   Future<void> _setSort(String s) async {
