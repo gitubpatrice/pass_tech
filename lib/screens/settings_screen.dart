@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:biometric_storage/biometric_storage.dart';
@@ -713,21 +714,48 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
+  /// Cap import : refuse les fichiers > 50 Mo AVANT de demander leur contenu
+  /// en RAM via withData. Sans ça, FilePicker chargeait des fichiers
+  /// arbitrairement gros en RAM avant que notre vérification ne s'applique.
+  static const _kMaxImportBytes = 50 * 1024 * 1024;
+
   Future<void> _importFile() async {
     final messenger = ScaffoldMessenger.of(context);
-    final picked = await FilePicker.pickFiles(
-      type: FileType.any,
-      withData: true,
-    );
-    if (picked == null || picked.files.isEmpty || !mounted) return;
-    final file = picked.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) {
+    // 1. Sélection sans bytes pour récupérer juste la taille (évite OOM).
+    final probe = await FilePicker.pickFiles(type: FileType.any);
+    if (probe == null || probe.files.isEmpty || !mounted) return;
+    final probeFile = probe.files.first;
+    if (probeFile.size > _kMaxImportBytes) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Fichier trop volumineux '
+            '(${(probeFile.size / 1024 / 1024).toStringAsFixed(0)} Mo, '
+            'max ${_kMaxImportBytes ~/ (1024 * 1024)} Mo).',
+          ),
+        ),
+      );
+      return;
+    }
+    // 2. Le path Android est rempli par défaut → on lit directement.
+    final filePath = probeFile.path;
+    if (filePath == null) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Lecture du fichier impossible')),
       );
       return;
     }
+    final Uint8List bytes;
+    try {
+      bytes = await File(filePath).readAsBytes();
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Lecture du fichier impossible')),
+      );
+      return;
+    }
+    final file = probeFile;
 
     String content;
     try {
@@ -753,6 +781,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         content.contains('"magic": "PTBAK"');
 
     if (isPtbak) {
+      if (!mounted) return;
       final passphrase = await showDialog<String>(
         context: context,
         builder: (_) => const _PassphraseDialog(

@@ -197,8 +197,8 @@ class VaultService {
   Future<bool> passwordMatchesPrimary(String password) async {
     try {
       final file = await _vaultFileFor(_Slot.primary);
-      if (!file.existsSync()) return false;
-      final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      if (!await file.exists()) return false;
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
 
       // Snapshot current state so the test doesn't leak into the open vault.
@@ -352,9 +352,9 @@ class VaultService {
   Future<UnlockResult> _tryUnlockSlot(_Slot slot, String masterPassword) async {
     try {
       final file = await _vaultFileFor(slot);
-      if (!file.existsSync()) return UnlockResult.wrongPassword;
+      if (!await file.exists()) return UnlockResult.wrongPassword;
 
-      final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
 
       if (version >= _currentVersion) {
@@ -477,16 +477,19 @@ class VaultService {
       final store = await _bioStorage();
       final keyB64 = await store.read();
       if (keyB64 == null || keyB64.isEmpty) return UnlockResult.wrongPassword;
+      // Wipe l'éventuelle clé résiduelle d'une session précédente AVANT
+      // d'écrire la nouvelle, pour éviter une fuite mémoire transitoire.
+      _wipeKey();
       _key = base64Decode(keyB64);
 
       // La biométrique est volontairement liée au coffre PRIMARY uniquement.
       // Permettre la bio sur le coffre leurre briserait le déni plausible.
       final file = await _vaultFileFor(_Slot.primary);
-      if (!file.existsSync()) {
+      if (!await file.exists()) {
         _wipeKey();
         return UnlockResult.wrongPassword;
       }
-      final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
 
       bool ok;
@@ -724,10 +727,10 @@ class VaultService {
     // happen post-creation), bail out silently — refusing to write a vault
     // we can't reload is safer than producing an inconsistent file.
     final file = await _vaultFileFor(slot);
-    if (!file.existsSync()) return;
+    if (!await file.exists()) return;
     Map<String, dynamic> prev;
     try {
-      prev = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      prev = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
     } catch (_) {
       return;
     }
@@ -838,9 +841,11 @@ class VaultService {
 
     final target = await _vaultFileFor(slot);
     final tmp = File('${target.path}.tmp');
-    tmp.writeAsStringSync(jsonEncode(out), flush: true);
-    if (target.existsSync()) target.deleteSync();
-    tmp.renameSync(target.path);
+    await tmp.writeAsString(jsonEncode(out), flush: true);
+    // rename atomique : sur POSIX/Android, rename remplace sans étape
+    // intermédiaire delete+rename qui pouvait laisser le vault perdu en
+    // cas de crash entre les deux opérations.
+    await tmp.rename(target.path);
   }
 
   /// Decrypt a v4 vault map. On success, populates `_entries` and returns
