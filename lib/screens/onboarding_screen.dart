@@ -163,7 +163,7 @@ class _OnboardPage {
 
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(28, 16, 28, 16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
