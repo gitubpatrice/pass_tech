@@ -14,8 +14,6 @@
 //
 // Crypto runs on a background isolate via `compute()` so the unlock screen
 // stays responsive during the ~1 s cost on a Galaxy S9.
-//
-// PBKDF2 helper exposed for v3 read-only during the migration window.
 
 import 'dart:convert';
 
@@ -81,22 +79,6 @@ class KdfService {
       }
     }
   }
-
-  /// PBKDF2-HMAC-SHA256, exposed read-only for v3 vault decryption during
-  /// the migration window.
-  static Future<Uint8List> pbkdf2LegacyV3({
-    required String password,
-    required Uint8List salt,
-    required int iterations,
-    required int outLen,
-  }) {
-    return compute(_pbkdf2Isolate, <Object>[
-      Uint8List.fromList(utf8.encode(password)),
-      salt,
-      iterations,
-      outLen,
-    ]);
-  }
 }
 
 // Top-level isolate entry-points (compute() requires them top-level).
@@ -121,28 +103,6 @@ Future<Uint8List> _argon2idIsolate(List<Object> args) async {
     nonce: salt,
   );
   final bytes = await secretKey.extractBytes();
-  for (var i = 0; i < password.length; i++) {
-    password[i] = 0;
-  }
-  return Uint8List.fromList(bytes);
-}
-
-Future<Uint8List> _pbkdf2Isolate(List<Object> args) async {
-  final password = args[0] as Uint8List;
-  final salt = args[1] as Uint8List;
-  final iterations = args[2] as int;
-  final outLen = args[3] as int;
-
-  final pbkdf2 = Pbkdf2(
-    macAlgorithm: Hmac.sha256(),
-    iterations: iterations,
-    bits: outLen * 8,
-  );
-  final sk = await pbkdf2.deriveKey(
-    secretKey: SecretKey(password),
-    nonce: salt,
-  );
-  final bytes = await sk.extractBytes();
   for (var i = 0; i < password.length; i++) {
     password[i] = 0;
   }

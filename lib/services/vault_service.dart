@@ -1,6 +1,6 @@
 // VaultService — orchestrateur du coffre-fort Pass Tech.
 //
-// Cette library a été splittée (v2.1.0) pour rendre la crypto critique plus
+// Cette library a été splittée (v2.1.2) pour rendre la crypto critique plus
 // auditable :
 //
 //   vault_service.dart        ← orchestration + état + API publique
