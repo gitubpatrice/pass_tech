@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 class ClipboardService {
   static Timer? _timer;
+  static VoidCallback? _pendingOnCleared;
   static int clearAfterSeconds = 30;
 
   static const _channel = MethodChannel(
@@ -32,11 +33,22 @@ class ClipboardService {
   }) async {
     HapticFeedback.lightImpact();
     await _copySensitive(text);
-    _timer?.cancel();
+    // Si un timer précédent est encore en attente, on l'annule mais on
+    // notifie son callback `onCleared` pour que l'UI qui l'avait posé puisse
+    // remettre son état à zéro (ex. badge "copié" qui doit disparaître).
+    if (_timer != null) {
+      _timer!.cancel();
+      _pendingOnCleared?.call();
+      _pendingOnCleared = null;
+    }
     if (clearAfterSeconds > 0) {
+      _pendingOnCleared = onCleared;
       _timer = Timer(Duration(seconds: clearAfterSeconds), () async {
         await _clearNative();
-        onCleared?.call();
+        final cb = _pendingOnCleared;
+        _pendingOnCleared = null;
+        _timer = null;
+        cb?.call();
       });
     }
   }
@@ -47,11 +59,17 @@ class ClipboardService {
   static Future<void> cancelAndClear() async {
     _timer?.cancel();
     _timer = null;
+    final cb = _pendingOnCleared;
+    _pendingOnCleared = null;
     await _clearNative();
+    cb?.call();
   }
 
   static void cancel() {
     _timer?.cancel();
     _timer = null;
+    final cb = _pendingOnCleared;
+    _pendingOnCleared = null;
+    cb?.call();
   }
 }

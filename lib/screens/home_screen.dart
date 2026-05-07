@@ -41,14 +41,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadSort() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
-      setState(() => _sort = prefs.getString('sort_mode') ?? 'recent');
+      setState(() {
+        _sort = prefs.getString('sort_mode') ?? 'recent';
+      });
     }
   }
 
   Future<void> _setSort(String s) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('sort_mode', s);
-    if (mounted) setState(() => _sort = s);
+    if (mounted) {
+      setState(() {
+        _sort = s;
+      });
+    }
   }
 
   static const _typeChips = ['Mots de passe', 'Notes', 'Cartes bancaires'];
@@ -73,6 +79,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Calcule la liste filtrée/triée à chaque accès. Recalculée à chaque build
+  /// pour garantir la fraîcheur après mutations indirectes (ex. édition depuis
+  /// AuditScreen via callback parallèle qui ne notifie pas HomeScreen).
+  /// Coût négligeable (<1000 entrées, ~ms).
   List<Entry> get _filtered {
     var list = VaultService().entries.toList();
     if (_filter == 'Favoris') {
@@ -212,7 +222,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   border: InputBorder.none,
                   isDense: true,
                 ),
-                onChanged: (v) => setState(() => _search = v),
+                onChanged: (v) => setState(() {
+                  _search = v;
+                }),
               )
             : const Text('Pass Tech'),
         actions: [
@@ -315,7 +327,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       : null,
                   label: Text(chip, style: const TextStyle(fontSize: 12)),
                   selected: selected,
-                  onSelected: (_) => setState(() => _filter = chip),
+                  onSelected: (_) => setState(() {
+                    _filter = chip;
+                  }),
                   showCheckmark: false,
                 );
               },

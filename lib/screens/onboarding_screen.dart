@@ -21,7 +21,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle: 'Votre coffre-fort de mots de passe 100 % local',
       points: [
         'Aucun serveur, aucun cloud, aucun tracker',
-        'Chiffrement AES-256 + PBKDF2 250 000 itérations',
+        'Chiffrement AES-256-GCM + Argon2id (OWASP 2024) + clé matérielle Android Keystore',
         'Audit de sécurité et détection de fuites intégrés',
       ],
     ),

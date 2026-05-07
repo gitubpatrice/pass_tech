@@ -10,7 +10,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '1.12.6';
+  static const _version = '2.0.2';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -74,7 +74,8 @@ class _AboutScreenState extends State<AboutScreen> {
     (
       icon: Icons.lock_outline,
       label: 'Coffre-fort chiffré',
-      desc: 'AES-256-CBC + HMAC-SHA256, PBKDF2 600 000 itérations (OWASP)',
+      desc:
+          'AES-GCM-256 + Argon2id (m=19 MiB, t=2) + KEK Keystore-bound (StrongBox/TEE)',
     ),
     (
       icon: Icons.fingerprint,

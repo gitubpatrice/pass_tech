@@ -352,7 +352,21 @@ class VaultService {
   Future<UnlockResult> _tryUnlockSlot(_Slot slot, String masterPassword) async {
     try {
       final file = await _vaultFileFor(slot);
-      if (!await file.exists()) return UnlockResult.wrongPassword;
+      if (!await file.exists()) {
+        // Anti-timing : si le slot (notamment decoy) n'existe pas, on doit
+        // tout de même consommer ~1 Argon2id pour que le timing total de
+        // unlock() soit identique au cas où le slot existe. Sinon, un
+        // attaquant qui chronomètre l'unlock peut déduire l'absence du
+        // coffre leurre — ce qui briserait le déni plausible.
+        // Mêmes paramètres (m=19 MiB, t=2, p=1) que les vrais slots.
+        final dummySalt = _randomBytes(32);
+        final dummyOut = await KdfService.argon2id(
+          password: 'dummy_$masterPassword',
+          salt: dummySalt,
+        );
+        _zero(dummyOut);
+        return UnlockResult.wrongPassword;
+      }
 
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
@@ -852,6 +866,15 @@ class VaultService {
   /// `true`. On any failure (wrong key, bad tag, corrupt JSON), returns
   /// `false` and leaves `_entries` untouched. The `finalKey` argument is
   /// the 32-byte HKDF output; caller is responsible for wiping it after.
+  ///
+  /// TODO: refactor _decryptVaultV4 to be pure (non-mutating). Aujourd'hui
+  /// la méthode mute `_entries` et `_isOpen` directement, ce qui couple le
+  /// déchiffrement au state global. Plusieurs appelants (`_v4Unlock`,
+  /// `unlockWithBiometric`, `passwordMatchesPrimary`) en dépendent et
+  /// doivent restaurer l'état autour de l'appel — fragile mais non
+  /// exploitable (Dart est single-isolate, pas de course concurrente).
+  /// Refacto à faire dans un patch dédié : retourner `List<Entry>?` et
+  /// laisser les appelants assigner `_entries` / `_isOpen` après succès.
   Future<bool> _decryptVaultV4(
     Map<String, dynamic> raw,
     Uint8List finalKey,
