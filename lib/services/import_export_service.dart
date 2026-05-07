@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/entry.dart';
@@ -443,31 +443,18 @@ class ImportExportService {
     }
   }
 
-  // M-2 (note de sécurité) : ce _constEq retourne tôt sur length mismatch.
-  // C'est inoffensif ici car on l'utilise UNIQUEMENT pour comparer des HMAC-
-  // SHA256 (toujours 32 octets). Ne PAS le réutiliser pour comparer des
-  // secrets de longueur variable (un attaquant pourrait observer un timing
-  // différent selon la longueur).
-  static bool _constEq(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
-    int diff = 0;
-    for (int i = 0; i < a.length; i++) {
-      diff |= a[i] ^ b[i];
-    }
-    return diff == 0;
-  }
+  // v2.1.1 — `_constEq`, `_randomBytes`, `_zero` ont migré vers `SecretBytes`
+  // dans `files_tech_core`. Shims locaux pour limiter le diff sur les
+  // callsites historiques.
+  //
+  // M-2 : `SecretBytes.constantTimeEq` retourne tôt sur length mismatch.
+  // Inoffensif ici (HMAC-SHA256, 32 octets fixes). Ne PAS l'utiliser pour
+  // comparer des secrets de longueur variable.
+  static bool _constEq(List<int> a, List<int> b) =>
+      SecretBytes.constantTimeEq(a, b);
 
-  static Uint8List _randomBytes(int n) {
-    final rng = Random.secure();
-    return Uint8List.fromList(List.generate(n, (_) => rng.nextInt(256)));
-  }
+  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 
-  /// M-3 : zéroïse une copie temporaire de matériel cryptographique
-  /// (sublist de la clé dérivée). Sans ça, les bytes restent en heap Dart
-  /// jusqu'au prochain GC.
-  static void _zero(Uint8List buf) {
-    for (int i = 0; i < buf.length; i++) {
-      buf[i] = 0;
-    }
-  }
+  /// M-3 : zéroïse une copie temporaire de matériel cryptographique.
+  static void _zero(Uint8List buf) => SecretBytes.wipe(buf);
 }

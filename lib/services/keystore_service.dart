@@ -20,7 +20,7 @@
 //   - "pt_vault_kek_decoy_v1"  : decoy slot KEK (always present, unused if
 //     decoy not configured — preserves plausible deniability).
 
-import 'dart:math';
+import 'package:files_tech_core/files_tech_core.dart';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/services.dart';
@@ -197,14 +197,7 @@ class InMemoryKeystoreBackend implements KeystoreBackend {
     return Uint8List.fromList(pt);
   }
 
-  static Uint8List _randomBytes(int n) {
-    final rng = Random.secure();
-    final out = Uint8List(n);
-    for (var i = 0; i < n; i++) {
-      out[i] = rng.nextInt(256);
-    }
-    return out;
-  }
+  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 }
 
 /// High-level façade used by VaultService. Defaults to the channel backend on

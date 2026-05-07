@@ -17,10 +17,10 @@
 // GCM, so each call generates a fresh nonce — never derive from a counter
 // without state guarantees.
 
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:files_tech_core/files_tech_core.dart';
 
 class AeadResult {
   /// Ciphertext only (no tag, no nonce).
@@ -126,12 +126,5 @@ class AeadService {
     );
   }
 
-  static Uint8List _randomBytes(int n) {
-    final rng = Random.secure();
-    final out = Uint8List(n);
-    for (var i = 0; i < n; i++) {
-      out[i] = rng.nextInt(256);
-    }
-    return out;
-  }
+  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 }

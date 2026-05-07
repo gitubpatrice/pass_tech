@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
@@ -211,32 +211,22 @@ class HeritageService {
     return File('${dir.path}/pt_heir.enc');
   }
 
-  Uint8List _randomBytes(int n) {
-    final rng = Random.secure();
-    return Uint8List.fromList(List<int>.generate(n, (_) => rng.nextInt(256)));
-  }
+  // v2.1.1 — `_randomBytes`, `_wipe`, `_constEq` ont migré vers `SecretBytes`
+  // dans `files_tech_core`. Shims locaux pour limiter le diff sur les
+  // callsites historiques.
+  //
+  // M-2 : `SecretBytes.constantTimeEq` retourne tôt sur length mismatch.
+  // Inoffensif ici (HMAC-SHA256 32 octets fixes). Ne pas réutiliser pour
+  // des secrets de longueur variable.
+  Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 
   Future<Uint8List> _deriveKey(String password, Uint8List salt, int iter) {
     return compute(pbkdf2Worker, [utf8.encode(password), salt, iter, 64]);
   }
 
-  void _wipe(Uint8List k) {
-    for (var i = 0; i < k.length; i++) {
-      k[i] = 0;
-    }
-  }
+  void _wipe(Uint8List k) => SecretBytes.wipe(k);
 
-  // M-2 : retour précoce sur length mismatch — inoffensif uniquement parce
-  // qu'on compare des HMAC-SHA256 de longueur fixe (32 octets). Ne pas
-  // réutiliser pour des secrets de longueur variable.
-  bool _constEq(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
-    var diff = 0;
-    for (var i = 0; i < a.length; i++) {
-      diff |= a[i] ^ b[i];
-    }
-    return diff == 0;
-  }
+  bool _constEq(List<int> a, List<int> b) => SecretBytes.constantTimeEq(a, b);
 
   Future<void> _writeSnapshot(
     List<Entry> entries,

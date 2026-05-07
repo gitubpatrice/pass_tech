@@ -21,13 +21,13 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:biometric_storage/biometric_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart' as cg;
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
@@ -388,31 +388,23 @@ class VaultService {
     }
   }
 
-  /// Zéroïse une copie temporaire de matériel cryptographique (sublist du
-  /// _key, par exemple). Ne pas confondre avec _wipeKey qui agit sur l'instance
-  /// principale _key. M-3 : appelé pour les copies créées via Uint8List.sublist
-  /// dans _decryptVault et _saveVault.
-  static void _zero(Uint8List buf) {
-    for (int i = 0; i < buf.length; i++) {
-      buf[i] = 0;
-    }
-  }
-
   // ── Crypto helpers (statics — re-utilisés par les parts) ────────────────────
+  //
+  // Depuis v2.1.1 : `_zero`, `_constEq`, `_randomBytes` ont migré vers
+  // `SecretBytes` dans `files_tech_core`. On garde des shims `static` minimaux
+  // qui forwardent vers le helper centralisé. Ça évite d'avoir à modifier les
+  // dizaines de callsites `VaultService._zero(...)` répartis dans les `part`.
+  //
+  // M-2 (note de sécurité conservée) : `SecretBytes.constantTimeEq` retourne
+  // tôt si les longueurs diffèrent. C'est inoffensif tant qu'on l'utilise sur
+  // des HMAC/AEAD tags de taille fixe (cas de tous les callsites de la lib).
+  // Ne PAS l'utiliser pour comparer des secrets de longueur variable.
+  static void _zero(Uint8List buf) => SecretBytes.wipe(buf);
 
-  // M-2 : ce _constEq retourne tôt si les longueurs diffèrent. C'est
-  // inoffensif ici car on l'utilise UNIQUEMENT pour des HMAC-SHA256 (32 octets
-  // fixes). Ne PAS le réutiliser pour comparer des secrets de longueur
-  // variable — un attaquant pourrait observer un timing distinct selon la
-  // longueur.
-  static bool _constEq(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
-    int diff = 0;
-    for (int i = 0; i < a.length; i++) {
-      diff |= a[i] ^ b[i];
-    }
-    return diff == 0;
-  }
+  static bool _constEq(List<int> a, List<int> b) =>
+      SecretBytes.constantTimeEq(a, b);
+
+  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 
   static Future<Uint8List> _deriveKey(
     String password,
@@ -420,9 +412,4 @@ class VaultService {
     int iterations,
   ) async =>
       compute(pbkdf2Worker, [utf8.encode(password), salt, iterations, 64]);
-
-  static Uint8List _randomBytes(int n) {
-    final rng = Random.secure();
-    return Uint8List.fromList(List.generate(n, (_) => rng.nextInt(256)));
-  }
 }
