@@ -87,7 +87,24 @@ remplacé pour le coffre principal :
 - **Déni plausible** : 2 alias KEK (`pt_vault_kek_v1` +
   `pt_vault_kek_decoy_v1`) sont créés systématiquement à la 1ʳᵉ install,
   même si le coffre leurre n'est pas configuré — l'inspection du Keystore
-  ne révèle rien sur l'usage du décoy.
+  ne révèle rien sur l'usage du décoy. Depuis la **v2.0.2**, un sel dummy
+  de 32 octets est généré pour le décoy même sans usage et le timing de
+  la vérification du leurre est aligné sur celui du coffre principal —
+  une attaque side-channel temporelle ne peut plus distinguer les deux
+  chemins.
+
+### Surface protégée
+
+Le modèle de menace cible trois scénarios :
+
+1. **Anti-coercition** — un attaquant force l'utilisateur à déverrouiller
+   l'app. Pass Tech répond avec le coffre leurre + mode panique.
+2. **Perte / vol de l'appareil** — l'attaquant a un accès physique mais
+   pas le master password. Pass Tech répond avec Argon2id + KEK Keystore
+   non-extractible + lockout progressif + auto-lock + wipe RAM.
+3. **Malware sandbox** — un autre process tente de lire le coffre. Pass
+   Tech répond avec sandbox Android, FLAG_SECURE, allowBackup=false,
+   clipboard `IS_SENSITIVE`.
 
 ### Pass Tech protège contre
 
@@ -111,6 +128,23 @@ remplacé pour le coffre principal :
   Mitigation : exporter une `.ptbak` AVANT factory reset.
 - Attaquant ayant le mot de passe maître ET un accès au device déverrouillé
 
+### Limitations connues
+
+- **Dart `String` non zeroizable** : la VM Dart ne permet pas d'effacer
+  fiablement une `String` en mémoire. Les master passwords sont saisis
+  dans des `TextEditingController` puis convertis le plus rapidement
+  possible en `Uint8List` zeroizables. Une fenêtre temporelle résiduelle
+  existe (quelques ms à quelques s en cas de pause GC). Mitigation :
+  auto-lock court + FLAG_SECURE.
+- **Wipe Keystore = perte du coffre** : factory reset, restauration usine,
+  certaines opérations Samsung Auto Blocker invalident la KEK. Sans la
+  KEK, le coffre est mathématiquement irrécupérable même avec le master
+  password. Mitigation : exporter régulièrement un `.ptbak` (pack Argon2id
+  + AES-GCM portable, indépendant du Keystore).
+- **Mode panique non-instantané sur certains OEM** : le camouflage d'icône
+  via alias d'activité peut prendre 1–3 s sur Samsung One UI à cause du
+  cache du launcher.
+
 ### Migration v3 → v4
 
 À la 1ʳᵉ ouverture après mise à jour vers la v2.0.0, Pass Tech détecte
@@ -131,7 +165,7 @@ Aucun retour en arrière : v3 ne peut plus être réécrit. Les fichiers
 
 Vulnérabilités acceptées :
 
-- Faiblesse cryptographique (PBKDF2, AES, HMAC, IV)
+- Faiblesse cryptographique (Argon2id, AES-GCM, HKDF, AAD, nonce, IV)
 - Bypass de la biométrie hardware-bound
 - Bypass du lockout / brute-force facilité
 - Fuite du vault chiffré ou de la clé maître hors processus

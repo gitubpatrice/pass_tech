@@ -1,6 +1,6 @@
 # Conditions d'utilisation — Pass Tech
 
-**Version du document** : 28 avril 2026
+**Version du document** : 7 mai 2026 (Pass Tech v2.0.2)
 **App** : Pass Tech
 **Site officiel** : https://www.files-tech.com
 **Contact** : contact@files-tech.com

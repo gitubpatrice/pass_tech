@@ -1,6 +1,6 @@
 # Privacy Policy — Pass Tech
 
-**Document version** : 28 April 2026
+**Document version** : 7 May 2026 (Pass Tech v2.0.2)
 **App** : Pass Tech
 **Website** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -36,17 +36,22 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 | Data type                            | Use                                                      | Processing location                              |
 | ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------ |
 | Passwords, TOTP secrets, payment cards, secure notes | Vault entries created by the user                | Encrypted at rest on the device (`pt_vault.enc`) |
-| Master password                       | Derives the vault encryption key (PBKDF2-SHA256 600 000 iterations) | Never persisted; wiped from RAM on lock      |
+| Master password                       | Derives the vault encryption key (Argon2id m=19 MiB, t=2) | Never persisted; wiped from RAM on lock      |
 | Biometric-bound key                   | Optional unlock via fingerprint/face                      | Android Keystore (hardware-bound), `setUserAuthenticationRequired(true)` |
+| Hardware-bound KEK                    | AES-256-GCM key wrapping the vault secret                 | Android Keystore alias `pt_vault_kek_v1` (StrongBox/TEE) — never extractable |
+| Decoy vault (optional)                | Plausible-deniability secondary vault                     | Encrypted with a separate KEK alias (`pt_vault_kek_decoy_v1`) on device |
 | Encrypted backups (`.ptbak`)          | Optional user-triggered export                            | User-chosen storage location                     |
 | Local preferences                     | Theme, auto-lock duration, clipboard timeout              | Local storage on the device                      |
 
-## 5. Encryption & key derivation
+## 5. Encryption & key derivation (vault v4)
 
-- **AES-256-CBC + HMAC-SHA256** (encrypt-then-MAC), constant-time MAC verification before decrypt.
-- **PBKDF2-HMAC-SHA256, 600 000 iterations** for vault and `.ptbak` (OWASP 2023 recommendation).
-- **HMAC over metadata** (version, iterations, salt) prevents downgrade attacks on the vault file.
-- **Biometric key hardware-bound** to Android Keystore; cannot be extracted without biometric authentication.
+- **AES-256-GCM** (NIST SP 800-38D) with 96-bit random nonce and 128-bit authentication tag. The GCM AAD binds `version | KEK alias | KDF parameters` to prevent silent downgrade.
+- **Argon2id** (RFC 9106) — m = 19 MiB, t = 2, p = 1, L = 32 bytes (OWASP 2024 recommendation for mobile password managers). Replaces PBKDF2 used in legacy v3 vaults.
+- **Hardware-bound KEK** — a 32-byte `hwSecret` is wrapped by an AES-256-GCM KEK held in the Android Keystore (alias `pt_vault_kek_v1`, StrongBox-backed when available, TEE software fallback). The KEK never leaves the secure element.
+- **Final key derivation** — `finalKey = HKDF-SHA256(salt, pwHash || hwSecret, "pt:v4", 32)`. An attacker who exfiltrates the vault file alone cannot brute-force it without the device-bound KEK.
+- **Plausible deniability** — two KEK aliases (`pt_vault_kek_v1` + `pt_vault_kek_decoy_v1`) are created at first install regardless of decoy use; a 32-byte dummy salt is generated and timing of decoy verification is aligned with the real path so Keystore inspection and side-channel timing do not reveal whether a decoy is configured.
+- **`.ptbak` backups** — encrypted with a user-chosen passphrase using the same Argon2id + AES-GCM pack (no Keystore binding so the backup is portable across devices).
+- **Biometric unlock** — optional; biometric-bound key in Android Keystore, not extractable without biometric authentication.
 
 ## 6. Network
 
@@ -78,6 +83,11 @@ The application does not transmit user data to any server operated by the develo
 - Master password key wiped from RAM on lock.
 - RASP detection (root, emulator, debugger) with explicit user disclaimer.
 - Sensitive clipboard flag (Android 13+) and immediate clipboard wipe on app pause.
+- **Decoy vault** — a secondary master password opens a plausible fake vault (timing-aligned with the real path).
+- **Panic mode** — instant lock, clipboard wipe, optional icon camouflage as "Calculator".
+- **Inheritance / dead-man switch** — optional local-only flow that lets a trusted relative access the vault after a long inactivity window. No cloud, no third party.
+- **Anti-phishing by domain** — the app verifies the foreground browser's domain before allowing copy of credentials, alerting on typosquatting.
+- APK v2+ signature only (`enableV1Signing = false`) — neutralizes CVE-2017-13156 (Janus).
 
 See [SECURITY.md](./SECURITY.md) for the vulnerability disclosure policy.
 

@@ -1,6 +1,6 @@
 # Politique de confidentialité — Pass Tech
 
-**Version du document** : 28 avril 2026
+**Version du document** : 7 mai 2026 (Pass Tech v2.0.2)
 **App** : Pass Tech
 **Site officiel** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -36,17 +36,22 @@ La présente Politique de confidentialité explique comment l'application **Pass
 | Type de donnée                       | Utilisation                                              | Lieu de traitement                                |
 | ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------- |
 | Mots de passe, secrets TOTP, cartes bancaires, notes sécurisées | Entrées du coffre créées par l'utilisateur | Chiffré au repos sur l'appareil (`pt_vault.enc`)  |
-| Mot de passe maître                  | Dérive la clé de chiffrement (PBKDF2-SHA256 600 000 itérations) | Jamais persisté ; effacé de la RAM au verrouillage |
+| Mot de passe maître                  | Dérive la clé de chiffrement (Argon2id m=19 MiB, t=2)    | Jamais persisté ; effacé de la RAM au verrouillage |
 | Clé biométrique                      | Déverrouillage optionnel par empreinte / face            | Android Keystore (lié au matériel), `setUserAuthenticationRequired(true)` |
+| KEK liée au matériel                 | Clé AES-256-GCM enveloppant le secret du coffre          | Android Keystore alias `pt_vault_kek_v1` (StrongBox/TEE) — non extractible |
+| Coffre leurre (optionnel)            | Coffre secondaire pour déni plausible                    | Chiffré avec un alias KEK distinct (`pt_vault_kek_decoy_v1`) sur l'appareil |
 | Sauvegardes chiffrées (`.ptbak`)     | Export optionnel déclenché par l'utilisateur             | Emplacement choisi par l'utilisateur              |
 | Préférences locales                  | Thème, durée auto-lock, timeout presse-papier            | Stockage local sur l'appareil                     |
 
-## 5. Chiffrement & dérivation de clé
+## 5. Chiffrement & dérivation de clé (vault v4)
 
-- **AES-256-CBC + HMAC-SHA256** (encrypt-then-MAC), comparaison MAC en temps constant avant déchiffrement.
-- **PBKDF2-HMAC-SHA256, 600 000 itérations** pour le coffre et les `.ptbak` (recommandation OWASP 2023).
-- **HMAC sur les métadonnées** (version, itérations, sel) empêche les attaques par downgrade du fichier.
-- **Clé biométrique liée au matériel** via Android Keystore ; non extractible sans authentification biométrique.
+- **AES-256-GCM** (NIST SP 800-38D) avec nonce aléatoire 96 bits et tag d'authentification 128 bits. L'AAD GCM lie `version | alias KEK | paramètres KDF` pour empêcher tout downgrade silencieux.
+- **Argon2id** (RFC 9106) — m = 19 MiB, t = 2, p = 1, L = 32 octets (recommandation OWASP 2024 pour gestionnaires de mots de passe sur mobile). Remplace le PBKDF2 utilisé dans les coffres v3 hérités.
+- **KEK liée au matériel** — un `hwSecret` de 32 octets est enveloppé par une KEK AES-256-GCM stockée dans l'Android Keystore (alias `pt_vault_kek_v1`, StrongBox si disponible, fallback TEE software). La KEK ne quitte jamais le secure element.
+- **Dérivation finale** — `finalKey = HKDF-SHA256(salt, pwHash || hwSecret, "pt:v4", 32)`. Un attaquant qui exfiltre le seul fichier coffre ne peut pas le brute-forcer sans la KEK liée à l'appareil.
+- **Déni plausible** — 2 alias KEK (`pt_vault_kek_v1` + `pt_vault_kek_decoy_v1`) sont créés systématiquement à la 1ʳᵉ install, qu'un coffre leurre soit configuré ou non ; un sel dummy de 32 octets est généré et le timing de la vérification du leurre est aligné sur celui du coffre principal — l'inspection du Keystore et l'analyse temporelle ne révèlent rien sur l'usage du décoy.
+- **Sauvegardes `.ptbak`** — chiffrées avec une passphrase choisie par l'utilisateur, même pack Argon2id + AES-GCM (pas de liaison Keystore pour rester portable entre appareils).
+- **Déverrouillage biométrique** — optionnel ; clé biométrique liée à l'Android Keystore, non extractible sans authentification biométrique.
 
 ## 6. Réseau
 
@@ -78,6 +83,11 @@ L'application ne transmet aucune donnée à un serveur opéré par le développe
 - Clé du mot de passe maître effacée de la RAM au verrouillage.
 - Détection RASP (root, émulateur, debugger) avec décharge utilisateur explicite.
 - Flag clipboard sensible (Android 13+) et effacement immédiat du presse-papier au pause.
+- **Coffre leurre** — un mot de passe maître secondaire ouvre un faux coffre crédible (timing aligné avec le coffre réel).
+- **Mode panique** — verrouillage instantané, effacement du presse-papier, camouflage optionnel de l'icône en « Calculatrice ».
+- **Héritage / dead-man switch** — flux optionnel 100 % local permettant à un proche d'accéder au coffre après une longue période d'inactivité. Aucun cloud, aucun tiers.
+- **Anti-phishing par domaine** — l'app vérifie le domaine du navigateur en avant-plan avant de copier des identifiants ; alerte en cas de typosquatting.
+- Signature APK v2+ uniquement (`enableV1Signing = false`) — neutralise CVE-2017-13156 (Janus).
 
 Voir [SECURITY.md](./SECURITY.md).
 
