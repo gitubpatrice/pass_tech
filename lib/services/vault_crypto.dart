@@ -6,9 +6,10 @@
 //  - déchiffrement v3 (legacy) et v4 (in-place),
 //  - helpers de zéroïsation, RNG et comparaison constant-time (statics).
 //
-// Les méthodes de déchiffrement v3/v4 mutent `_entries` / `_isOpen` (legacy
-// pattern). Le splitter ne corrige PAS ce comportement (TODO v2.2). Voir le
-// commentaire au-dessus de [_decryptVaultV4] pour le détail.
+// v2.2.0 : `_decryptVaultV4` est désormais pur — il retourne la liste
+// d'entries au lieu de muter le state. `_decryptVaultV3` (path read-only,
+// legacy) mute encore — acceptable car le path v3 disparaît dès la première
+// ouverture (migration v3→v4 atomique).
 
 part of 'vault_service.dart';
 
@@ -42,7 +43,7 @@ extension VaultCrypto on VaultService {
       final bytes = await out.extractBytes();
       return Uint8List.fromList(bytes);
     } finally {
-      VaultService._zero(ikm);
+      SecretBytes.wipe(ikm);
     }
   }
 
@@ -92,7 +93,7 @@ extension VaultCrypto on VaultService {
           macInput = [...ivBytes, ...cipherBytes];
         }
         final computed = Hmac(sha256, macKey).convert(macInput).bytes;
-        if (!VaultService._constEq(computed, macBytes)) return false;
+        if (!SecretBytes.constantTimeEq(computed, macBytes)) return false;
 
         final encKey = enc.Key(encKeyBytes);
         final iv = enc.IV(Uint8List.fromList(ivBytes));
@@ -109,40 +110,34 @@ extension VaultCrypto on VaultService {
         _isOpen = true;
         return true;
       } finally {
-        VaultService._zero(macKey);
-        VaultService._zero(encKeyBytes);
+        SecretBytes.wipe(macKey);
+        SecretBytes.wipe(encKeyBytes);
       }
     } catch (_) {
       return false;
     }
   }
 
-  /// Decrypt a v4 vault map. On success, populates `_entries` and returns
-  /// `true`. On any failure (wrong key, bad tag, corrupt JSON), returns
-  /// `false` and leaves `_entries` untouched. The `finalKey` argument is
-  /// the 32-byte HKDF output; caller is responsible for wiping it after.
+  /// Decrypt a v4 vault map. **Pure** depuis v2.2.0 : retourne la liste
+  /// d'entries déchiffrées (ou `null` sur erreur). Les appelants doivent
+  /// assigner eux-mêmes `_entries` / `_isOpen` en cas de succès.
   ///
-  /// TODO (v2.2): refactor _decryptVaultV4 to be pure (non-mutating).
-  /// Aujourd'hui la méthode mute `_entries` et `_isOpen` directement, ce qui
-  /// couple le déchiffrement au state global. Plusieurs appelants
-  /// (`_v4Unlock`, `unlockWithBiometric`, `passwordMatchesPrimary`) en
-  /// dépendent et doivent restaurer l'état autour de l'appel — fragile mais
-  /// non exploitable (Dart est single-isolate, pas de course concurrente).
-  /// Refacto à faire dans un patch dédié : retourner `List<Entry>?` et
-  /// laisser les appelants assigner `_entries` / `_isOpen` après succès.
-  Future<bool> _decryptVaultV4(
+  /// Sur n'importe quelle erreur (wrong key, bad tag, corrupt JSON), retourne
+  /// `null` sans toucher au state. Le `finalKey` argument est la sortie HKDF
+  /// 32B ; l'appelant reste responsable de son wipe après usage.
+  Future<List<Entry>?> _decryptVaultV4(
     Map<String, dynamic> raw,
     Uint8List finalKey,
   ) async {
     try {
-      if (raw['magic'] != VaultService._vaultMagic) return false;
-      if (raw['version'] != VaultService._currentVersion) return false;
+      if (raw['magic'] != VaultService._vaultMagic) return null;
+      if (raw['version'] != VaultService._currentVersion) return null;
       final kek = raw['kek'];
       final cipher = raw['cipher'];
-      if (kek is! Map || cipher is! Map) return false;
+      if (kek is! Map || cipher is! Map) return null;
       final alias = kek['alias'] as String?;
       if (alias != KeystoreAliases.primary && alias != KeystoreAliases.decoy) {
-        return false;
+        return null;
       }
       final nonce = base64Decode(cipher['nonce'] as String);
       final dataBlob = base64Decode(cipher['data'] as String);
@@ -156,15 +151,13 @@ extension VaultCrypto on VaultService {
         tag: split.tag,
         aad: aad,
       );
-      if (pt == null) return false;
+      if (pt == null) return null;
       final list = jsonDecode(utf8.decode(pt)) as List;
-      _entries = list
+      return list
           .map((e) => Entry.fromJson(e as Map<String, dynamic>))
           .toList();
-      _isOpen = true;
-      return true;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 }

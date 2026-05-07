@@ -119,7 +119,6 @@ class VaultService {
   // L'unlock teste le password contre les deux slots successivement.
   static const _saltKey = 'pt_salt'; // = primary (rétro-compat)
   static const _decoySaltKey = 'pt_salt_decoy';
-  static const _legacyBiometricKeyKey = 'pt_biometric_key'; // pre-v1.6 storage
   static const _biometricStorageName = 'pt_biometric_key_v2';
   static const _biometricFlagKey = 'pt_biometric_enabled';
   static const _failCountKey = 'pt_fail_count';
@@ -169,10 +168,10 @@ class VaultService {
 
   // Crypto parameters
   // v3 (legacy, read-only): PBKDF2-HMAC-SHA256 600 000 iter, AES-CBC + HMAC.
+  //                         (Référence historique — plus utilisé : tous les
+  //                         vaults sont migrés en v4 au premier unlock.)
   // v4 (current)          : Argon2id (m=19 MiB, t=2, p=1) → HKDF, AES-GCM-256,
   //                         hwSecret 32B wrapped by an AndroidKeyStore KEK.
-  // ignore: unused_field
-  static const _currentIterations = 600000; // v3 reference, not used in v4
   static const _legacyIterations =
       100000; // for v1.0.0 vaults without iterations field
   static const _maxIterations =
@@ -290,7 +289,6 @@ class VaultService {
     final store = await _bioStorage();
     await store.write(base64Encode(_key!));
     await _storage.write(key: _biometricFlagKey, value: '1');
-    await _storage.delete(key: _legacyBiometricKeyKey);
   }
 
   Future<void> deleteBiometricKey() async {
@@ -299,7 +297,6 @@ class VaultService {
       await store.delete();
     } catch (_) {}
     await _storage.delete(key: _biometricFlagKey);
-    await _storage.delete(key: _legacyBiometricKeyKey);
     _bioFile = null;
   }
 
@@ -390,21 +387,14 @@ class VaultService {
 
   // ── Crypto helpers (statics — re-utilisés par les parts) ────────────────────
   //
-  // Depuis v2.1.1 : `_zero`, `_constEq`, `_randomBytes` ont migré vers
-  // `SecretBytes` dans `files_tech_core`. On garde des shims `static` minimaux
-  // qui forwardent vers le helper centralisé. Ça évite d'avoir à modifier les
-  // dizaines de callsites `VaultService._zero(...)` répartis dans les `part`.
+  // v2.2.0 : les shims `_zero / _constEq / _randomBytes` ont été supprimés.
+  // Les parts utilisent désormais `SecretBytes.*` directement (cf. v2.1.1 où
+  // l'helper a été centralisé dans `files_tech_core`).
   //
   // M-2 (note de sécurité conservée) : `SecretBytes.constantTimeEq` retourne
   // tôt si les longueurs diffèrent. C'est inoffensif tant qu'on l'utilise sur
   // des HMAC/AEAD tags de taille fixe (cas de tous les callsites de la lib).
   // Ne PAS l'utiliser pour comparer des secrets de longueur variable.
-  static void _zero(Uint8List buf) => SecretBytes.wipe(buf);
-
-  static bool _constEq(List<int> a, List<int> b) =>
-      SecretBytes.constantTimeEq(a, b);
-
-  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 
   static Future<Uint8List> _deriveKey(
     String password,

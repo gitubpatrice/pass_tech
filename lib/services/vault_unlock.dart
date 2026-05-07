@@ -6,8 +6,10 @@
 //  - `_v4Unlock` (Argon2id + KEK unwrap + AES-GCM decrypt),
 //  - `unlockWithBiometric` (cache `_key` 32B + AES-GCM decrypt direct).
 //
-// `_decryptVaultV4` (vault_crypto) reste muteur ; les méthodes ici clonent /
-// restaurent l'état autour de l'appel pour ne pas leak entre slots.
+// v2.2.0 : `_decryptVaultV4` (vault_crypto) est désormais pur. Les méthodes
+// ici assignent `_entries` / `_isOpen` localement après succès. Le path v3
+// (legacy) est encore muteur, donc `passwordMatchesPrimary` snapshot/restore
+// uniquement pour ce path.
 
 part of 'vault_service.dart';
 
@@ -23,7 +25,11 @@ extension VaultUnlock on VaultService {
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
 
-      // Snapshot current state so the test doesn't leak into the open vault.
+      // v2.2.0 : `_decryptVaultV4` est désormais pur — il ne touche plus
+      // `_entries` / `_isOpen`, donc plus besoin de snapshot/restore pour le
+      // path v4. Le path v3 (legacy, read-only) mute encore : on garde le
+      // snapshot pour ce cas. Le snapshot de `_key` reste utile car v3 dérive
+      // une clé PBKDF2 que l'on doit wipe et restaurer.
       final savedKey = _key == null ? null : Uint8List.fromList(_key!);
       final savedEntries = List<Entry>.from(_entries);
       final savedOpen = _isOpen;
@@ -36,7 +42,7 @@ extension VaultUnlock on VaultService {
             raw: raw,
           );
           if (fk == null) return false;
-          VaultService._zero(fk);
+          SecretBytes.wipe(fk);
           return true;
         }
         // v3 path — derive PBKDF2 then attempt MAC check.
@@ -79,12 +85,12 @@ extension VaultUnlock on VaultService {
         // attaquant qui chronomètre l'unlock peut déduire l'absence du
         // coffre leurre — ce qui briserait le déni plausible.
         // Mêmes paramètres (m=19 MiB, t=2, p=1) que les vrais slots.
-        final dummySalt = VaultService._randomBytes(32);
+        final dummySalt = SecretBytes.randomBytes(32);
         final dummyOut = await KdfService.argon2id(
           password: 'dummy_$masterPassword',
           salt: dummySalt,
         );
-        VaultService._zero(dummyOut);
+        SecretBytes.wipe(dummyOut);
         return UnlockResult.wrongPassword;
       }
 
@@ -171,8 +177,10 @@ extension VaultUnlock on VaultService {
   }
 
   /// Try to unlock a v4 vault for `slot`. Returns the recovered finalKey on
-  /// success, or `null` on failure. `_entries` is populated as a side-effect
-  /// of [_decryptVaultV4]. Caller wipes the returned key after use.
+  /// success, or `null` on failure. v2.2.0 : `_decryptVaultV4` est pur, donc
+  /// cette méthode mute désormais `_entries` et `_isOpen` directement après
+  /// succès — comportement attendu par les appelants (`_tryUnlockSlot`,
+  /// `unlock`). Caller wipes the returned key after use.
   Future<Uint8List?> _v4Unlock({
     required _Slot slot,
     required String password,
@@ -201,18 +209,22 @@ extension VaultUnlock on VaultService {
         pwHash: pwHash,
         hwSecret: hwSecret,
       );
-      final ok = await _decryptVaultV4(raw, finalKey);
-      if (!ok) {
-        VaultService._zero(finalKey);
+      final entries = await _decryptVaultV4(raw, finalKey);
+      if (entries == null) {
+        SecretBytes.wipe(finalKey);
         return null;
       }
+      // Apply side effects only on success — `_decryptVaultV4` est pur depuis
+      // v2.2.0, l'assignation revient à l'appelant.
+      _entries = entries;
+      _isOpen = true;
       // Caller takes ownership of the buffer.
       final out = Uint8List.fromList(finalKey);
-      VaultService._zero(finalKey);
+      SecretBytes.wipe(finalKey);
       return out;
     } finally {
-      if (pwHash != null) VaultService._zero(pwHash);
-      if (hwSecret != null) VaultService._zero(hwSecret);
+      if (pwHash != null) SecretBytes.wipe(pwHash);
+      if (hwSecret != null) SecretBytes.wipe(hwSecret);
     }
   }
 
@@ -225,18 +237,18 @@ extension VaultUnlock on VaultService {
       final store = await _bioStorage();
       final keyB64 = await store.read();
       if (keyB64 == null || keyB64.isEmpty) return UnlockResult.wrongPassword;
+
+      // La biométrique est volontairement liée au coffre PRIMARY uniquement.
+      // Permettre la bio sur le coffre leurre briserait le déni plausible.
+      // P2-2 (v2.2.0) : on vérifie l'existence du fichier AVANT de poser la
+      // clé en mémoire pour éviter de la wipe immédiatement après.
+      final file = await _vaultFileFor(_Slot.primary);
+      if (!await file.exists()) return UnlockResult.wrongPassword;
+
       // Wipe l'éventuelle clé résiduelle d'une session précédente AVANT
       // d'écrire la nouvelle, pour éviter une fuite mémoire transitoire.
       _wipeKey();
       _key = base64Decode(keyB64);
-
-      // La biométrique est volontairement liée au coffre PRIMARY uniquement.
-      // Permettre la bio sur le coffre leurre briserait le déni plausible.
-      final file = await _vaultFileFor(_Slot.primary);
-      if (!await file.exists()) {
-        _wipeKey();
-        return UnlockResult.wrongPassword;
-      }
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
 
@@ -247,7 +259,15 @@ extension VaultUnlock on VaultService {
         if (_key == null || _key!.length != 32) {
           ok = false;
         } else {
-          ok = await _decryptVaultV4(raw, _key!);
+          // v2.2.0 : `_decryptVaultV4` est pur. On assigne ici en cas de succès.
+          final entries = await _decryptVaultV4(raw, _key!);
+          if (entries == null) {
+            ok = false;
+          } else {
+            _entries = entries;
+            _isOpen = true;
+            ok = true;
+          }
         }
       } else {
         ok = _decryptVaultV3(raw);

@@ -19,7 +19,7 @@ extension VaultSetup on VaultService {
     // users (preserves plausible deniability).
     await _keystore.ensureBothKeksExist();
 
-    final salt = VaultService._randomBytes(32);
+    final salt = SecretBytes.randomBytes(32);
     await VaultService._storage.write(
       key: _saltKeyFor(slot),
       value: base64Encode(salt),
@@ -29,7 +29,7 @@ extension VaultSetup on VaultService {
     final pwHash = await KdfService.argon2id(password: password, salt: salt);
 
     // Generate hwSecret (32 random bytes), wrap with KEK.
-    final hwSecret = VaultService._randomBytes(32);
+    final hwSecret = SecretBytes.randomBytes(32);
     Uint8List? finalKey;
     try {
       final alias = _aliasFor(slot);
@@ -54,9 +54,9 @@ extension VaultSetup on VaultService {
       );
       await _onUnlockSuccess();
     } finally {
-      VaultService._zero(pwHash);
-      VaultService._zero(hwSecret);
-      if (finalKey != null) VaultService._zero(finalKey);
+      SecretBytes.wipe(pwHash);
+      SecretBytes.wipe(hwSecret);
+      if (finalKey != null) SecretBytes.wipe(finalKey);
     }
   }
 
@@ -68,13 +68,13 @@ extension VaultSetup on VaultService {
   Future<void> changeMasterPassword(String newPassword) async {
     // v4 : Argon2id + re-wrap fresh hwSecret. Le slot opposé n'est pas affecté.
     final slot = _activeSlot ?? _Slot.primary;
-    final salt = VaultService._randomBytes(32);
+    final salt = SecretBytes.randomBytes(32);
     await VaultService._storage.write(
       key: _saltKeyFor(slot),
       value: base64Encode(salt),
     );
 
-    final hwSecret = VaultService._randomBytes(32);
+    final hwSecret = SecretBytes.randomBytes(32);
     Uint8List? pwHash;
     Uint8List? finalKey;
     try {
@@ -98,9 +98,9 @@ extension VaultSetup on VaultService {
         wrapNonce: wrap.nonce,
       );
     } finally {
-      if (pwHash != null) VaultService._zero(pwHash);
-      VaultService._zero(hwSecret);
-      if (finalKey != null) VaultService._zero(finalKey);
+      if (pwHash != null) SecretBytes.wipe(pwHash);
+      SecretBytes.wipe(hwSecret);
+      if (finalKey != null) SecretBytes.wipe(finalKey);
     }
 
     // La biométrique est liée au PRIMARY uniquement. Ne la supprimer QUE

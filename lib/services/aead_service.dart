@@ -68,7 +68,7 @@ class AeadService {
     if (key.length != keyBytes) {
       throw ArgumentError('AES-GCM-256 key must be $keyBytes bytes');
     }
-    final nonce = _randomBytes(nonceBytes);
+    final nonce = SecretBytes.randomBytes(nonceBytes);
     final box = await _algo.encrypt(
       plaintext,
       secretKey: SecretKey(key),
@@ -125,6 +125,4 @@ class AeadService {
       tag: Uint8List.fromList(cipherAndTag.sublist(ctLen)),
     );
   }
-
-  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 }

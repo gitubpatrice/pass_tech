@@ -326,7 +326,7 @@ class ImportExportService {
     List<Entry> entries,
     String passphrase,
   ) async {
-    final salt = _randomBytes(32);
+    final salt = SecretBytes.randomBytes(32);
     final key = await compute(pbkdf2Worker, [
       utf8.encode(passphrase),
       salt,
@@ -364,9 +364,9 @@ class ImportExportService {
         'exportedAt': DateTime.now().toIso8601String(),
       });
     } finally {
-      _zero(encKeyBytes);
-      _zero(macKey);
-      _zero(key);
+      SecretBytes.wipe(encKeyBytes);
+      SecretBytes.wipe(macKey);
+      SecretBytes.wipe(key);
     }
   }
 
@@ -415,7 +415,7 @@ class ImportExportService {
           macInput = [...iv, ...cipher];
         }
         final computed = Hmac(sha256, macKey).convert(macInput).bytes;
-        if (!_constEq(computed, mac)) return null;
+        if (!SecretBytes.constantTimeEq(computed, mac)) return null;
 
         encKeyBytes = key.sublist(0, 32);
         final encKey = enc.Key(encKeyBytes);
@@ -434,27 +434,19 @@ class ImportExportService {
         }
         return entries;
       } finally {
-        _zero(macKey);
-        if (encKeyBytes != null) _zero(encKeyBytes);
-        _zero(key);
+        SecretBytes.wipe(macKey);
+        if (encKeyBytes != null) SecretBytes.wipe(encKeyBytes);
+        SecretBytes.wipe(key);
       }
     } catch (_) {
       return null;
     }
   }
 
-  // v2.1.1 — `_constEq`, `_randomBytes`, `_zero` ont migré vers `SecretBytes`
-  // dans `files_tech_core`. Shims locaux pour limiter le diff sur les
-  // callsites historiques.
+  // v2.2.0 — shims locaux supprimés. Les callsites utilisent `SecretBytes.*`
+  // directement (cf. files_tech_core 0.3.0).
   //
   // M-2 : `SecretBytes.constantTimeEq` retourne tôt sur length mismatch.
   // Inoffensif ici (HMAC-SHA256, 32 octets fixes). Ne PAS l'utiliser pour
   // comparer des secrets de longueur variable.
-  static bool _constEq(List<int> a, List<int> b) =>
-      SecretBytes.constantTimeEq(a, b);
-
-  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
-
-  /// M-3 : zéroïse une copie temporaire de matériel cryptographique.
-  static void _zero(Uint8List buf) => SecretBytes.wipe(buf);
 }

@@ -31,7 +31,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
     _checkLockout();
     _checkBiometric();
     _checkIntegrity();
+    _loadHeirFailCount();
   }
+
+  /// P3-3 (v2.2.0) : restaure le compteur d'échecs heir depuis les prefs.
+  /// Avant v2.2.0 le compteur était RAM-only — un attaquant pouvait force-close
+  /// l'app pour annuler le délai progressif. Désormais persisté.
+  Future<void> _loadHeirFailCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final n = prefs.getInt(_heirFailCountKey) ?? 0;
+      if (mounted) setState(() => _heirFailCount = n);
+    } catch (_) {}
+  }
+
+  static const _heirFailCountKey = 'heir_fail_count';
 
   /// Vérifie root / émulateur / debugger. Avertit l'utilisateur une seule
   /// fois par session si un problème est détecté. L'app fonctionne malgré
@@ -264,6 +278,12 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!mounted) return;
     if (entries == null) {
       _heirFailCount++;
+      // P3-3 : persiste pour résister à un force-close (sinon l'attaquant
+      // peut reset le délai progressif en relançant l'app).
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_heirFailCountKey, _heirFailCount);
+      } catch (_) {}
       setState(() {
         _loading = false;
         _error = 'Mot de passe héritier incorrect';
@@ -271,6 +291,11 @@ class _UnlockScreenState extends State<UnlockScreen> {
       return;
     }
     _heirFailCount = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_heirFailCountKey);
+    } catch (_) {}
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => HeirViewScreen(entries: entries)),
     );

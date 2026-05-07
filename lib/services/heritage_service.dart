@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/entry.dart';
+import 'aead_service.dart';
+import 'kdf_service.dart';
 import 'vault_service.dart';
 
 /// Héritage / dead man's switch — accès aux données du coffre par un héritier
@@ -21,8 +23,9 @@ import 'vault_service.dart';
 ///   distinct du master password.
 /// - L'app crée un **snapshot chiffré séparé** (`pt_heir.enc`) contenant la
 ///   même liste d'entries, chiffrée avec une clé dérivée du heir_password
-///   via PBKDF2-SHA256 600 000 itérations + salt aléatoire de 32 octets.
-/// - Format identique au vault principal (AES-256-CBC + HMAC-SHA256 v3).
+///   via Argon2id (m=19 MiB, t=2, p=1) + salt aléatoire de 32 octets.
+/// - Format v2 (depuis v2.2.0) : AES-GCM-256 avec AAD bound (anti-downgrade).
+/// - Format v1 (legacy, read-only) : PBKDF2-SHA256 600 000 + AES-CBC + HMAC.
 /// - L'utilisateur peut "régénérer" le snapshot pour mettre à jour ce que
 ///   l'héritier verra.
 ///
@@ -46,10 +49,16 @@ class HeritageService {
   static const _thresholdKey = 'pt_heir_threshold_days';
   static const _graceStartKey = 'pt_heir_grace_start_ts';
 
-  static const _iterations = 600000;
-  static const _heirVersion = 1;
+  static const _iterations = 600000; // legacy v1 only (PBKDF2)
+  static const _heirVersionV1 = 1; // PBKDF2 + AES-CBC + HMAC-SHA256
+  static const _heirVersionV2 = 2; // Argon2id + AES-GCM-256 (v2.2.0)
   static const _defaultThresholdDays = 90;
   static const _gracePeriodDays = 7;
+
+  // Argon2id baseline (cohérent avec VaultService v4).
+  static const _argon2M = 19456;
+  static const _argon2T = 2;
+  static const _argon2P = 1;
 
   /// True si un snapshot héritage a déjà été configuré.
   Future<bool> get isEnabled async {
@@ -151,18 +160,19 @@ class HeritageService {
     if (entries.isEmpty) {
       throw StateError('Le coffre est vide — rien à transmettre');
     }
-    final salt = _randomBytes(32);
-    final key = await _deriveKey(heirPassword, salt, _iterations);
+    // v2.2.0 : write target = v2 (Argon2id + AES-GCM-256). Le salt sert à la
+    // dérivation Argon2id ET à l'AAD (anti-downgrade). v1 reste lisible pour
+    // les snapshots historiques (pas de break compat).
+    final salt = SecretBytes.randomBytes(32);
+    final key = await KdfService.argon2id(password: heirPassword, salt: salt);
     try {
       // Ordre critique : salt AVANT le fichier. Si crash après salt et
       // avant fichier, le prochain setup réécrasera salt sans état corrompu.
-      // Inverse causerait "fichier sans salt" → unlockAsHeir retourne null
-      // pour toujours sans recovery possible.
       await _storage.write(key: _saltKey, value: base64Encode(salt));
-      await _writeSnapshot(entries, key, salt);
+      await _writeSnapshotV2(entries, key, salt);
       await _storage.write(key: _enabledKey, value: '1');
     } finally {
-      _wipe(key);
+      SecretBytes.wipe(key);
     }
   }
 
@@ -190,14 +200,31 @@ class HeritageService {
       final f = await _heirFile();
       if (!f.existsSync()) return null;
       final raw = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+      final version = raw['version'] as int? ?? _heirVersionV1;
+      // M-9 : version bornée
+      if (version < 1 || version > _heirVersionV2) return null;
+
+      if (version == _heirVersionV2) {
+        // v2 : Argon2id 32B → AES-GCM-256
+        final key = await KdfService.argon2id(
+          password: heirPassword,
+          salt: salt,
+        );
+        try {
+          return await _readSnapshotV2(raw, key);
+        } finally {
+          SecretBytes.wipe(key);
+        }
+      }
+
+      // v1 (legacy) : PBKDF2 64B → AES-CBC + HMAC-SHA256
       final iter = raw['iterations'] as int? ?? _iterations;
-      // Garde-fou : iterations bornées (anti-DoS sur fichier altéré)
       if (iter < 1 || iter > 2000000) return null;
-      final key = await _deriveKey(heirPassword, salt, iter);
+      final key = await _deriveKeyV1(heirPassword, salt, iter);
       try {
-        return _readSnapshot(raw, key);
+        return _readSnapshotV1(raw, key);
       } finally {
-        _wipe(key);
+        SecretBytes.wipe(key);
       }
     } catch (_) {
       return null;
@@ -211,71 +238,101 @@ class HeritageService {
     return File('${dir.path}/pt_heir.enc');
   }
 
-  // v2.1.1 — `_randomBytes`, `_wipe`, `_constEq` ont migré vers `SecretBytes`
-  // dans `files_tech_core`. Shims locaux pour limiter le diff sur les
-  // callsites historiques.
+  // v2.2.0 — shims locaux supprimés. Les callsites utilisent `SecretBytes.*`
+  // directement.
   //
   // M-2 : `SecretBytes.constantTimeEq` retourne tôt sur length mismatch.
   // Inoffensif ici (HMAC-SHA256 32 octets fixes). Ne pas réutiliser pour
   // des secrets de longueur variable.
-  Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 
-  Future<Uint8List> _deriveKey(String password, Uint8List salt, int iter) {
+  Future<Uint8List> _deriveKeyV1(String password, Uint8List salt, int iter) {
     return compute(pbkdf2Worker, [utf8.encode(password), salt, iter, 64]);
   }
 
-  void _wipe(Uint8List k) => SecretBytes.wipe(k);
+  /// AAD bound to a v2 heir snapshot (anti-downgrade).
+  Uint8List _aadV2(String saltB64) => Uint8List.fromList(
+    utf8.encode(
+      'pt-heir:v=$_heirVersionV2|kdf=argon2id|m=$_argon2M|t=$_argon2T|p=$_argon2P|salt=$saltB64',
+    ),
+  );
 
-  bool _constEq(List<int> a, List<int> b) => SecretBytes.constantTimeEq(a, b);
-
-  Future<void> _writeSnapshot(
+  /// Écrit le snapshot au format v2 (Argon2id + AES-GCM-256).
+  /// `key` doit être la sortie Argon2id 32B.
+  Future<void> _writeSnapshotV2(
     List<Entry> entries,
     Uint8List key,
     Uint8List salt,
   ) async {
-    final iv = enc.IV.fromSecureRandom(16);
-    // M-3 : sublist crée des copies. Zéroïser en finally pour éviter de
-    // laisser des fragments de la heir key en RAM jusqu'au GC.
-    final encKeyBytes = key.sublist(0, 32);
-    final macKey = key.sublist(32);
-    try {
-      final encKey = enc.Key(encKeyBytes);
-      final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
+    final saltB64 = base64Encode(salt);
+    final aad = _aadV2(saltB64);
+    final plain = Uint8List.fromList(
+      utf8.encode(jsonEncode(entries.map((e) => e.toJson()).toList())),
+    );
+    final res = await AeadService.encryptGcm(
+      key: key,
+      plaintext: plain,
+      aad: aad,
+    );
 
-      final plain = jsonEncode(entries.map((e) => e.toJson()).toList());
-      final encrypted = encrypter.encrypt(plain, iv: iv);
-
-      final saltB64 = base64Encode(salt);
-      final aad = utf8.encode(
-        'pt-heir:v=$_heirVersion|iter=$_iterations|salt=$saltB64',
-      );
-      final mac = Hmac(
-        sha256,
-        macKey,
-      ).convert([...aad, ...iv.bytes, ...encrypted.bytes]).bytes;
-
-      final out = {
-        'version': _heirVersion,
-        'iterations': _iterations,
+    final out = {
+      'magic': 'PTHEIR',
+      'version': _heirVersionV2,
+      'kdf': {
+        'algo': 'argon2id',
+        'm': _argon2M,
+        't': _argon2T,
+        'p': _argon2P,
         'salt': saltB64,
-        'iv': base64Encode(iv.bytes),
-        'mac': base64Encode(mac),
-        'data': base64Encode(encrypted.bytes),
-      };
+      },
+      'cipher': {
+        'nonce': base64Encode(res.nonce),
+        'data': base64Encode(res.cipherAndTag),
+      },
+    };
 
-      // Écriture atomique : tmp + rename (anti corruption sur crash mid-write)
-      final target = await _heirFile();
-      final tmp = File('${target.path}.tmp');
-      tmp.writeAsStringSync(jsonEncode(out), flush: true);
-      if (target.existsSync()) target.deleteSync();
-      tmp.renameSync(target.path);
-    } finally {
-      _wipe(encKeyBytes);
-      _wipe(macKey);
+    // Écriture atomique : tmp + rename (anti corruption sur crash mid-write)
+    final target = await _heirFile();
+    final tmp = File('${target.path}.tmp');
+    tmp.writeAsStringSync(jsonEncode(out), flush: true);
+    if (target.existsSync()) target.deleteSync();
+    tmp.renameSync(target.path);
+  }
+
+  /// Déchiffre un snapshot v2. La clé fournie est la sortie Argon2id 32B.
+  Future<List<Entry>?> _readSnapshotV2(
+    Map<String, dynamic> raw,
+    Uint8List key,
+  ) async {
+    try {
+      if (raw['magic'] != 'PTHEIR') return null;
+      final cipher = raw['cipher'];
+      final kdf = raw['kdf'];
+      if (cipher is! Map || kdf is! Map) return null;
+      final saltB64 = kdf['salt'] as String? ?? '';
+      final nonce = base64Decode(cipher['nonce'] as String);
+      final dataBlob = base64Decode(cipher['data'] as String);
+      final split = AeadService.splitCipherAndTag(dataBlob);
+      final aad = _aadV2(saltB64);
+      final pt = await AeadService.decryptGcm(
+        key: key,
+        nonce: nonce,
+        ciphertext: split.ciphertext,
+        tag: split.tag,
+        aad: aad,
+      );
+      if (pt == null) return null;
+      final list = jsonDecode(utf8.decode(pt)) as List;
+      return list
+          .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return null;
     }
   }
 
-  List<Entry>? _readSnapshot(Map<String, dynamic> raw, Uint8List key) {
+  /// Lecture v1 (legacy : PBKDF2 + AES-CBC + HMAC-SHA256). Conservé en
+  /// read-only pour les snapshots créés avant v2.2.0.
+  List<Entry>? _readSnapshotV1(Map<String, dynamic> raw, Uint8List key) {
     Uint8List? macKey;
     Uint8List? encKeyBytes;
     try {
@@ -284,8 +341,7 @@ class HeritageService {
       final cipherBytes = base64Decode(raw['data'] as String);
       final saltB64 = raw['salt'] as String? ?? '';
       final version = raw['version'] as int? ?? 1;
-      // M-9 : version bornée
-      if (version < 1 || version > _heirVersion) return null;
+      if (version != _heirVersionV1) return null;
       final iterations = raw['iterations'] as int? ?? _iterations;
 
       macKey = key.sublist(32);
@@ -296,7 +352,7 @@ class HeritageService {
         sha256,
         macKey,
       ).convert([...aad, ...ivBytes, ...cipherBytes]).bytes;
-      if (!_constEq(computed, macBytes)) return null;
+      if (!SecretBytes.constantTimeEq(computed, macBytes)) return null;
 
       encKeyBytes = key.sublist(0, 32);
       final encKey = enc.Key(encKeyBytes);
@@ -313,9 +369,8 @@ class HeritageService {
     } catch (_) {
       return null;
     } finally {
-      // M-3 : zéroïser les sous-buffers dérivés de la heir key
-      if (macKey != null) _wipe(macKey);
-      if (encKeyBytes != null) _wipe(encKeyBytes);
+      if (macKey != null) SecretBytes.wipe(macKey);
+      if (encKeyBytes != null) SecretBytes.wipe(encKeyBytes);
     }
   }
 }

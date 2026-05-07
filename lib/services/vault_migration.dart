@@ -45,8 +45,8 @@ extension VaultMigration on VaultService {
 
     await _keystore.ensureBothKeksExist();
 
-    final newSalt = VaultService._randomBytes(32);
-    final hwSecret = VaultService._randomBytes(32);
+    final newSalt = SecretBytes.randomBytes(32);
+    final hwSecret = SecretBytes.randomBytes(32);
     Uint8List? pwHash;
     Uint8List? finalKey;
     try {
@@ -80,9 +80,9 @@ extension VaultMigration on VaultService {
     } catch (_) {
       return false;
     } finally {
-      if (pwHash != null) VaultService._zero(pwHash);
-      VaultService._zero(hwSecret);
-      if (finalKey != null) VaultService._zero(finalKey);
+      if (pwHash != null) SecretBytes.wipe(pwHash);
+      SecretBytes.wipe(hwSecret);
+      if (finalKey != null) SecretBytes.wipe(finalKey);
     }
   }
 }

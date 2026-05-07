@@ -140,7 +140,7 @@ class InMemoryKeystoreBackend implements KeystoreBackend {
   @override
   Future<bool> createKek(String alias) async {
     if (_keks.containsKey(alias)) return false;
-    _keks[alias] = _randomBytes(32);
+    _keks[alias] = SecretBytes.randomBytes(32);
     return true;
   }
 
@@ -163,7 +163,7 @@ class InMemoryKeystoreBackend implements KeystoreBackend {
     if (key == null) {
       throw StateError('KEK not found for alias');
     }
-    final nonce = _randomBytes(12);
+    final nonce = SecretBytes.randomBytes(12);
     final box = await _gcm.encrypt(
       plaintext,
       secretKey: SecretKey(key),
@@ -196,8 +196,6 @@ class InMemoryKeystoreBackend implements KeystoreBackend {
     final pt = await _gcm.decrypt(box, secretKey: SecretKey(key));
     return Uint8List.fromList(pt);
   }
-
-  static Uint8List _randomBytes(int n) => SecretBytes.randomBytes(n);
 }
 
 /// High-level façade used by VaultService. Defaults to the channel backend on
