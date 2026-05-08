@@ -1,7 +1,7 @@
 name: pass_tech
 description: "Gestionnaire de mots de passe 100% local et sécurisé"
 publish_to: 'none'
-version: 2.3.4+18
+version: 2.3.5+19
 
 environment:
   sdk: ^3.11.5

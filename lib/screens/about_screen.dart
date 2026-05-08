@@ -11,7 +11,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '2.3.4';
+  static const _version = '2.3.5';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -368,7 +368,22 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 24),
 
           // ── Sections partagées Files Tech (support + légal) ─────────────────
-          const LegalSupportSections(appName: 'Pass Tech', version: _version),
+          LegalSupportSections(
+            appName: 'Pass Tech',
+            version: _version,
+            helpSectionTitle: t.legalHelpSection,
+            legalSectionTitle: t.legalLegalSection,
+            contactSupportTitle: t.legalContactSupport,
+            officialWebsiteTitle: t.legalOfficialWebsite,
+            reportBugTitle: t.legalReportBug,
+            reportBugSubtitle: t.legalReportBugSubtitle,
+            bugBodyIntro: t.legalBugBodyIntro,
+            bugBodyVersionLabel: t.legalBugBodyVersion,
+            bugBodyDeviceLabel: t.legalBugBodyDevice,
+            privacyTitle: t.legalPrivacy,
+            termsTitle: t.legalTerms,
+            licenseTitle: t.legalLicense,
+          ),
         ],
       ),
     );
