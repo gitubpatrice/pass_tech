@@ -68,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case _filterCards:
         return t.homeFilterCards;
       default:
-        return f; // raw category name
+        return categoryLabel(f, t);
     }
   }
 
@@ -657,7 +657,7 @@ class _EntryCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    entry.category,
+                    categoryLabel(entry.category, AppLocalizations.of(context)),
                     style: TextStyle(
                       fontSize: 10,
                       color: categoryColor(entry.category),

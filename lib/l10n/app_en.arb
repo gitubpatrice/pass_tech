@@ -4,6 +4,14 @@
   "appTitle": "Pass Tech",
   "appTagline": "100% local password manager",
 
+  "categoryWeb": "Web",
+  "categoryEmail": "Email",
+  "categoryBank": "Bank",
+  "categorySocial": "Social media",
+  "categoryApps": "Apps",
+  "categoryCards": "Cards",
+  "categoryOther": "Other",
+
   "actionContinue": "Continue",
   "actionNext": "Next",
   "actionStart": "Get started",

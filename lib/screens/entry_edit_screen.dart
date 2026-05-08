@@ -299,7 +299,10 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
                   final selected = _category == cat;
                   final color = categoryColor(cat);
                   return ChoiceChip(
-                    label: Text(cat, style: const TextStyle(fontSize: 12)),
+                    label: Text(
+                      categoryLabel(cat, AppLocalizations.of(context)),
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     avatar: Icon(
                       categoryIcon(cat),
                       size: 14,

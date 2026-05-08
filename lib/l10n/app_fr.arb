@@ -4,6 +4,14 @@
   "appTitle": "Pass Tech",
   "appTagline": "Gestionnaire de mots de passe 100 % local",
 
+  "categoryWeb": "Web",
+  "categoryEmail": "Email",
+  "categoryBank": "Banque",
+  "categorySocial": "Réseaux sociaux",
+  "categoryApps": "Apps",
+  "categoryCards": "Cartes",
+  "categoryOther": "Autres",
+
   "actionContinue": "Continuer",
   "actionNext": "Suivant",
   "actionStart": "Commencer",

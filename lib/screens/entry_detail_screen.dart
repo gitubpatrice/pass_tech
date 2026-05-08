@@ -291,7 +291,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                   alignment: WrapAlignment.center,
                   children: [
                     _badge(_entryTypeLabelLocalized(_entry.type, t), catColor),
-                    _badge(_entry.category, cs.onSurfaceVariant),
+                    _badge(
+                      categoryLabel(_entry.category, t),
+                      cs.onSurfaceVariant,
+                    ),
                   ],
                 ),
               ],

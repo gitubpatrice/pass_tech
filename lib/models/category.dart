@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 const categories = [
   'Web',
@@ -9,6 +10,29 @@ const categories = [
   'Cartes',
   'Autres',
 ];
+
+/// Affichage localisé d'une catégorie. Les valeurs canoniques (stockées en
+/// base) restent les chaînes FR pour ne pas casser les vaults existants.
+String categoryLabel(String cat, AppLocalizations t) {
+  switch (cat) {
+    case 'Web':
+      return t.categoryWeb;
+    case 'Email':
+      return t.categoryEmail;
+    case 'Banque':
+      return t.categoryBank;
+    case 'Réseaux sociaux':
+      return t.categorySocial;
+    case 'Apps':
+      return t.categoryApps;
+    case 'Cartes':
+      return t.categoryCards;
+    case 'Autres':
+      return t.categoryOther;
+    default:
+      return cat;
+  }
+}
 
 IconData categoryIcon(String cat) {
   switch (cat) {
