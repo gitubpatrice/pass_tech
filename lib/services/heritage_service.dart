@@ -372,6 +372,10 @@ class HeritageService {
       final macBytes = base64Decode(raw['mac'] as String);
       final cipherBytes = base64Decode(raw['data'] as String);
       final saltB64 = raw['salt'] as String? ?? '';
+      // P2-fix v2.3.3 : refuse un fichier forgé avec salt vide ou trop court.
+      // Sans cette borne, PBKDF2 sur salt vide réduirait la difficulté de
+      // brute-force d'un attaquant ayant accès au fichier (root requis).
+      if (saltB64.isEmpty || base64Decode(saltB64).length < 16) return null;
       final version = raw['version'] as int? ?? 1;
       if (version != _heirVersionV1) return null;
       final iterations = raw['iterations'] as int? ?? _iterations;
