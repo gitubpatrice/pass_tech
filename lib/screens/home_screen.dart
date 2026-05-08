@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/vault_service.dart';
@@ -20,17 +21,56 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _search = '';
-  String _filter = 'Tous';
+  // Internal stable filter keys (i18n-safe). UI labels are resolved via
+  // _filterLabel() against the current locale; categories keep their raw
+  // (data-side) string.
+  static const _filterAll = '__all__';
+  static const _filterFavorites = '__fav__';
+  static const _filterPasswords = '__type_password__';
+  static const _filterNotes = '__type_note__';
+  static const _filterCards = '__type_card__';
+  String _filter = _filterAll;
   final _searchCtrl = TextEditingController();
   bool _searchOpen = false;
   String _sort = 'recent';
 
-  static const _sortOptions = [
-    (label: 'Récent', value: 'recent', icon: Icons.schedule),
-    (label: 'Plus ancien', value: 'oldest', icon: Icons.history),
-    (label: 'A → Z', value: 'alpha', icon: Icons.sort_by_alpha),
-    (label: 'Z → A', value: 'alphaDesc', icon: Icons.sort_by_alpha),
-  ];
+  static const _sortValues = ['recent', 'oldest', 'alpha', 'alphaDesc'];
+  static const _sortIcons = {
+    'recent': Icons.schedule,
+    'oldest': Icons.history,
+    'alpha': Icons.sort_by_alpha,
+    'alphaDesc': Icons.sort_by_alpha,
+  };
+
+  String _sortLabel(String v, AppLocalizations t) {
+    switch (v) {
+      case 'oldest':
+        return t.homeSortOldest;
+      case 'alpha':
+        return t.homeSortAlpha;
+      case 'alphaDesc':
+        return t.homeSortAlphaDesc;
+      default:
+        return t.homeSortRecent;
+    }
+  }
+
+  String _filterLabel(String f, AppLocalizations t) {
+    switch (f) {
+      case _filterAll:
+        return t.homeFilterAll;
+      case _filterFavorites:
+        return t.homeFilterFavorites;
+      case _filterPasswords:
+        return t.homeFilterPasswords;
+      case _filterNotes:
+        return t.homeFilterNotes;
+      case _filterCards:
+        return t.homeFilterCards;
+      default:
+        return f; // raw category name
+    }
+  }
 
   @override
   void initState() {
@@ -57,8 +97,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  static const _typeChips = ['Mots de passe', 'Notes', 'Cartes bancaires'];
-  static const _chips = ['Tous', 'Favoris', ..._typeChips, ...categories];
+  static const _typeChips = [_filterPasswords, _filterNotes, _filterCards];
+  static const _chips = [
+    _filterAll,
+    _filterFavorites,
+    ..._typeChips,
+    ...categories,
+  ];
 
   @override
   void dispose() {
@@ -68,11 +113,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   EntryType? _typeFromFilter(String f) {
     switch (f) {
-      case 'Mots de passe':
+      case _filterPasswords:
         return EntryType.password;
-      case 'Notes':
+      case _filterNotes:
         return EntryType.note;
-      case 'Cartes bancaires':
+      case _filterCards:
         return EntryType.card;
       default:
         return null;
@@ -85,12 +130,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Coût négligeable (<1000 entrées, ~ms).
   List<Entry> get _filtered {
     var list = VaultService().entries.toList();
-    if (_filter == 'Favoris') {
+    if (_filter == _filterFavorites) {
       list = list.where((e) => e.isFavorite).toList();
     } else if (_typeFromFilter(_filter) != null) {
       final t = _typeFromFilter(_filter)!;
       list = list.where((e) => e.type == t).toList();
-    } else if (_filter != 'Tous') {
+    } else if (_filter != _filterAll) {
       list = list.where((e) => e.category == _filter).toList();
     }
     if (_search.isNotEmpty) {
@@ -128,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _refresh() => setState(() {});
 
   Future<void> _addEntry() async {
+    final t = AppLocalizations.of(context);
     final type = await showModalBottomSheet<EntryType>(
       context: context,
       showDragHandle: true,
@@ -140,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                 child: Text(
-                  'Quel type d\'entrée ?',
+                  t.homeAddSheetTitle,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -150,24 +196,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 context: context,
                 icon: Icons.key,
                 color: const Color(0xFF58A6FF),
-                title: 'Mot de passe',
-                subtitle: 'Identifiant et mot de passe d\'un compte',
+                title: t.homeAddPassword,
+                subtitle: t.homeAddPasswordSub,
                 onTap: () => Navigator.pop(context, EntryType.password),
               ),
               _addOption(
                 context: context,
                 icon: Icons.sticky_note_2_outlined,
                 color: const Color(0xFFFF7043),
-                title: 'Note sécurisée',
-                subtitle: 'Texte confidentiel chiffré',
+                title: t.homeAddNote,
+                subtitle: t.homeAddNoteSub,
                 onTap: () => Navigator.pop(context, EntryType.note),
               ),
               _addOption(
                 context: context,
                 icon: Icons.credit_card,
                 color: const Color(0xFF43A047),
-                title: 'Carte bancaire',
-                subtitle: 'Numéro, CVV, expiration, PIN',
+                title: t.homeAddCard,
+                subtitle: t.homeAddCardSub,
                 onTap: () => Navigator.pop(context, EntryType.card),
               ),
             ],
@@ -209,6 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final entries = _filtered;
 
     return Scaffold(
@@ -217,8 +264,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Rechercher…',
+                decoration: InputDecoration(
+                  hintText: t.homeSearchHint,
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -226,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _search = v;
                 }),
               )
-            : const Text('Pass Tech'),
+            : Text(t.homeTitle),
         actions: [
           IconButton(
             icon: Icon(_searchOpen ? Icons.close : Icons.search),
@@ -240,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.password),
-            tooltip: 'Générateur',
+            tooltip: t.homeTooltipGenerator,
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const GeneratorScreen()),
@@ -248,17 +295,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
-            tooltip: 'Trier',
-            itemBuilder: (_) => _sortOptions
+            tooltip: t.homeTooltipSort,
+            itemBuilder: (_) => _sortValues
                 .map(
-                  (o) => PopupMenuItem(
-                    value: o.value,
+                  (v) => PopupMenuItem(
+                    value: v,
                     child: Row(
                       children: [
-                        Icon(o.icon, size: 16),
+                        Icon(_sortIcons[v], size: 16),
                         const SizedBox(width: 10),
-                        Text(o.label),
-                        if (_sort == o.value) ...[
+                        Text(_sortLabel(v, t)),
+                        if (_sort == v) ...[
                           const SizedBox(width: 8),
                           const Icon(Icons.check, size: 14),
                         ],
@@ -271,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.lock_outline),
-            tooltip: 'Verrouiller',
+            tooltip: t.homeTooltipLock,
             onPressed: () {
               VaultService().lock();
               Navigator.of(context).pushAndRemoveUntil(
@@ -282,9 +329,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'settings', child: Text('Paramètres')),
-              PopupMenuItem(value: 'about', child: Text('À propos')),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'settings', child: Text(t.actionSettings)),
+              PopupMenuItem(value: 'about', child: Text(t.actionAbout)),
             ],
             onSelected: (v) {
               if (v == 'settings') {
@@ -325,7 +372,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: selected ? cs.onPrimary : null,
                         )
                       : null,
-                  label: Text(chip, style: const TextStyle(fontSize: 12)),
+                  label: Text(
+                    _filterLabel(chip, t),
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   selected: selected,
                   onSelected: (_) => setState(() {
                     _filter = chip;
@@ -341,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               children: [
                 Text(
-                  '${entries.length} entrée${entries.length != 1 ? 's' : ''}',
+                  t.homeEntryCount(entries.length),
                   style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
               ],
@@ -362,14 +412,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 12),
                         Text(
                           _search.isNotEmpty
-                              ? 'Aucun résultat'
-                              : 'Aucune entrée',
+                              ? t.homeEmptyNoResult
+                              : t.homeEmptyNoEntry,
                           style: TextStyle(color: cs.onSurfaceVariant),
                         ),
-                        if (_search.isEmpty && _filter == 'Tous') ...[
+                        if (_search.isEmpty && _filter == _filterAll) ...[
                           const SizedBox(height: 6),
                           Text(
-                            'Appuie sur + pour ajouter',
+                            t.homeEmptyHint,
                             style: TextStyle(
                               fontSize: 12,
                               color: cs.onSurfaceVariant,
@@ -391,18 +441,18 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addEntry,
         icon: const Icon(Icons.add),
-        label: const Text('Ajouter'),
+        label: Text(t.actionAdd),
       ),
     );
   }
 
   IconData _chipIcon(String chip) {
     switch (chip) {
-      case 'Mots de passe':
+      case _filterPasswords:
         return Icons.key;
-      case 'Notes':
+      case _filterNotes:
         return Icons.sticky_note_2_outlined;
-      case 'Cartes bancaires':
+      case _filterCards:
         return Icons.credit_card;
       default:
         return Icons.folder_outlined;
@@ -471,7 +521,9 @@ class _EntryCard extends StatelessWidget {
             backgroundColor: Colors.amber.shade600,
             foregroundColor: Colors.white,
             icon: entry.isFavorite ? Icons.star : Icons.star_border,
-            label: entry.isFavorite ? 'Retirer' : 'Favori',
+            label: entry.isFavorite
+                ? AppLocalizations.of(context).actionRemove
+                : AppLocalizations.of(context).actionFavorite,
             borderRadius: BorderRadius.circular(12),
           ),
         ],
@@ -482,23 +534,24 @@ class _EntryCard extends StatelessWidget {
         children: [
           SlidableAction(
             onPressed: (ctx) async {
+              final t = AppLocalizations.of(ctx);
               final messenger = ScaffoldMessenger.of(ctx);
               final confirm = await showDialog<bool>(
                 context: ctx,
                 builder: (dctx) => AlertDialog(
-                  title: const Text('Supprimer ?'),
-                  content: Text('Supprimer "${entry.title}" définitivement ?'),
+                  title: Text(t.homeDeleteTitle),
+                  content: Text(t.homeDeleteConfirm(entry.title)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(dctx, false),
-                      child: const Text('Annuler'),
+                      child: Text(t.actionCancel),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(dctx, true),
                       style: TextButton.styleFrom(
                         foregroundColor: Theme.of(ctx).colorScheme.error,
                       ),
-                      child: const Text('Supprimer'),
+                      child: Text(t.actionDelete),
                     ),
                   ],
                 ),
@@ -508,7 +561,7 @@ class _EntryCard extends StatelessWidget {
               onChanged();
               messenger.showSnackBar(
                 SnackBar(
-                  content: Text('"${entry.title}" supprimé'),
+                  content: Text(t.homeDeletedSnack(entry.title)),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -516,7 +569,7 @@ class _EntryCard extends StatelessWidget {
             backgroundColor: cs.error,
             foregroundColor: Colors.white,
             icon: Icons.delete_outline,
-            label: 'Supprimer',
+            label: AppLocalizations.of(context).actionDelete,
             borderRadius: BorderRadius.circular(12),
           ),
         ],

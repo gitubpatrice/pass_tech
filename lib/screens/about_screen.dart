@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/app_update.dart';
 import 'package:files_tech_core/files_tech_core.dart';
 
@@ -10,7 +11,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '2.2.0';
+  static const _version = '2.3.0';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -148,14 +149,15 @@ class _AboutScreenState extends State<AboutScreen> {
   ];
 
   Future<void> _checkUpdate() async {
+    final t = AppLocalizations.of(context);
     setState(() => _checkingUpdate = true);
     final info = await appUpdateService.checkForUpdate(force: true);
     if (!mounted) return;
     setState(() => _checkingUpdate = false);
     if (info == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vous avez déjà la dernière version ✓')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.aboutAlreadyLatest)));
       return;
     }
     showDialog(
@@ -163,16 +165,14 @@ class _AboutScreenState extends State<AboutScreen> {
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         return AlertDialog(
-          title: Text('v${info.version} disponible'),
+          title: Text(t.aboutVersionAvailable(info.version)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  info.body.isNotEmpty
-                      ? info.body
-                      : 'Une nouvelle version est disponible.',
+                  info.body.isNotEmpty ? info.body : t.aboutNewVersionAvailable,
                 ),
                 if (info.expectedSha256 != null) ...[
                   const SizedBox(height: 14),
@@ -194,9 +194,9 @@ class _AboutScreenState extends State<AboutScreen> {
                               color: cs.primary,
                             ),
                             const SizedBox(width: 6),
-                            const Text(
-                              'SHA-256 attendu (APK arm64-v8a)',
-                              style: TextStyle(
+                            Text(
+                              t.aboutShaExpected,
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -214,8 +214,7 @@ class _AboutScreenState extends State<AboutScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Avant install, vérifiez ce hash : '
-                          'sha256sum app-arm64-v8a-release.apk',
+                          t.aboutShaHint,
                           style: TextStyle(
                             fontSize: 10,
                             color: cs.onSurfaceVariant,
@@ -231,11 +230,11 @@ class _AboutScreenState extends State<AboutScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Plus tard'),
+              child: Text(t.actionLater),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
+              child: Text(t.actionOk),
             ),
           ],
         );
@@ -246,8 +245,9 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('À propos')),
+      appBar: AppBar(title: Text(t.aboutTitle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
         children: [
@@ -266,7 +266,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Pass Tech',
+                  t.appTitle,
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -292,7 +292,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Gestionnaire de mots de passe 100 % local',
+                  t.aboutTagline,
                   style: Theme.of(context).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -308,8 +308,8 @@ class _AboutScreenState extends State<AboutScreen> {
                       : const Icon(Icons.system_update_outlined, size: 18),
                   label: Text(
                     _checkingUpdate
-                        ? 'Vérification…'
-                        : 'Vérifier les mises à jour',
+                        ? t.aboutCheckingUpdates
+                        : t.aboutCheckUpdates,
                   ),
                 ),
               ],
@@ -319,14 +319,14 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 28),
 
           // ── Confidentialité ─────────────────────────────────────────────────
-          _sectionTitle(context, 'Confidentialité'),
+          _sectionTitle(context, t.aboutSectionPrivacy),
           const SizedBox(height: 8),
           const _PrivacyCard(),
 
           const SizedBox(height: 24),
 
           // ── Fonctionnalités ─────────────────────────────────────────────────
-          _sectionTitle(context, 'Fonctionnalités'),
+          _sectionTitle(context, t.aboutSectionFeatures),
           const SizedBox(height: 8),
           ..._features.map(
             (f) => _FeatureRow(icon: f.icon, label: f.label, desc: f.desc),
@@ -335,7 +335,7 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 24),
 
           // ── Auteur ──────────────────────────────────────────────────────────
-          _sectionTitle(context, 'Auteur'),
+          _sectionTitle(context, t.aboutSectionAuthor),
           const SizedBox(height: 8),
           Card(
             child: ListTile(
@@ -344,35 +344,26 @@ class _AboutScreenState extends State<AboutScreen> {
                 child: Icon(Icons.person_outline, color: cs.primary),
               ),
               title: const Text(_author),
-              subtitle: const Text('Développeur'),
+              subtitle: Text(t.aboutAuthorRole),
             ),
           ),
 
           const SizedBox(height: 16),
 
           // ── Aide ────────────────────────────────────────────────────────────
-          _sectionTitle(context, 'Aide rapide'),
+          _sectionTitle(context, t.aboutSectionHelp),
           const SizedBox(height: 8),
           _HelpCard(
-            title: 'Premier lancement',
-            steps: [
-              'Choisissez un mot de passe maître fort (min. 8 caractères)',
-              'Il chiffre toutes vos données — ne peut pas être récupéré',
-            ],
+            title: t.aboutHelpFirstLaunchTitle,
+            steps: [t.aboutHelpFirstLaunchStep1, t.aboutHelpFirstLaunchStep2],
           ),
           _HelpCard(
-            title: 'Ajouter un mot de passe',
-            steps: [
-              'Bouton "+ Ajouter" en bas de l\'écran principal',
-              'Ou utilisez le générateur pour créer un mot de passe sécurisé',
-            ],
+            title: t.aboutHelpAddTitle,
+            steps: [t.aboutHelpAddStep1, t.aboutHelpAddStep2],
           ),
           _HelpCard(
-            title: 'Mise à jour',
-            steps: [
-              'L\'app vérifie automatiquement les mises à jour au lancement',
-              'Ou appuyez sur "Vérifier les mises à jour" ci-dessus',
-            ],
+            title: t.aboutHelpUpdateTitle,
+            steps: [t.aboutHelpUpdateStep1, t.aboutHelpUpdateStep2],
           ),
 
           const SizedBox(height: 24),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_localizations.dart';
 import 'setup_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -13,38 +14,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _ctrl = PageController();
   int _page = 0;
 
-  static final _pages = [
+  List<_OnboardPage> _buildPages(AppLocalizations t) => [
     _OnboardPage(
       icon: Icons.lock,
-      iconColor: Color(0xFF58A6FF),
-      title: 'Bienvenue dans Pass Tech',
-      subtitle: 'Votre coffre-fort de mots de passe 100 % local',
+      iconColor: const Color(0xFF58A6FF),
+      title: t.onboardWelcomeTitle,
+      subtitle: t.onboardWelcomeSubtitle,
       points: [
-        'Aucun serveur, aucun cloud, aucun tracker',
-        'Chiffrement AES-256-GCM + Argon2id (OWASP 2024) + clé matérielle Android Keystore',
-        'Audit de sécurité et détection de fuites intégrés',
+        t.onboardWelcomePoint1,
+        t.onboardWelcomePoint2,
+        t.onboardWelcomePoint3,
       ],
     ),
     _OnboardPage(
       icon: Icons.key,
-      iconColor: Color(0xFFFF7043),
-      title: 'Mot de passe maître',
-      subtitle: 'Une seule clé protège tout votre coffre',
+      iconColor: const Color(0xFFFF7043),
+      title: t.onboardMasterTitle,
+      subtitle: t.onboardMasterSubtitle,
       points: [
-        'Choisissez un mot de passe long et unique (14+ caractères)',
-        'Il ne peut PAS être récupéré : si vous l\'oubliez, tout est perdu',
-        'L\'empreinte / Face ID peut le remplacer après le 1er déverrouillage',
+        t.onboardMasterPoint1,
+        t.onboardMasterPoint2,
+        t.onboardMasterPoint3,
       ],
     ),
     _OnboardPage(
       icon: Icons.backup_outlined,
-      iconColor: Color(0xFF43A047),
-      title: 'Pensez à sauvegarder',
-      subtitle: 'Le coffre vit uniquement sur ce téléphone',
+      iconColor: const Color(0xFF43A047),
+      title: t.onboardBackupTitle,
+      subtitle: t.onboardBackupSubtitle,
       points: [
-        'Si vous perdez le téléphone, le coffre est perdu',
-        'Exportez régulièrement un backup chiffré (.ptbak)',
-        'Conservez-le dans un endroit sûr (autre appareil, clé USB…)',
+        t.onboardBackupPoint1,
+        t.onboardBackupPoint2,
+        t.onboardBackupPoint3,
       ],
     ),
   ];
@@ -58,8 +59,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ).pushReplacement(MaterialPageRoute(builder: (_) => const SetupScreen()));
   }
 
-  void _next() {
-    if (_page < _pages.length - 1) {
+  void _next(int total) {
+    if (_page < total - 1) {
       _ctrl.nextPage(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
@@ -78,7 +79,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isLast = _page == _pages.length - 1;
+    final t = AppLocalizations.of(context);
+    final pages = _buildPages(t);
+    final isLast = _page == pages.length - 1;
 
     return Scaffold(
       body: SafeArea(
@@ -91,22 +94,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.fromLTRB(0, 12, 12, 0),
                 child: TextButton(
                   onPressed: _finish,
-                  child: const Text('Passer'),
+                  child: Text(t.actionSkip),
                 ),
               ),
             ),
             Expanded(
               child: PageView.builder(
                 controller: _ctrl,
-                itemCount: _pages.length,
+                itemCount: pages.length,
                 onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (_, i) => _pages[i].build(context),
+                itemBuilder: (_, i) => pages[i].build(context),
               ),
             ),
             // Dots
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_pages.length, (i) {
+              children: List.generate(pages.length, (i) {
                 final active = i == _page;
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -128,12 +131,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _next,
+                  onPressed: () => _next(pages.length),
                   icon: Icon(
                     isLast ? Icons.check : Icons.arrow_forward,
                     size: 18,
                   ),
-                  label: Text(isLast ? 'Commencer' : 'Suivant'),
+                  label: Text(isLast ? t.actionStart : t.actionNext),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
                   ),

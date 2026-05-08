@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
 import '../services/vault_service.dart';
 import 'home_screen.dart';
@@ -44,29 +45,27 @@ class _SetupScreenState extends State<SetupScreen> {
     return const Color(0xFF43A047);
   }
 
-  String _strengthLabel(double s) {
-    if (s < 0.35) return 'Faible';
-    if (s < 0.65) return 'Moyen';
-    if (s < 0.85) return 'Fort';
-    return 'Très fort';
+  String _strengthLabel(double s, AppLocalizations t) {
+    if (s < 0.35) return t.strengthWeak;
+    if (s < 0.65) return t.strengthMedium;
+    if (s < 0.85) return t.strengthStrong;
+    return t.strengthVeryStrong;
   }
 
   Future<void> _create() async {
+    final t = AppLocalizations.of(context);
     final p1 = _pass1.text;
     final p2 = _pass2.text;
     if (p1.length < 12) {
-      setState(() => _error = 'Minimum 12 caractères');
+      setState(() => _error = t.setupErrorMin);
       return;
     }
     if (_strength(p1) < 0.6) {
-      setState(
-        () => _error =
-            'Mot de passe trop faible — variez majuscules, chiffres, symboles',
-      );
+      setState(() => _error = t.setupErrorWeak);
       return;
     }
     if (p1 != p2) {
-      setState(() => _error = 'Les mots de passe ne correspondent pas');
+      setState(() => _error = t.setupErrorMismatch);
       return;
     }
     setState(() {
@@ -88,6 +87,7 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final s = _strength(_pass1.text);
 
     return Scaffold(
@@ -109,14 +109,14 @@ class _SetupScreenState extends State<SetupScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Créer votre coffre-fort',
+                  t.setupTitle,
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Choisissez un mot de passe maître fort.\nIl chiffre toutes vos données en local.',
+                  t.setupSubtitle,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -130,8 +130,8 @@ class _SetupScreenState extends State<SetupScreen> {
                   keyboardType: TextInputType.visiblePassword,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    labelText: 'Mot de passe maître',
-                    helperText: 'Minimum 12 caractères',
+                    labelText: t.setupMasterLabel,
+                    helperText: t.setupMasterHelper,
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -163,7 +163,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        _strengthLabel(s),
+                        _strengthLabel(s, t),
                         style: TextStyle(
                           fontSize: 12,
                           color: _strengthColor(s),
@@ -184,7 +184,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   keyboardType: TextInputType.visiblePassword,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    labelText: 'Confirmer le mot de passe',
+                    labelText: t.setupConfirmLabel,
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -213,7 +213,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       const CircularProgressIndicator(),
                       const SizedBox(height: 12),
                       Text(
-                        'Chiffrement en cours…',
+                        t.setupEncrypting,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -222,7 +222,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   FilledButton.icon(
                     onPressed: _create,
                     icon: const Icon(Icons.shield_outlined, size: 18),
-                    label: const Text('Créer le coffre-fort'),
+                    label: Text(t.setupCreateCta),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                     ),
@@ -246,7 +246,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Ce mot de passe ne peut pas être récupéré. Si vous l\'oubliez, vos données seront inaccessibles.',
+                          t.setupWarning,
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onSurfaceVariant,

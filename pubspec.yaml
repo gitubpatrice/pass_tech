@@ -1,7 +1,7 @@
 name: pass_tech
 description: "Gestionnaire de mots de passe 100% local et sécurisé"
 publish_to: 'none'
-version: 2.2.0+13
+version: 2.3.0+14
 
 environment:
   sdk: ^3.11.5
@@ -10,6 +10,8 @@ dependencies:
   files_tech_core:
     path: ../files_tech_core
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_secure_storage: ^10.0.0
@@ -41,5 +43,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
   assets:
     - assets/legal/

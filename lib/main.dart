@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'l10n/app_localizations.dart';
 import 'services/clipboard_service.dart';
 import 'services/app_update.dart';
 import 'services/vault_service.dart';
@@ -12,6 +13,31 @@ final _navigatorKey = GlobalKey<NavigatorState>();
 
 /// Global theme mode notifier — listened by the app, updated by settings.
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+
+/// Global locale notifier — `null` means follow the system locale.
+/// Updated by settings, listened by the app.
+final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
+
+const String prefKeyLocale = 'app_locale';
+
+/// Parse a locale code from prefs into a `Locale?`.
+/// `'system'` or unknown → null (follow system).
+Locale? parseLocale(String? code) {
+  switch (code) {
+    case 'fr':
+      return const Locale('fr');
+    case 'en':
+      return const Locale('en');
+    default:
+      return null;
+  }
+}
+
+/// Serialize a `Locale?` for prefs. `null` → `'system'`.
+String localeToString(Locale? l) {
+  if (l == null) return 'system';
+  return l.languageCode;
+}
 
 ThemeMode parseThemeMode(String s) {
   switch (s) {
@@ -46,6 +72,7 @@ void main() async {
   themeNotifier.value = parseThemeMode(
     prefs.getString('theme_mode') ?? 'system',
   );
+  localeNotifier.value = parseLocale(prefs.getString(prefKeyLocale));
 
   final vaultExists = await VaultService().vaultExists;
   final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
@@ -132,16 +159,24 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
-      builder: (_, mode, child) => MaterialApp(
-        title: 'Pass Tech',
-        navigatorKey: _navigatorKey,
-        debugShowCheckedModeBanner: false,
-        themeMode: mode,
-        theme: _lightTheme(),
-        darkTheme: _darkTheme(),
-        home: !widget.onboardingDone && !widget.vaultExists
-            ? const OnboardingScreen()
-            : (widget.vaultExists ? const UnlockScreen() : const SetupScreen()),
+      builder: (_, mode, _) => ValueListenableBuilder<Locale?>(
+        valueListenable: localeNotifier,
+        builder: (_, locale, _) => MaterialApp(
+          title: 'Pass Tech',
+          navigatorKey: _navigatorKey,
+          debugShowCheckedModeBanner: false,
+          themeMode: mode,
+          theme: _lightTheme(),
+          darkTheme: _darkTheme(),
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: !widget.onboardingDone && !widget.vaultExists
+              ? const OnboardingScreen()
+              : (widget.vaultExists
+                    ? const UnlockScreen()
+                    : const SetupScreen()),
+        ),
       ),
     );
   }

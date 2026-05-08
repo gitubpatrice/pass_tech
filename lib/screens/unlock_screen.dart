@@ -3,6 +3,7 @@ import 'package:biometric_storage/biometric_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
 import '../services/integrity_service.dart';
 import '../services/vault_service.dart';
@@ -59,7 +60,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final fingerprint = status.issues.join('|');
     if (prefs.getString('integrity_warned') == fingerprint) return;
     if (!mounted) return;
-
+    final t = AppLocalizations.of(context);
     final accepted = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -67,17 +68,13 @@ class _UnlockScreenState extends State<UnlockScreen> {
         final cs = Theme.of(ctx).colorScheme;
         return AlertDialog(
           icon: Icon(Icons.warning_amber_rounded, color: cs.error, size: 36),
-          title: const Text('Environnement à risque'),
+          title: Text(t.integrityTitle),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Pass Tech a détecté un environnement potentiellement '
-                  'compromis :',
-                  style: TextStyle(fontSize: 13),
-                ),
+                Text(t.integrityIntro, style: const TextStyle(fontSize: 13)),
                 const SizedBox(height: 10),
                 ...status.issues.map(
                   (i) => Padding(
@@ -95,11 +92,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Sur un appareil rooté, en mode debug ou émulé, le '
-                  'coffre-fort est moins protégé : un attaquant local '
-                  'peut lire le fichier chiffré, contourner la biométrie '
-                  'liée au Keystore, et tenter une attaque hors-ligne sur '
-                  'votre mot de passe maître.',
+                  t.integrityExplanation,
                   style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: 14),
@@ -110,12 +103,12 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: cs.error.withValues(alpha: 0.3)),
                   ),
-                  child: const Text(
-                    'En continuant, vous reconnaissez avoir été averti et '
-                    'utilisez Pass Tech à vos propres risques. Le '
-                    'développeur ne peut garantir la confidentialité de '
-                    'vos données dans cet environnement.',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                  child: Text(
+                    t.integrityAcknowledge,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -124,14 +117,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Quitter'),
+              child: Text(t.actionQuit),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error,
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Continuer à mes risques'),
+              child: Text(t.integrityContinueAtRisk),
             ),
           ],
         );
@@ -206,9 +199,11 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _checkLockout();
         break;
       case UnlockResult.wrongPassword:
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
         setState(() {
           _loading = false;
-          _error = 'Échec biométrique';
+          _error = t.unlockBiometricFailed;
         });
         break;
     }
@@ -246,9 +241,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _checkLockout();
         break;
       case UnlockResult.wrongPassword:
+        final t = AppLocalizations.of(context);
         setState(() {
           _loading = false;
-          _error = 'Mot de passe incorrect';
+          _error = t.unlockWrongPassword;
         });
         _checkLockout(); // may have just hit threshold
         break;
@@ -284,9 +280,11 @@ class _UnlockScreenState extends State<UnlockScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt(_heirFailCountKey, _heirFailCount);
       } catch (_) {}
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
       setState(() {
         _loading = false;
-        _error = 'Mot de passe héritier incorrect';
+        _error = t.unlockHeirWrongPassword;
       });
       return;
     }
@@ -311,6 +309,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final locked = _lockoutRemaining != null;
 
     return Scaffold(
@@ -338,16 +337,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Pass Tech',
+                  t.appTitle,
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  locked
-                      ? 'Trop de tentatives — verrouillé'
-                      : 'Entrez votre mot de passe maître',
+                  locked ? t.unlockTooManyAttempts : t.unlockEnterMaster,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 32),
@@ -368,7 +365,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'Réessayez dans',
+                          t.unlockTryAgainIn,
                           style: TextStyle(fontSize: 12, color: cs.error),
                         ),
                         const SizedBox(height: 4),
@@ -394,7 +391,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     autocorrect: false,
                     keyboardType: TextInputType.visiblePassword,
                     decoration: InputDecoration(
-                      labelText: 'Mot de passe maître',
+                      labelText: t.unlockMasterLabel,
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -423,7 +420,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         const CircularProgressIndicator(),
                         const SizedBox(height: 12),
                         Text(
-                          'Déchiffrement…',
+                          t.unlockDecrypting,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -434,7 +431,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         FilledButton.icon(
                           onPressed: _unlock,
                           icon: const Icon(Icons.lock_open, size: 18),
-                          label: const Text('Déverrouiller'),
+                          label: Text(t.unlockCta),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(48),
                           ),
@@ -444,7 +441,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                           OutlinedButton.icon(
                             onPressed: _tryBiometric,
                             icon: const Icon(Icons.fingerprint, size: 18),
-                            label: const Text('Empreinte / Face ID'),
+                            label: Text(t.unlockBiometricCta),
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size.fromHeight(44),
                             ),
@@ -468,7 +465,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                                   Icons.family_restroom,
                                   size: 18,
                                 ),
-                                label: const Text('Accès héritier'),
+                                label: Text(t.unlockHeirCta),
                               ),
                             );
                           },
@@ -514,16 +511,16 @@ class _HeirPasswordDialogState extends State<_HeirPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return AlertDialog(
       icon: const Icon(Icons.family_restroom, size: 36),
-      title: const Text('Accès héritier'),
+      title: Text(t.heirDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Période d\'inactivité du propriétaire dépassée.\n'
-            'Saisissez le mot de passe héritier qui vous a été confié.',
-            style: TextStyle(fontSize: 12),
+          Text(
+            t.heirDialogBody,
+            style: const TextStyle(fontSize: 12),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
@@ -532,9 +529,9 @@ class _HeirPasswordDialogState extends State<_HeirPasswordDialog> {
             obscureText: true,
             autofocus: true,
             onSubmitted: (_) => _submit(),
-            decoration: const InputDecoration(
-              labelText: 'Mot de passe héritier',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t.heirPasswordLabel,
+              border: const OutlineInputBorder(),
             ),
           ),
         ],
@@ -545,9 +542,9 @@ class _HeirPasswordDialogState extends State<_HeirPasswordDialog> {
             _ctrl.clear();
             Navigator.pop(context);
           },
-          child: const Text('Annuler'),
+          child: Text(t.actionCancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Déverrouiller')),
+        FilledButton(onPressed: _submit, child: Text(t.actionUnlock)),
       ],
     );
   }

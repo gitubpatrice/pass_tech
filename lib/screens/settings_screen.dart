@@ -14,7 +14,16 @@ import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
 import '../services/panic_service.dart';
 import '../services/vault_service.dart';
-import '../main.dart' show themeNotifier, parseThemeMode, themeModeToString;
+import '../l10n/app_localizations.dart';
+import '../main.dart'
+    show
+        themeNotifier,
+        parseThemeMode,
+        themeModeToString,
+        localeNotifier,
+        parseLocale,
+        localeToString,
+        prefKeyLocale;
 import 'audit_screen.dart';
 import 'setup_screen.dart';
 import 'unlock_screen.dart';
@@ -34,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   int _clipboardClear = 30;
   int _autoLockSeconds = 300;
   ThemeMode _themeMode = ThemeMode.system;
+  Locale? _locale;
   bool _antiPhishingEnabled = false;
   bool _antiPhishingASActive = false;
 
@@ -90,6 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final clip = prefs.getInt('clipboard_clear') ?? 30;
     final lock = prefs.getInt('auto_lock_seconds') ?? 300;
     final theme = parseThemeMode(prefs.getString('theme_mode') ?? 'system');
+    final loc = parseLocale(prefs.getString(prefKeyLocale));
     final apSvc = AntiPhishingService();
     final apEnabled = await apSvc.isEnabled;
     final apASActive = await apSvc.isAccessibilityServiceActive;
@@ -101,6 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         _clipboardClear = clip;
         _autoLockSeconds = lock;
         _themeMode = theme;
+        _locale = loc;
         _antiPhishingEnabled = apEnabled;
         _antiPhishingASActive = apASActive;
       });
@@ -174,6 +186,20 @@ class _SettingsScreenState extends State<SettingsScreen>
       case ThemeMode.system:
         return 'Système';
     }
+  }
+
+  Future<void> _setLocale(Locale? l) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(prefKeyLocale, localeToString(l));
+    localeNotifier.value = l;
+    if (mounted) setState(() => _locale = l);
+  }
+
+  String _localeLabel(AppLocalizations t) {
+    if (_locale == null) return t.settingsLanguageSystem;
+    if (_locale!.languageCode == 'fr') return t.settingsLanguageFrench;
+    if (_locale!.languageCode == 'en') return t.settingsLanguageEnglish;
+    return t.settingsLanguageSystem;
   }
 
   Future<void> _setAutoLock(int v) async {
@@ -1193,6 +1219,45 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               );
               if (m != null) _setTheme(m);
+            },
+          ),
+          Builder(
+            builder: (ctx) {
+              final t = AppLocalizations.of(ctx);
+              return ListTile(
+                leading: const Icon(Icons.language),
+                title: Text(t.settingsLanguage),
+                subtitle: Text(_localeLabel(t)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: () async {
+                  // Use a sentinel string so we can distinguish a barrier
+                  // dismiss (null) from an explicit "System" choice.
+                  final choice = await showDialog<String>(
+                    context: ctx,
+                    builder: (_) => SimpleDialog(
+                      title: Text(t.settingsLanguage),
+                      children:
+                          <(String, String)>[
+                            (t.settingsLanguageSystem, 'system'),
+                            (t.settingsLanguageFrench, 'fr'),
+                            (t.settingsLanguageEnglish, 'en'),
+                          ].map((opt) {
+                            final selected =
+                                (_locale?.languageCode ?? 'system') == opt.$2;
+                            return ListTile(
+                              title: Text(opt.$1),
+                              trailing: selected
+                                  ? const Icon(Icons.check)
+                                  : null,
+                              onTap: () => Navigator.pop(ctx, opt.$2),
+                            );
+                          }).toList(),
+                    ),
+                  );
+                  if (choice == null) return; // barrier dismiss
+                  await _setLocale(parseLocale(choice));
+                },
+              );
             },
           ),
 
