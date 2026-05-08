@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import '../l10n/app_localizations.dart';
 import '../services/clipboard_service.dart';
 import '../services/diceware_fr.dart';
+import '../services/password_strength_service.dart';
 
 class GeneratorScreen extends StatefulWidget {
   final bool returnPassword;
@@ -73,6 +74,11 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
   /// Score de force normalisé [0..1] basé sur l'entropie réelle.
   /// Pour Diceware : log2(N^k) / 80 (80 bits = très fort).
   /// Pour caractères : log2(pool^len) / 80.
+  ///
+  /// Utilise les mêmes seuils que [PasswordStrengthService] (80 bits = 1.0)
+  /// pour cohérence visuelle avec setup/audit, mais conserve une mesure
+  /// d'entropie spécifique au mode (Diceware vs char-pool effectif d'après
+  /// les options cochées, pas les classes présentes dans la sortie).
   double _strengthScore() {
     final bits = _entropyBits();
     return (bits / 80.0).clamp(0.0, 1.0);
@@ -97,16 +103,8 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final strength = _strengthScore();
-    final sColor = strength < 0.4
-        ? const Color(0xFFE53935)
-        : strength < 0.7
-        ? const Color(0xFFFF7043)
-        : const Color(0xFF43A047);
-    final sLabel = strength < 0.4
-        ? t.strengthWeak
-        : strength < 0.7
-        ? t.strengthMedium
-        : t.strengthStrong;
+    final sColor = PasswordStrengthService.color(strength);
+    final sLabel = PasswordStrengthService.label(strength, t);
     final bits = _entropyBits().round();
 
     return Scaffold(

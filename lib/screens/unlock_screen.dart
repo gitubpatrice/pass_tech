@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
 import '../services/integrity_service.dart';
 import '../services/vault_service.dart';
+import '../widgets/password_text_field.dart';
 import 'heir_view_screen.dart';
 import 'home_screen.dart';
 
@@ -19,7 +20,6 @@ class UnlockScreen extends StatefulWidget {
 
 class _UnlockScreenState extends State<UnlockScreen> {
   final _passCtrl = TextEditingController();
-  bool _show = false;
   bool _loading = false;
   String? _error;
   bool _hasBiometric = false;
@@ -384,29 +384,11 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     ),
                   ),
                 ] else ...[
-                  TextField(
+                  PasswordTextField(
                     controller: _passCtrl,
-                    obscureText: !_show,
+                    labelText: t.unlockMasterLabel,
                     autofocus: true,
                     onSubmitted: (_) => _unlock(),
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    keyboardType: TextInputType.visiblePassword,
-                    decoration: InputDecoration(
-                      labelText: t.unlockMasterLabel,
-                      prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _show ? Icons.visibility_off : Icons.visibility,
-                          size: 20,
-                        ),
-                        tooltip: _show
-                            ? t.unlockHidePassword
-                            : t.unlockShowPassword,
-                        onPressed: () => setState(() => _show = !_show),
-                      ),
-                      border: const OutlineInputBorder(),
-                    ),
                   ),
 
                   if (_error != null) ...[

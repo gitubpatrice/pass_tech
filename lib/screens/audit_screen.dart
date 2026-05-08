@@ -3,6 +3,7 @@ import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/breach_service.dart';
+import '../services/password_strength_service.dart';
 import '../services/vault_service.dart';
 import 'entry_detail_screen.dart';
 
@@ -45,7 +46,7 @@ class _AuditScreenState extends State<AuditScreen> {
           (e) =>
               e.type == EntryType.password &&
               e.password.isNotEmpty &&
-              _isWeak(e.password),
+              PasswordStrengthService.isWeak(e.password),
         )
         .toList();
 
@@ -90,16 +91,6 @@ class _AuditScreenState extends State<AuditScreen> {
     s -= _old.length.clamp(0, 4) * 5; // -5 each, max -20
     s -= _missing2fa.length.clamp(0, 4) * 5; // -5 each, max -20
     _score = s.clamp(0, 100);
-  }
-
-  static bool _isWeak(String pwd) {
-    if (pwd.length < 10) return true;
-    int variety = 0;
-    if (pwd.contains(RegExp(r'[A-Z]'))) variety++;
-    if (pwd.contains(RegExp(r'[a-z]'))) variety++;
-    if (pwd.contains(RegExp(r'[0-9]'))) variety++;
-    if (pwd.contains(RegExp(r'[^A-Za-z0-9]'))) variety++;
-    return variety < 3;
   }
 
   Color _scoreColor(BuildContext ctx) {

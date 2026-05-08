@@ -5,6 +5,7 @@ import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/totp_service.dart';
 import '../services/vault_service.dart';
+import '../widgets/password_text_field.dart';
 import 'generator_screen.dart';
 import 'qr_scanner_screen.dart';
 
@@ -39,10 +40,6 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
   late EntryType _type;
   String _category = 'Autres';
-  bool _showPass = false;
-  bool _showCvv = false;
-  bool _showPin = false;
-  bool _showTotp = false;
   bool _isFavorite = false;
   bool _saving = false;
   String? _totpError;
@@ -379,35 +376,17 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
       _label(t.entryEditFieldPassword),
       const SizedBox(height: 6),
-      TextField(
+      PasswordTextField(
         controller: _passCtrl,
-        obscureText: !_showPass,
-        enableSuggestions: false,
-        autocorrect: false,
-        keyboardType: TextInputType.visiblePassword,
-        decoration: InputDecoration(
-          labelText: t.entryEditFieldPassword,
-          hintText: t.entryEditHintPassword,
-          border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.lock_outline, size: 20),
-          suffixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(
-                  _showPass ? Icons.visibility_off : Icons.visibility,
-                  size: 20,
-                ),
-                onPressed: () => setState(() => _showPass = !_showPass),
-              ),
-              IconButton(
-                icon: const Icon(Icons.auto_fix_high, size: 20),
-                tooltip: t.entryEditTooltipGenerate,
-                onPressed: _pickGenerated,
-              ),
-            ],
+        labelText: t.entryEditFieldPassword,
+        hintText: t.entryEditHintPassword,
+        extraSuffixIcons: [
+          IconButton(
+            icon: const Icon(Icons.auto_fix_high, size: 20),
+            tooltip: t.entryEditTooltipGenerate,
+            onPressed: _pickGenerated,
           ),
-        ),
+        ],
       ),
       const SizedBox(height: 16),
 
@@ -428,39 +407,23 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       // TOTP / 2FA
       _label(t.entryEditField2faOptional),
       const SizedBox(height: 6),
-      TextField(
+      PasswordTextField(
         controller: _totpCtrl,
-        obscureText: !_showTotp,
-        enableSuggestions: false,
-        autocorrect: false,
+        labelText: t.entryEditField2faOptional,
+        hintText: t.entryEditHint2fa,
+        helperText: t.entryEditHelper2fa,
+        errorText: _totpError,
+        prefixIcon: const Icon(Icons.shield_outlined, size: 20),
         onChanged: (_) {
           if (_totpError != null) setState(() => _totpError = null);
         },
-        decoration: InputDecoration(
-          labelText: t.entryEditField2faOptional,
-          hintText: t.entryEditHint2fa,
-          border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.shield_outlined, size: 20),
-          errorText: _totpError,
-          helperText: t.entryEditHelper2fa,
-          suffixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(
-                  _showTotp ? Icons.visibility_off : Icons.visibility,
-                  size: 20,
-                ),
-                onPressed: () => setState(() => _showTotp = !_showTotp),
-              ),
-              IconButton(
-                icon: const Icon(Icons.qr_code_scanner, size: 20),
-                tooltip: t.entryEditTooltipScanQr,
-                onPressed: _scanQrForTotp,
-              ),
-            ],
+        extraSuffixIcons: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner, size: 20),
+            tooltip: t.entryEditTooltipScanQr,
+            onPressed: _scanQrForTotp,
           ),
-        ),
+        ],
       ),
       const SizedBox(height: 16),
 
@@ -570,26 +533,16 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
               children: [
                 _label(t.entryEditFieldCvv),
                 const SizedBox(height: 6),
-                TextField(
+                PasswordTextField(
                   controller: _cvvCtrl,
-                  obscureText: !_showCvv,
+                  labelText: t.entryEditFieldCvv,
+                  hintText: t.entryEditHintCvv,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(4),
                   ],
-                  decoration: InputDecoration(
-                    labelText: t.entryEditFieldCvv,
-                    hintText: t.entryEditHintCvv,
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _showCvv ? Icons.visibility_off : Icons.visibility,
-                        size: 20,
-                      ),
-                      onPressed: () => setState(() => _showCvv = !_showCvv),
-                    ),
-                  ),
+                  showPrefixIcon: false,
                 ),
               ],
             ),
@@ -600,27 +553,16 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
       _label(t.entryEditFieldPinOptional),
       const SizedBox(height: 6),
-      TextField(
+      PasswordTextField(
         controller: _pinCtrl,
-        obscureText: !_showPin,
+        labelText: t.entryEditFieldPinOptional,
+        hintText: t.entryEditHintPin,
         keyboardType: TextInputType.number,
         inputFormatters: [
           FilteringTextInputFormatter.digitsOnly,
           LengthLimitingTextInputFormatter(8),
         ],
-        decoration: InputDecoration(
-          labelText: t.entryEditFieldPinOptional,
-          hintText: t.entryEditHintPin,
-          border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.pin_outlined, size: 20),
-          suffixIcon: IconButton(
-            icon: Icon(
-              _showPin ? Icons.visibility_off : Icons.visibility,
-              size: 20,
-            ),
-            onPressed: () => setState(() => _showPin = !_showPin),
-          ),
-        ),
+        prefixIcon: const Icon(Icons.pin_outlined, size: 20),
       ),
       const SizedBox(height: 16),
 

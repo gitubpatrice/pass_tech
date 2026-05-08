@@ -11,140 +11,138 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '2.3.3';
+  static const _version = '2.3.4';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
 
-  static const _features = [
+  List<({IconData icon, String label, String desc})> _featuresFor(
+    AppLocalizations t,
+  ) => [
     (
       icon: Icons.shield_outlined,
-      label: 'Sauvegarde chiffrée (.ptbak)',
-      desc: 'Export chiffré AES-256 + restaurable avec passphrase',
+      label: t.aboutFeatureBackupLabel,
+      desc: t.aboutFeatureBackupDesc,
     ),
     (
       icon: Icons.download_outlined,
-      label: 'Import multi-format',
-      desc: 'Chrome, Edge, Bitwarden JSON, CSV générique',
+      label: t.aboutFeatureImportLabel,
+      desc: t.aboutFeatureImportDesc,
     ),
     (
       icon: Icons.gpp_good_outlined,
-      label: 'Audit de sécurité',
-      desc: 'Score, mots de passe faibles, doublons, anciens, sans 2FA',
+      label: t.aboutFeatureAuditLabel,
+      desc: t.aboutFeatureAuditDesc,
     ),
     (
       icon: Icons.travel_explore_outlined,
-      label: 'Détection de fuites',
-      desc: 'Vérifie 800M+ fuites publiques (HaveIBeenPwned, k-anonymity)',
+      label: t.aboutFeatureBreachLabel,
+      desc: t.aboutFeatureBreachDesc,
     ),
     (
       icon: Icons.qr_code_scanner,
-      label: 'Scanner QR pour 2FA',
-      desc: 'Scanne le QR code TOTP fourni par tout site',
+      label: t.aboutFeatureQrLabel,
+      desc: t.aboutFeatureQrDesc,
     ),
     (
       icon: Icons.brightness_6_outlined,
-      label: 'Thème clair / sombre',
-      desc: 'Au choix ou en suivant le système',
+      label: t.aboutFeatureThemeLabel,
+      desc: t.aboutFeatureThemeDesc,
     ),
     (
       icon: Icons.sort,
-      label: 'Tri personnalisé',
-      desc: 'Récent, ancien, A → Z, Z → A',
+      label: t.aboutFeatureSortLabel,
+      desc: t.aboutFeatureSortDesc,
     ),
     (
       icon: Icons.key,
-      label: '3 types d\'entrées',
-      desc: 'Mots de passe, notes sécurisées, cartes bancaires',
+      label: t.aboutFeatureTypesLabel,
+      desc: t.aboutFeatureTypesDesc,
     ),
     (
       icon: Icons.shield_outlined,
-      label: 'Codes 2FA intégrés (TOTP)',
-      desc: 'Génère les codes à 6 chiffres comme Google Authenticator',
+      label: t.aboutFeatureTotpLabel,
+      desc: t.aboutFeatureTotpDesc,
     ),
     (
       icon: Icons.credit_card,
-      label: 'Cartes bancaires',
-      desc: 'Numéro, CVV, expiration, PIN — affichage carte 3D',
+      label: t.aboutFeatureCardsLabel,
+      desc: t.aboutFeatureCardsDesc,
     ),
     (
       icon: Icons.sticky_note_2_outlined,
-      label: 'Notes sécurisées',
-      desc: 'Texte confidentiel chiffré (RIB, codes, recovery keys)',
+      label: t.aboutFeatureNotesLabel,
+      desc: t.aboutFeatureNotesDesc,
     ),
     (
       icon: Icons.lock_outline,
-      label: 'Coffre-fort chiffré',
-      desc:
-          'AES-GCM-256 + Argon2id (m=19 MiB, t=2) + KEK Keystore-bound (StrongBox/TEE)',
+      label: t.aboutFeatureVaultLabel,
+      desc: t.aboutFeatureVaultDesc,
     ),
     (
       icon: Icons.fingerprint,
-      label: 'Biométrie hardware-bound',
-      desc:
-          'Clé liée à Android Keystore — la biométrie est obligatoire pour lire',
+      label: t.aboutFeatureBiometricLabel,
+      desc: t.aboutFeatureBiometricDesc,
     ),
     (
       icon: Icons.gpp_good_outlined,
-      label: 'Anti-brute force',
-      desc: 'Verrouillage progressif après 5 tentatives (30s → 30min)',
+      label: t.aboutFeatureBruteforceLabel,
+      desc: t.aboutFeatureBruteforceDesc,
     ),
     (
       icon: Icons.verified_user_outlined,
-      label: 'Détection d\'environnement',
-      desc: 'Avertit en cas de root, émulateur ou debugger détecté',
+      label: t.aboutFeatureEnvLabel,
+      desc: t.aboutFeatureEnvDesc,
     ),
     (
       icon: Icons.no_photography_outlined,
-      label: 'Captures bloquées',
-      desc: 'Aucune capture d\'écran ni aperçu dans le sélecteur récent',
+      label: t.aboutFeatureScreenshotLabel,
+      desc: t.aboutFeatureScreenshotDesc,
     ),
     (
       icon: Icons.cloud_off_outlined,
-      label: 'Backup désactivé',
-      desc: 'Le coffre-fort n\'est jamais sauvegardé dans le cloud Android',
+      label: t.aboutFeatureBackupOffLabel,
+      desc: t.aboutFeatureBackupOffDesc,
     ),
     (
       icon: Icons.timer_outlined,
-      label: 'Auto-lock configurable',
-      desc: 'Immédiat, 1 / 5 / 15 / 30 minutes ou jamais',
+      label: t.aboutFeatureAutoLockLabel,
+      desc: t.aboutFeatureAutoLockDesc,
     ),
     (
       icon: Icons.password,
-      label: 'Générateur',
-      desc: 'Caractères 8–64 OU phrases de passe FR (Diceware) mémorables',
+      label: t.aboutFeatureGeneratorLabel,
+      desc: t.aboutFeatureGeneratorDesc,
     ),
     (
       icon: Icons.shield_moon_outlined,
-      label: 'Coffre leurre',
-      desc: 'Un 2e mot de passe ouvre un faux coffre — déni plausible',
+      label: t.aboutFeatureDecoyLabel,
+      desc: t.aboutFeatureDecoyDesc,
     ),
     (
       icon: Icons.warning_amber_rounded,
-      label: 'Mode panique',
-      desc: 'Lock + clipboard wipe + camouflage icône en « Calculatrice »',
+      label: t.aboutFeaturePanicLabel,
+      desc: t.aboutFeaturePanicDesc,
     ),
     (
       icon: Icons.family_restroom,
-      label: 'Héritage',
-      desc:
-          'Un proche accède au coffre après inactivité prolongée — local, sans cloud',
+      label: t.aboutFeatureHeritageLabel,
+      desc: t.aboutFeatureHeritageDesc,
     ),
     (
       icon: Icons.verified_user_outlined,
-      label: 'Anti-phishing',
-      desc:
-          'Vérifie le domaine du navigateur avant de copier — alerte typosquatting',
+      label: t.aboutFeaturePhishingLabel,
+      desc: t.aboutFeaturePhishingDesc,
     ),
     (
       icon: Icons.content_paste_off_outlined,
-      label: 'Presse-papiers sécurisé',
-      desc: 'Effacement automatique configurable (15s–60s)',
+      label: t.aboutFeatureClipboardLabel,
+      desc: t.aboutFeatureClipboardDesc,
     ),
     (
       icon: Icons.search,
-      label: 'Recherche',
-      desc: 'Par titre, identifiant, URL ou contenu',
+      label: t.aboutFeatureSearchLabel,
+      desc: t.aboutFeatureSearchDesc,
     ),
   ];
 
@@ -246,6 +244,7 @@ class _AboutScreenState extends State<AboutScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final features = _featuresFor(t);
     return Scaffold(
       appBar: AppBar(title: Text(t.aboutTitle)),
       body: ListView(
@@ -328,7 +327,7 @@ class _AboutScreenState extends State<AboutScreen> {
           // ── Fonctionnalités ─────────────────────────────────────────────────
           _sectionTitle(context, t.aboutSectionFeatures),
           const SizedBox(height: 8),
-          ..._features.map(
+          ...features.map(
             (f) => _FeatureRow(icon: f.icon, label: f.label, desc: f.desc),
           ),
 
@@ -380,7 +379,7 @@ class _AboutScreenState extends State<AboutScreen> {
     child: Text(
       title,
       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-        color: Colors.grey.shade600,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.5,
       ),
@@ -399,20 +398,26 @@ class _FeatureRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 6),
-    child: ListTile(
-      dense: true,
-      leading: Icon(
-        icon,
-        size: 20,
-        color: Theme.of(context).colorScheme.primary,
+  Widget build(BuildContext context) => Semantics(
+    label: '$label. $desc',
+    container: true,
+    child: ExcludeSemantics(
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 6),
+        child: ListTile(
+          dense: true,
+          leading: Icon(
+            icon,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+          subtitle: Text(desc, style: const TextStyle(fontSize: 12)),
+        ),
       ),
-      title: Text(
-        label,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-      ),
-      subtitle: Text(desc, style: const TextStyle(fontSize: 12)),
     ),
   );
 }
@@ -420,78 +425,84 @@ class _FeatureRow extends StatelessWidget {
 class _PrivacyCard extends StatelessWidget {
   const _PrivacyCard();
 
-  static const _items = [
-    (icon: Icons.block, color: Color(0xFFE53935), label: 'Aucune publicité'),
-    (
-      icon: Icons.analytics_outlined,
-      color: Color(0xFFFF7043),
-      label: 'Aucun tracker',
-    ),
-    (
-      icon: Icons.wifi_off,
-      color: Color(0xFF43A047),
-      label: 'Fonctionne hors ligne',
-    ),
-    (
-      icon: Icons.visibility_off,
-      color: Color(0xFF1976D2),
-      label: 'Aucune collecte de données',
-    ),
-    (
-      icon: Icons.share_outlined,
-      color: Color(0xFF7B1FA2),
-      label: 'Aucun partage de données',
-    ),
-    (
-      icon: Icons.store_mall_directory_outlined,
-      color: Color(0xFF00897B),
-      label: 'Sans Play Store',
-    ),
-  ];
-
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.shield_outlined,
-                color: Color(0xFF43A047),
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '100 % privé — zéro surveillance',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: Colors.grey.shade300,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _items
-                .map(
-                  (item) => _Badge(
-                    icon: item.icon,
-                    label: item.label,
-                    color: item.color,
-                  ),
-                )
-                .toList(),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final items = <({IconData icon, Color color, String label})>[
+      (
+        icon: Icons.block,
+        color: const Color(0xFFE53935),
+        label: t.aboutPrivacyNoAds,
       ),
-    ),
-  );
+      (
+        icon: Icons.analytics_outlined,
+        color: const Color(0xFFFF7043),
+        label: t.aboutPrivacyNoTracker,
+      ),
+      (
+        icon: Icons.wifi_off,
+        color: const Color(0xFF43A047),
+        label: t.aboutPrivacyOffline,
+      ),
+      (
+        icon: Icons.visibility_off,
+        color: const Color(0xFF1976D2),
+        label: t.aboutPrivacyNoCollect,
+      ),
+      (
+        icon: Icons.share_outlined,
+        color: const Color(0xFF7B1FA2),
+        label: t.aboutPrivacyNoShare,
+      ),
+      (
+        icon: Icons.store_mall_directory_outlined,
+        color: const Color(0xFF00897B),
+        label: t.aboutPrivacyNoStore,
+      ),
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.shield_outlined,
+                  color: Color(0xFF43A047),
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  t.aboutPrivacyHeader,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: items
+                  .map(
+                    (item) => _Badge(
+                      icon: item.icon,
+                      label: item.label,
+                      color: item.color,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Badge extends StatelessWidget {

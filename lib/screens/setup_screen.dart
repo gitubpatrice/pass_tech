@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
+import '../services/password_strength_service.dart';
 import '../services/vault_service.dart';
+import '../widgets/password_text_field.dart';
 import 'home_screen.dart';
 
 class SetupScreen extends StatefulWidget {
@@ -14,7 +16,6 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   final _pass1 = TextEditingController();
   final _pass2 = TextEditingController();
-  bool _show1 = false, _show2 = false;
   bool _loading = false;
   String? _error;
 
@@ -25,33 +26,6 @@ class _SetupScreenState extends State<SetupScreen> {
     super.dispose();
   }
 
-  double _strength(String p) {
-    if (p.isEmpty) return 0;
-    double s = 0;
-    if (p.length >= 12) s += 0.25;
-    if (p.length >= 16) s += 0.20;
-    if (p.length >= 20) s += 0.10;
-    if (p.contains(RegExp(r'[A-Z]'))) s += 0.10;
-    if (p.contains(RegExp(r'[a-z]'))) s += 0.10;
-    if (p.contains(RegExp(r'[0-9]'))) s += 0.10;
-    if (p.contains(RegExp(r'[^A-Za-z0-9]'))) s += 0.15;
-    return s.clamp(0.0, 1.0);
-  }
-
-  Color _strengthColor(double s) {
-    if (s < 0.35) return const Color(0xFFE53935);
-    if (s < 0.65) return const Color(0xFFFF7043);
-    if (s < 0.85) return const Color(0xFFFDD835);
-    return const Color(0xFF43A047);
-  }
-
-  String _strengthLabel(double s, AppLocalizations t) {
-    if (s < 0.35) return t.strengthWeak;
-    if (s < 0.65) return t.strengthMedium;
-    if (s < 0.85) return t.strengthStrong;
-    return t.strengthVeryStrong;
-  }
-
   Future<void> _create() async {
     final t = AppLocalizations.of(context);
     final p1 = _pass1.text;
@@ -60,7 +34,7 @@ class _SetupScreenState extends State<SetupScreen> {
       setState(() => _error = t.setupErrorMin);
       return;
     }
-    if (_strength(p1) < 0.6) {
+    if (PasswordStrengthService.score(p1) < 0.6) {
       setState(() => _error = t.setupErrorWeak);
       return;
     }
@@ -88,7 +62,7 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
-    final s = _strength(_pass1.text);
+    final s = PasswordStrengthService.score(_pass1.text);
 
     return Scaffold(
       body: SafeArea(
@@ -122,26 +96,11 @@ class _SetupScreenState extends State<SetupScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                TextField(
+                PasswordTextField(
                   controller: _pass1,
-                  obscureText: !_show1,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  keyboardType: TextInputType.visiblePassword,
+                  labelText: t.setupMasterLabel,
+                  helperText: t.setupMasterHelper,
                   onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: t.setupMasterLabel,
-                    helperText: t.setupMasterHelper,
-                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _show1 ? Icons.visibility_off : Icons.visibility,
-                        size: 20,
-                      ),
-                      onPressed: () => setState(() => _show1 = !_show1),
-                    ),
-                    border: const OutlineInputBorder(),
-                  ),
                 ),
 
                 if (_pass1.text.isNotEmpty) ...[
@@ -156,17 +115,17 @@ class _SetupScreenState extends State<SetupScreen> {
                             minHeight: 6,
                             backgroundColor: cs.surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation(
-                              _strengthColor(s),
+                              PasswordStrengthService.color(s),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        _strengthLabel(s, t),
+                        PasswordStrengthService.label(s, t),
                         style: TextStyle(
                           fontSize: 12,
-                          color: _strengthColor(s),
+                          color: PasswordStrengthService.color(s),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -176,25 +135,10 @@ class _SetupScreenState extends State<SetupScreen> {
 
                 const SizedBox(height: 16),
 
-                TextField(
+                PasswordTextField(
                   controller: _pass2,
-                  obscureText: !_show2,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  keyboardType: TextInputType.visiblePassword,
+                  labelText: t.setupConfirmLabel,
                   onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: t.setupConfirmLabel,
-                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _show2 ? Icons.visibility_off : Icons.visibility,
-                        size: 20,
-                      ),
-                      onPressed: () => setState(() => _show2 = !_show2),
-                    ),
-                    border: const OutlineInputBorder(),
-                  ),
                 ),
 
                 if (_error != null) ...[
