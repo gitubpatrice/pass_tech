@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../l10n/app_localizations.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -60,14 +61,16 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scanner un QR code'),
+        title: Text(t.qrScannerTitle),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: Icon(_torch ? Icons.flash_on : Icons.flash_off),
+            tooltip: _torch ? t.qrTorchOff : t.qrTorchOn,
             onPressed: () {
               _controller.toggleTorch();
               setState(() => _torch = !_torch);
@@ -75,6 +78,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
           ),
           IconButton(
             icon: const Icon(Icons.cameraswitch_outlined),
+            tooltip: t.qrSwitchCamera,
             onPressed: () => _controller.switchCamera(),
           ),
         ],
@@ -98,7 +102,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Caméra non disponible',
+                      t.qrScannerCameraUnavailable,
                       style: Theme.of(
                         context,
                       ).textTheme.titleMedium?.copyWith(color: Colors.white),
@@ -106,7 +110,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                     const SizedBox(height: 8),
                     Text(
                       error.errorDetails?.message ??
-                          'Vérifiez les autorisations dans les paramètres.',
+                          t.qrScannerCheckPermissions,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white70,
@@ -148,9 +152,9 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Pointez le QR code 2FA dans le cadre',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+                child: Text(
+                  t.qrScannerPointHint,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ),

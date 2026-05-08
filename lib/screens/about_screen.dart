@@ -11,7 +11,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '2.3.1';
+  static const _version = '2.3.2';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -197,7 +197,7 @@ class _AboutScreenState extends State<AboutScreen> {
                             Text(
                               t.aboutShaExpected,
                               style: const TextStyle(
-                                fontSize: 11,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -208,7 +208,7 @@ class _AboutScreenState extends State<AboutScreen> {
                           info.expectedSha256!,
                           style: const TextStyle(
                             fontFamily: 'monospace',
-                            fontSize: 10,
+                            fontSize: 12,
                             letterSpacing: 0.3,
                           ),
                         ),
@@ -216,7 +216,7 @@ class _AboutScreenState extends State<AboutScreen> {
                         Text(
                           t.aboutShaHint,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
@@ -412,7 +412,7 @@ class _FeatureRow extends StatelessWidget {
         label,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
       ),
-      subtitle: Text(desc, style: const TextStyle(fontSize: 11)),
+      subtitle: Text(desc, style: const TextStyle(fontSize: 12)),
     ),
   );
 }
@@ -516,7 +516,7 @@ class _Badge extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             color: color,
             fontWeight: FontWeight.w600,
           ),

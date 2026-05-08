@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/breach_service.dart';
@@ -108,16 +109,17 @@ class _AuditScreenState extends State<AuditScreen> {
     return const Color(0xFFE53935);
   }
 
-  String get _scoreLabel {
-    if (_score >= 90) return 'Excellent';
-    if (_score >= 70) return 'Bon';
-    if (_score >= 50) return 'Moyen';
-    return 'Faible';
+  String _scoreLabel(AppLocalizations t) {
+    if (_score >= 90) return t.auditScoreExcellent;
+    if (_score >= 70) return t.auditScoreGood;
+    if (_score >= 50) return t.auditScoreMedium;
+    return t.auditScoreWeak;
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final scoreColor = _scoreColor(context);
 
     final passCount = _all.where((e) => e.type == EntryType.password).length;
@@ -129,10 +131,11 @@ class _AuditScreenState extends State<AuditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Audit sécurité'),
+        title: Text(t.auditTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: t.auditRefreshTooltip,
             onPressed: () => setState(_analyze),
           ),
         ],
@@ -176,7 +179,7 @@ class _AuditScreenState extends State<AuditScreen> {
                             Text(
                               '/100',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 12,
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
@@ -191,7 +194,7 @@ class _AuditScreenState extends State<AuditScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Score de sécurité',
+                          t.auditScoreLabel,
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onSurfaceVariant,
@@ -200,7 +203,7 @@ class _AuditScreenState extends State<AuditScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _scoreLabel,
+                          _scoreLabel(t),
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
@@ -210,10 +213,10 @@ class _AuditScreenState extends State<AuditScreen> {
                         const SizedBox(height: 4),
                         Text(
                           _score == 100
-                              ? 'Aucun problème détecté 🎉'
-                              : 'Améliorations recommandées ci-dessous',
+                              ? t.auditScorePerfect
+                              : t.auditScoreImprovements,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 14,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
@@ -232,7 +235,7 @@ class _AuditScreenState extends State<AuditScreen> {
               Expanded(
                 child: _StatTile(
                   value: '${_all.length}',
-                  label: 'Entrées',
+                  label: t.auditStatEntries,
                   icon: Icons.folder_outlined,
                 ),
               ),
@@ -240,7 +243,7 @@ class _AuditScreenState extends State<AuditScreen> {
               Expanded(
                 child: _StatTile(
                   value: '$passCount',
-                  label: 'Mots de passe',
+                  label: t.auditStatPasswords,
                   icon: Icons.key,
                 ),
               ),
@@ -252,7 +255,7 @@ class _AuditScreenState extends State<AuditScreen> {
               Expanded(
                 child: _StatTile(
                   value: '$with2fa',
-                  label: 'Avec 2FA',
+                  label: t.auditStatWith2fa,
                   icon: Icons.shield_outlined,
                 ),
               ),
@@ -260,7 +263,7 @@ class _AuditScreenState extends State<AuditScreen> {
               Expanded(
                 child: _StatTile(
                   value: '$noteCount',
-                  label: 'Notes',
+                  label: t.auditStatNotes,
                   icon: Icons.sticky_note_2_outlined,
                 ),
               ),
@@ -268,7 +271,7 @@ class _AuditScreenState extends State<AuditScreen> {
               Expanded(
                 child: _StatTile(
                   value: '$cardCount',
-                  label: 'Cartes',
+                  label: t.auditStatCards,
                   icon: Icons.credit_card,
                 ),
               ),
@@ -301,40 +304,40 @@ class _AuditScreenState extends State<AuditScreen> {
 
           // Issues
           _IssueSection(
-            title: 'Mots de passe faibles',
-            description: 'Moins de 10 caractères ou peu de variété',
+            title: t.auditIssueWeakTitle,
+            description: t.auditIssueWeakDesc,
             color: const Color(0xFFE53935),
             icon: Icons.warning_amber_outlined,
             entries: _weak,
             onTap: _refreshFromDetail,
-            emptyText: 'Tous vos mots de passe sont robustes',
+            emptyText: t.auditIssueWeakEmpty,
           ),
           _IssueSection(
-            title: 'Doublons',
-            description: 'Même mot de passe utilisé sur plusieurs comptes',
+            title: t.auditIssueDuplicateTitle,
+            description: t.auditIssueDuplicateDesc,
             color: const Color(0xFFFF7043),
             icon: Icons.content_copy_outlined,
             entries: _duplicates,
             onTap: _refreshFromDetail,
-            emptyText: 'Aucun mot de passe réutilisé',
+            emptyText: t.auditIssueDuplicateEmpty,
           ),
           _IssueSection(
-            title: 'Sans 2FA sur compte sensible',
-            description: 'Banque ou Email sans code TOTP configuré',
+            title: t.auditIssueNo2faTitle,
+            description: t.auditIssueNo2faDesc,
             color: const Color(0xFF1976D2),
             icon: Icons.shield_outlined,
             entries: _missing2fa,
             onTap: _refreshFromDetail,
-            emptyText: 'Tous vos comptes sensibles ont un 2FA',
+            emptyText: t.auditIssueNo2faEmpty,
           ),
           _IssueSection(
-            title: 'Anciens (> 1 an)',
-            description: 'Pensez à les renouveler',
+            title: t.auditIssueOldTitle,
+            description: t.auditIssueOldDesc,
             color: const Color(0xFFFDD835),
             icon: Icons.schedule_outlined,
             entries: _old,
             onTap: _refreshFromDetail,
-            emptyText: 'Aucun mot de passe ancien',
+            emptyText: t.auditIssueOldEmpty,
           ),
         ],
       ),
@@ -347,6 +350,7 @@ class _AuditScreenState extends State<AuditScreen> {
 
   Future<void> _runBreachCheck() async {
     final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
     final candidates = _all
         .where((e) => e.type == EntryType.password && e.password.isNotEmpty)
         .toList();
@@ -377,13 +381,9 @@ class _AuditScreenState extends State<AuditScreen> {
     if (!networkOk) {
       setState(() {
         _checkingBreach = false;
-        _breachError = 'Erreur réseau — vérification annulée';
+        _breachError = t.auditBreachNetworkError;
       });
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Vérification impossible : pas de connexion ?'),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(t.auditBreachSnackError)));
       return;
     }
     setState(() {
@@ -414,6 +414,7 @@ class _BreachCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final purple = const Color(0xFF7B1FA2);
     final hasResult = breached != null;
     final isClean = hasResult && breached!.isEmpty;
@@ -454,9 +455,9 @@ class _BreachCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Vérification de fuites de données',
-                        style: TextStyle(
+                      Text(
+                        t.auditBreachTitle,
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -464,11 +465,11 @@ class _BreachCard extends StatelessWidget {
                       Text(
                         hasResult
                             ? (isClean
-                                  ? 'Aucun mot de passe compromis détecté'
-                                  : '${breached!.length} mot${breached!.length > 1 ? 's' : ''} de passe compromis')
-                            : 'Compare vos mots de passe à 800M+ fuites publiques',
+                                  ? t.auditBreachClean
+                                  : t.auditBreachFound(breached!.length))
+                            : t.auditBreachIntro,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -495,7 +496,7 @@ class _BreachCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Text(
                     '$progress / $total',
-                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -505,7 +506,7 @@ class _BreachCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onRun,
                 icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Réessayer'),
+                label: Text(t.auditBreachRetry),
               ),
             ] else if (hasBreach) ...[
               ...breached!.map(
@@ -547,27 +548,27 @@ class _BreachCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onRun,
                 icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Vérifier à nouveau'),
+                label: Text(t.auditBreachRecheck),
               ),
             ] else if (isClean) ...[
               OutlinedButton.icon(
                 onPressed: onRun,
                 icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Vérifier à nouveau'),
+                label: Text(t.auditBreachRecheck),
               ),
             ] else ...[
               FilledButton.icon(
                 onPressed: onRun,
                 icon: const Icon(Icons.travel_explore_outlined, size: 16),
-                label: const Text('Lancer la vérification'),
+                label: Text(t.auditBreachRun),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(40),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Confidentialité préservée : seuls 5 caractères du hash SHA-1 quittent l\'appareil (k-anonymity).',
-                style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                t.auditBreachPrivacyNote,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
           ],
@@ -603,7 +604,7 @@ class _StatTile extends StatelessWidget {
             ),
             Text(
               label,
-              style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],

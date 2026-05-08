@@ -220,42 +220,25 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _setupHeritage() async {
     final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
     // Avertissement explicatif
     final go = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         icon: const Icon(Icons.family_restroom, size: 36),
-        title: const Text('Configurer un héritier'),
-        content: const Text(
-          'Un mot de passe distinct du vôtre permettra à un proche '
-          '(conjoint, enfant, exécuteur testamentaire) d\'accéder au '
-          'contenu du coffre **après une période d\'inactivité prolongée** '
-          'de votre part (90 jours par défaut + 7 jours de grâce).\n\n'
-          'À retenir :\n'
-          '• Le mot de passe héritier doit être différent de votre mot '
-          'de passe principal\n'
-          '• Communiquez-le à votre héritier de manière sûre (oralement, '
-          'testament, coffre bancaire) — il n\'est jamais stocké et ne '
-          'peut pas être récupéré\n'
-          '• L\'héritier accédera à un instantané (snapshot) du coffre. '
-          'Pensez à le mettre à jour régulièrement.\n'
-          '• Si vous vous reconnectez avant la fin de la grâce, le compte '
-          'à rebours est réinitialisé.\n'
-          '• L\'existence d\'un snapshot héritage est détectable par '
-          'analyse forensique du téléphone (pas de déni plausible — '
-          'pour ça, voir le coffre leurre).\n\n'
-          'Ce système fonctionne 100 % localement, sans cloud ni tiers '
-          'de confiance.',
-          style: TextStyle(fontSize: 12),
+        title: Text(t.heritageSetupTitle),
+        content: Text(
+          t.heritageSetupBody,
+          style: const TextStyle(fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(t.actionCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Configurer'),
+            child: Text(t.heritageConfigure),
           ),
         ],
       ),
@@ -265,32 +248,22 @@ class _SettingsScreenState extends State<SettingsScreen>
     // Refus si pas dans le primary (l'héritage doit refléter le vrai coffre)
     if (VaultService().isDecoyActive) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'L\'héritage n\'est disponible que sur le coffre principal',
-          ),
-        ),
+        SnackBar(content: Text(t.heritageDecoyActiveSnack)),
       );
       return;
     }
 
     final pwd = await showDialog<String>(
       context: context,
-      builder: (_) => const _PassphraseDialog(
-        title: 'Mot de passe de l\'héritier',
-        confirm: true,
-      ),
+      builder: (_) =>
+          _PassphraseDialog(title: t.heirPasswordPromptTitle, confirm: true),
     );
     if (pwd == null || pwd.isEmpty || !mounted) return;
 
     // Vérifie que le password diffère du primary
     final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
     if (matchesPrimary) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Le mot de passe héritier doit différer du principal'),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(t.heirSamePasswordSnack)));
       return;
     }
 
@@ -299,45 +272,42 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (!mounted) return;
       setState(() {});
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Héritage configuré ✓ Snapshot du coffre chiffré.'),
-        ),
+        SnackBar(content: Text(t.heritageConfiguredSnack)),
       );
     } on StateError catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } on ArgumentError catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('${e.message}')));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
     }
   }
 
   Future<void> _manageHeritage() async {
+    final t = AppLocalizations.of(context);
     final action = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Gérer l\'héritage'),
-        content: const Text(
-          'L\'héritier accède à un instantané du coffre. Vous pouvez :\n\n'
-          '• Mettre à jour le snapshot (avec le mot de passe héritier)\n'
-          '• Désactiver l\'héritage et supprimer le snapshot',
-          style: TextStyle(fontSize: 12),
+        title: Text(t.heritageManageTitle),
+        content: Text(
+          t.heritageManageBody,
+          style: const TextStyle(fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 'cancel'),
-            child: const Text('Annuler'),
+            child: Text(t.actionCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, 'disable'),
-            child: const Text(
-              'Désactiver',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              t.heritageDisable,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, 'update'),
-            child: const Text('Mettre à jour'),
+            child: Text(t.heritageUpdate),
           ),
         ],
       ),
@@ -347,26 +317,22 @@ class _SettingsScreenState extends State<SettingsScreen>
       await HeritageService().disable();
       if (!mounted) return;
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Héritage désactivé, snapshot supprimé')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.heritageDisabledSnack)));
     } else if (action == 'update') {
       // Re-prompt heir password pour confirmer + sauvegarder
       final pwd = await showDialog<String>(
         context: context,
-        builder: (_) => const _PassphraseDialog(
-          title: 'Mot de passe héritier (re-saisie)',
-          confirm: true,
-        ),
+        builder: (_) =>
+            _PassphraseDialog(title: t.heirPasswordReentryTitle, confirm: true),
       );
       if (pwd == null || pwd.isEmpty || !mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
       if (matchesPrimary) {
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Doit différer du mot de passe principal'),
-          ),
+          SnackBar(content: Text(t.heirSamePasswordShortSnack)),
         );
         return;
       }
@@ -375,23 +341,24 @@ class _SettingsScreenState extends State<SettingsScreen>
         if (!mounted) return;
         setState(() {});
         messenger.showSnackBar(
-          const SnackBar(content: Text('Snapshot mis à jour ✓')),
+          SnackBar(content: Text(t.heritageSnapshotUpdatedSnack)),
         );
       } catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+        messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
       }
     }
   }
 
   Future<void> _changeHeritageThreshold(int current) async {
+    final t = AppLocalizations.of(context);
     final v = await showDialog<int>(
       context: context,
       builder: (_) => SimpleDialog(
-        title: const Text('Période d\'inactivité avant accès héritier'),
+        title: Text(t.heritageThresholdTitle),
         children: [30, 60, 90, 180, 365]
             .map(
               (d) => ListTile(
-                title: Text('$d jours'),
+                title: Text(t.heritageDaysOption(d)),
                 trailing: current == d ? const Icon(Icons.check) : null,
                 onTap: () => Navigator.pop(context, d),
               ),
@@ -407,38 +374,27 @@ class _SettingsScreenState extends State<SettingsScreen>
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ).showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
     }
   }
 
   Future<void> _setupDecoy() async {
+    final t = AppLocalizations.of(context);
     // Avertissement explicatif avant la configuration.
     final go = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         icon: const Icon(Icons.shield_moon_outlined, size: 36),
-        title: const Text('Coffre leurre'),
-        content: const Text(
-          'Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec '
-          'un mot de passe différent.\n\n'
-          'Usage : si quelqu\'un vous force à ouvrir Pass Tech (frontière, '
-          'agression, contrôle), vous donnez le mot de passe du leurre. '
-          'L\'app affiche alors un faux coffre — il est cryptographiquement '
-          'impossible de prouver l\'existence du vrai.\n\n'
-          'À retenir :\n'
-          '• Le mot de passe du leurre doit être différent du vrai\n'
-          '• Remplissez le leurre avec quelques entrées crédibles\n'
-          '• Vous ne pourrez pas activer la biométrique sur le leurre',
-          style: TextStyle(fontSize: 12),
-        ),
+        title: Text(t.decoyDialogTitle),
+        content: Text(t.decoySetupBody, style: const TextStyle(fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(t.actionCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Configurer'),
+            child: Text(t.decoyConfigure),
           ),
         ],
       ),
@@ -447,10 +403,8 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     final pwd = await showDialog<String>(
       context: context,
-      builder: (_) => const _PassphraseDialog(
-        title: 'Mot de passe du coffre leurre',
-        confirm: true,
-      ),
+      builder: (_) =>
+          _PassphraseDialog(title: t.decoyPasswordPromptTitle, confirm: true),
     );
     if (pwd == null || pwd.isEmpty || !mounted) return;
 
@@ -460,14 +414,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final messenger = ScaffoldMessenger.of(context);
     final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
     if (matchesPrimary) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Ce mot de passe est déjà celui du coffre principal — '
-            'choisissez-en un différent.',
-          ),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(t.decoySamePasswordError)));
       return;
     }
 
@@ -478,42 +425,32 @@ class _SettingsScreenState extends State<SettingsScreen>
       VaultService().lock();
       if (!mounted) return;
       setState(() {});
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Coffre leurre configuré — déverrouillez à nouveau pour continuer',
-          ),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(t.decoyConfiguredSnack)));
       // Retour au unlock screen
       Navigator.of(context).popUntil((r) => r.isFirst);
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
     }
   }
 
   Future<void> _manageDecoy() async {
+    final t = AppLocalizations.of(context);
     final action = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Coffre leurre'),
-        content: const Text(
-          'Le coffre leurre est actif.\n\n'
-          'Vous pouvez le supprimer (action visible et silencieuse pour '
-          'l\'attaquant — il pensera juste qu\'il s\'est trompé de mot de passe).',
-          style: TextStyle(fontSize: 12),
-        ),
+        title: Text(t.decoyDialogTitle),
+        content: Text(t.decoyManageBody, style: const TextStyle(fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 'cancel'),
-            child: const Text('Annuler'),
+            child: Text(t.actionCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, 'delete'),
-            child: const Text(
-              'Supprimer le leurre',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              t.decoyDelete,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -525,10 +462,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     setState(() {});
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Coffre leurre supprimé')));
+    ).showSnackBar(SnackBar(content: Text(t.decoyDeletedSnack)));
   }
 
   Future<void> _triggerPanic() async {
+    final t = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -537,25 +475,17 @@ class _SettingsScreenState extends State<SettingsScreen>
           size: 36,
           color: Colors.red,
         ),
-        title: const Text('Mode panique ?'),
-        content: const Text(
-          'Cette action effectue immédiatement :\n\n'
-          '• Verrouillage du coffre\n'
-          '• Vidage du presse-papiers\n'
-          '• Camouflage de l\'icône en « Calculatrice » sur le launcher\n\n'
-          'Vous pourrez restaurer l\'icône depuis les Réglages quand vous '
-          'serez en sécurité.',
-          style: TextStyle(fontSize: 13),
-        ),
+        title: Text(t.panicDialogTitle),
+        content: Text(t.panicDialogBody, style: const TextStyle(fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(t.actionCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Activer'),
+            child: Text(t.panicDialogActivate),
           ),
         ],
       ),
@@ -568,15 +498,14 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _revealApp() async {
+    final t = AppLocalizations.of(context);
     await PanicService.revealApp();
     if (!mounted) return;
     setState(() {}); // Rafraîchit le FutureBuilder
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Icône Pass Tech restaurée — relancez le launcher si elle n\'apparaît pas',
-        ),
-        duration: Duration(seconds: 5),
+      SnackBar(
+        content: Text(t.panicRevealSnack),
+        duration: const Duration(seconds: 5),
       ),
     );
   }
@@ -981,6 +910,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Paramètres')),
@@ -1043,7 +973,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ),
 
-          _section('Coffre leurre (anti-coercition)'),
+          _section(t.decoySection),
           FutureBuilder<bool>(
             future: VaultService().hasDecoyVault,
             builder: (_, snap) {
@@ -1056,14 +986,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: hasDecoy ? Colors.green : null,
                     ),
                     title: Text(
-                      hasDecoy
-                          ? 'Coffre leurre configuré'
-                          : 'Configurer un coffre leurre',
+                      hasDecoy ? t.decoyTileConfigured : t.decoyTileSetup,
                     ),
-                    subtitle: const Text(
-                      'Un 2e mot de passe ouvre un faux coffre. Si quelqu\'un '
-                      'vous force à ouvrir l\'app, donnez le faux.',
-                      style: TextStyle(fontSize: 11),
+                    subtitle: Text(
+                      t.decoyTileSubtitle,
+                      style: const TextStyle(fontSize: 12),
                     ),
                     trailing: const Icon(Icons.chevron_right, size: 18),
                     onTap: hasDecoy ? _manageDecoy : _setupDecoy,
@@ -1082,7 +1009,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         ? 'Actif — alerte si le navigateur n\'est pas sur le bon domaine'
                         : '⚠ Activez "Pass Tech — anti-phishing" dans Accessibilité')
                   : 'Compare le domaine du navigateur à celui de l\'entrée',
-              style: const TextStyle(fontSize: 11),
+              style: const TextStyle(fontSize: 12),
             ),
             secondary: Icon(
               Icons.verified_user_outlined,
@@ -1099,7 +1026,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               title: const Text('Ouvrir Réglages > Accessibilité'),
               subtitle: const Text(
                 'Activez "Pass Tech — anti-phishing" dans la liste',
-                style: TextStyle(fontSize: 11),
+                style: TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.chevron_right, size: 18),
               onTap: () async {
@@ -1110,17 +1037,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               },
             ),
 
-          _section('Mode panique'),
+          _section(t.panicSection),
           ListTile(
             leading: Icon(
               Icons.warning_amber_rounded,
               color: Colors.red.shade700,
             ),
-            title: const Text('Activer le mode panique'),
-            subtitle: const Text(
-              'Verrouille immédiatement, vide le presse-papiers et '
-              'camoufle l\'icône en "Calculatrice"',
-              style: TextStyle(fontSize: 11),
+            title: Text(t.panicTriggerTitle),
+            subtitle: Text(
+              t.panicTriggerSubtitle,
+              style: const TextStyle(fontSize: 12),
             ),
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: _triggerPanic,
@@ -1131,10 +1057,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               if (snap.data != true) return const SizedBox.shrink();
               return ListTile(
                 leading: Icon(Icons.visibility, color: Colors.green.shade700),
-                title: const Text('Restaurer l\'icône Pass Tech'),
-                subtitle: const Text(
-                  'L\'app est actuellement camouflée en "Calculatrice"',
-                  style: TextStyle(fontSize: 11),
+                title: Text(t.panicRevealTitle),
+                subtitle: Text(
+                  t.panicRevealSubtitle,
+                  style: const TextStyle(fontSize: 12),
                 ),
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: _revealApp,
@@ -1142,7 +1068,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             },
           ),
 
-          _section('Héritage (dead man\'s switch)'),
+          _section(t.heritageSection),
           FutureBuilder<List<dynamic>>(
             future: _loadHeritageState(),
             builder: (_, snap) {
@@ -1157,14 +1083,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: enabled ? Colors.green : null,
                     ),
                     title: Text(
-                      enabled ? 'Héritier configuré' : 'Configurer un héritier',
+                      enabled ? t.heritageTileConfigured : t.heritageTileSetup,
                     ),
                     subtitle: Text(
                       enabled
-                          ? 'Toucher pour mettre à jour le snapshot ou désactiver'
-                          : 'Un proche pourra accéder au coffre après une période '
-                                'd\'inactivité prolongée. Aucun cloud, aucun tiers.',
-                      style: const TextStyle(fontSize: 11),
+                          ? t.heritageTileSubtitleConfigured
+                          : t.heritageTileSubtitleSetup,
+                      style: const TextStyle(fontSize: 12),
                     ),
                     trailing: const Icon(Icons.chevron_right, size: 18),
                     onTap: enabled ? _manageHeritage : _setupHeritage,
@@ -1172,11 +1097,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                   if (enabled)
                     ListTile(
                       leading: const Icon(Icons.timer_outlined),
-                      title: const Text('Période d\'inactivité avant accès'),
+                      title: Text(t.heritageThresholdTileTitle),
                       subtitle: Text(
-                        'Seuil : $threshold jours · '
-                        'inactivité actuelle : ${inactivity < 0 ? "—" : "$inactivity j"}',
-                        style: const TextStyle(fontSize: 11),
+                        t.heritageThresholdTileSubtitle(
+                          '$threshold',
+                          inactivity < 0 ? '—' : '$inactivity j',
+                        ),
+                        style: const TextStyle(fontSize: 12),
                       ),
                       trailing: const Icon(Icons.chevron_right, size: 18),
                       onTap: () => _changeHeritageThreshold(threshold),
@@ -1397,6 +1324,9 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
                   _show ? Icons.visibility_off : Icons.visibility,
                   size: 20,
                 ),
+                tooltip: _show
+                    ? AppLocalizations.of(context).unlockHidePassword
+                    : AppLocalizations.of(context).unlockShowPassword,
                 onPressed: () => setState(() => _show = !_show),
               ),
             ),
@@ -1491,6 +1421,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   _show ? Icons.visibility_off : Icons.visibility,
                   size: 20,
                 ),
+                tooltip: _show
+                    ? AppLocalizations.of(context).unlockHidePassword
+                    : AppLocalizations.of(context).unlockShowPassword,
                 onPressed: () => setState(() => _show = !_show),
               ),
             ),

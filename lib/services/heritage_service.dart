@@ -70,32 +70,62 @@ class HeritageService {
   /// partiel du device).
   Future<bool> get snapshotExists async => (await _heirFile()).existsSync();
 
+  /// v2.3.2 : migre les 3 clés de SharedPreferences (non chiffré, forgeable
+  /// sur device rooté) vers FlutterSecureStorage (Keystore-backed, non
+  /// forgeable). Best-effort : si la migration échoue, on continue avec FSS
+  /// vide et le compteur dead-man redémarrera proprement.
+  Future<void> _migrateFromPrefsIfNeeded() async {
+    try {
+      if (await _storage.containsKey(key: _lastActiveKey)) return;
+      final prefs = await SharedPreferences.getInstance();
+      final last = prefs.getInt(_lastActiveKey);
+      final grace = prefs.getInt(_graceStartKey);
+      final threshold = prefs.getInt(_thresholdKey);
+      if (last != null) {
+        await _storage.write(key: _lastActiveKey, value: last.toString());
+        await prefs.remove(_lastActiveKey);
+      }
+      if (grace != null) {
+        await _storage.write(key: _graceStartKey, value: grace.toString());
+        await prefs.remove(_graceStartKey);
+      }
+      if (threshold != null) {
+        await _storage.write(key: _thresholdKey, value: threshold.toString());
+        await prefs.remove(_thresholdKey);
+      }
+    } catch (e) {
+      debugPrint('HeritageService._migrateFromPrefsIfNeeded failed: $e');
+    }
+  }
+
   /// Seuil d'inactivité configuré en jours (défaut 90).
   Future<int> getThresholdDays() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_thresholdKey) ?? _defaultThresholdDays;
+    await _migrateFromPrefsIfNeeded();
+    final v = await _storage.read(key: _thresholdKey);
+    return int.tryParse(v ?? '') ?? _defaultThresholdDays;
   }
 
   Future<void> setThresholdDays(int days) async {
     if (days < 7 || days > 365) {
       throw ArgumentError('Seuil hors plage [7, 365] jours');
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_thresholdKey, days);
+    await _storage.write(key: _thresholdKey, value: days.toString());
   }
 
   /// Marque l'utilisateur principal comme actif maintenant. Appelé à chaque
   /// unlock du vault primary (PAS depuis le heir lui-même). Reset aussi
   /// la grace period si elle était démarrée.
   Future<void> markActive() async {
-    // Si l'écriture échoue (FS R/O, low memory, prefs corrompues), on logge
+    // Si l'écriture échoue (FS R/O, low memory, FSS indisponible), on logge
     // mais on n'interrompt pas le flow d'unlock. Le risque est que le timer
     // ne se reset pas → l'héritier accède plus tôt que prévu, ce qui est
     // moins grave qu'un échec d'unlock visible à l'utilisateur.
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_lastActiveKey, DateTime.now().millisecondsSinceEpoch);
-      await prefs.remove(_graceStartKey);
+      await _storage.write(
+        key: _lastActiveKey,
+        value: DateTime.now().millisecondsSinceEpoch.toString(),
+      );
+      await _storage.delete(key: _graceStartKey);
     } catch (e) {
       debugPrint('HeritageService.markActive failed: $e');
     }
@@ -104,8 +134,9 @@ class HeritageService {
   /// Nombre de jours depuis la dernière activité du primary. -1 si jamais
   /// déverrouillé (donc pas de last_active).
   Future<int> getInactivityDays() async {
-    final prefs = await SharedPreferences.getInstance();
-    final ts = prefs.getInt(_lastActiveKey);
+    await _migrateFromPrefsIfNeeded();
+    final v = await _storage.read(key: _lastActiveKey);
+    final ts = int.tryParse(v ?? '');
     if (ts == null) return -1;
     final diff = DateTime.now().millisecondsSinceEpoch - ts;
     return diff ~/ (1000 * 60 * 60 * 24);
@@ -114,16 +145,18 @@ class HeritageService {
   /// Démarre le compte à rebours de grâce si pas déjà démarré. Appelé à
   /// chaque ouverture de l'app si l'inactivité dépasse le seuil.
   Future<void> startGraceIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey(_graceStartKey)) return;
-    await prefs.setInt(_graceStartKey, DateTime.now().millisecondsSinceEpoch);
+    if (await _storage.containsKey(key: _graceStartKey)) return;
+    await _storage.write(
+      key: _graceStartKey,
+      value: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
   }
 
   /// Jours restants de la période de grâce. -1 si pas démarrée.
   /// 0 si expirée (l'héritier peut accéder).
   Future<int> getGraceDaysRemaining() async {
-    final prefs = await SharedPreferences.getInstance();
-    final ts = prefs.getInt(_graceStartKey);
+    final v = await _storage.read(key: _graceStartKey);
+    final ts = int.tryParse(v ?? '');
     if (ts == null) return -1;
     final elapsed = DateTime.now().millisecondsSinceEpoch - ts;
     final remainingMs = _gracePeriodDays * 24 * 60 * 60 * 1000 - elapsed;
@@ -182,8 +215,7 @@ class HeritageService {
     if (f.existsSync()) f.deleteSync();
     await _storage.delete(key: _saltKey);
     await _storage.delete(key: _enabledKey);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_graceStartKey);
+    await _storage.delete(key: _graceStartKey);
   }
 
   // ── Unlock as heir ──────────────────────────────────────────────────────

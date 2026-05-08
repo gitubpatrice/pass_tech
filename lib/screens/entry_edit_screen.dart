@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/totp_service.dart';
@@ -93,10 +94,11 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
   }
 
   Future<void> _save() async {
+    final t = AppLocalizations.of(context);
     if (_titleCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Le titre est obligatoire')));
+      ).showSnackBar(SnackBar(content: Text(t.entryEditTitleRequired)));
       return;
     }
 
@@ -179,6 +181,7 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
   Future<void> _scanQrForTotp() async {
     final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
     final raw = await Navigator.push<String>(
       context,
       MaterialPageRoute(builder: (_) => const QrScannerScreen()),
@@ -186,23 +189,21 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     if (raw == null || !mounted) return;
     final secret = _extractTotpSecret(raw);
     if (secret == null || secret.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('QR code invalide pour 2FA')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(t.entryEditQrInvalid)));
       return;
     }
     final err = TotpService.validate(secret);
     if (err != null) {
-      messenger.showSnackBar(SnackBar(content: Text('Secret invalide : $err')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(t.entryEditSecretInvalid(err))),
+      );
       return;
     }
     setState(() {
       _totpCtrl.text = secret;
       _totpError = null;
     });
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Secret 2FA ajouté ✓')),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(t.entryEditSecretAdded)));
   }
 
   @override
@@ -222,13 +223,25 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     return Theme(data: dense, child: _build(context));
   }
 
+  String _typeLabelLower(EntryType type, AppLocalizations t) {
+    switch (type) {
+      case EntryType.password:
+        return t.entryTypePassword.toLowerCase();
+      case EntryType.note:
+        return t.entryTypeNote.toLowerCase();
+      case EntryType.card:
+        return t.entryTypeCard.toLowerCase();
+    }
+  }
+
   Widget _build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _isEdit
-              ? 'Modifier'
-              : 'Nouveau ${entryTypeLabel(_type).toLowerCase()}',
+              ? t.entryEditTitleEdit
+              : t.entryEditTitleNew(_typeLabelLower(_type, t)),
         ),
         actions: [
           // Toggle favori dans l'AppBar — gain d'espace dans le form,
@@ -239,8 +252,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
               color: _isFavorite ? Colors.amber : null,
             ),
             tooltip: _isFavorite
-                ? 'Retirer des favoris'
-                : 'Ajouter aux favoris',
+                ? t.entryEditRemoveFavorite
+                : t.entryEditAddFavorite,
             onPressed: () => setState(() => _isFavorite = !_isFavorite),
           ),
         ],
@@ -253,7 +266,7 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
             // (fond bleu clair primaryContainer + bordure, bien visible).
             Row(
               children: [
-                _label('Catégorie'),
+                _label(t.entryEditCategory),
                 const Spacer(),
                 FilledButton.tonal(
                   onPressed: _saving ? null : _save,
@@ -268,7 +281,7 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
                     minimumSize: const Size(0, 38),
                   ),
                   child: Text(
-                    _saving ? 'Enregistrement…' : 'Enregistrer',
+                    _saving ? t.entryEditSaving : t.entryEditSave,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -305,13 +318,14 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
             const SizedBox(height: 16),
 
             // Title
-            _label('Titre *'),
+            _label(t.entryEditFieldTitleRequired),
             const SizedBox(height: 6),
             TextField(
               controller: _titleCtrl,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: _hintForTitle(),
+                labelText: t.entryEditFieldTitleRequired,
+                hintText: _hintForTitle(t),
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.title, size: 20),
               ),
@@ -332,286 +346,308 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     );
   }
 
-  String _hintForTitle() {
+  String _hintForTitle(AppLocalizations t) {
     switch (_type) {
       case EntryType.password:
-        return 'ex: Google, Netflix, BNP…';
+        return t.entryEditHintTitlePassword;
       case EntryType.note:
-        return 'ex: Code Wi-Fi, RIB, recovery key…';
+        return t.entryEditHintTitleNote;
       case EntryType.card:
-        return 'ex: Visa BNP, Mastercard pro…';
+        return t.entryEditHintTitleCard;
     }
   }
 
-  List<Widget> _buildPasswordFields() => [
-    _label('Identifiant'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _userCtrl,
-      keyboardType: TextInputType.emailAddress,
-      decoration: const InputDecoration(
-        hintText: 'Email, nom d\'utilisateur…',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.person_outline, size: 20),
-      ),
-    ),
-    const SizedBox(height: 16),
-
-    _label('Mot de passe'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _passCtrl,
-      obscureText: !_showPass,
-      enableSuggestions: false,
-      autocorrect: false,
-      keyboardType: TextInputType.visiblePassword,
-      decoration: InputDecoration(
-        hintText: 'Mot de passe',
-        border: const OutlineInputBorder(),
-        prefixIcon: const Icon(Icons.lock_outline, size: 20),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                _showPass ? Icons.visibility_off : Icons.visibility,
-                size: 20,
-              ),
-              onPressed: () => setState(() => _showPass = !_showPass),
-            ),
-            IconButton(
-              icon: const Icon(Icons.auto_fix_high, size: 20),
-              tooltip: 'Générer',
-              onPressed: _pickGenerated,
-            ),
-          ],
+  List<Widget> _buildPasswordFields() {
+    final t = AppLocalizations.of(context);
+    return [
+      _label(t.entryEditFieldUsername),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _userCtrl,
+        keyboardType: TextInputType.emailAddress,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldUsername,
+          hintText: t.entryEditHintUsername,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.person_outline, size: 20),
         ),
       ),
-    ),
-    const SizedBox(height: 16),
+      const SizedBox(height: 16),
 
-    _label('URL (optionnel)'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _urlCtrl,
-      keyboardType: TextInputType.url,
-      decoration: const InputDecoration(
-        hintText: 'https://…',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.link, size: 20),
-      ),
-    ),
-    const SizedBox(height: 16),
-
-    // TOTP / 2FA
-    _label('Code 2FA — secret TOTP (optionnel)'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _totpCtrl,
-      obscureText: !_showTotp,
-      enableSuggestions: false,
-      autocorrect: false,
-      onChanged: (_) {
-        if (_totpError != null) setState(() => _totpError = null);
-      },
-      decoration: InputDecoration(
-        hintText: 'Clé secrète Base32 ou scanner QR',
-        border: const OutlineInputBorder(),
-        prefixIcon: const Icon(Icons.shield_outlined, size: 20),
-        errorText: _totpError,
-        helperText: 'Génère des codes 2FA à 6 chiffres',
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                _showTotp ? Icons.visibility_off : Icons.visibility,
-                size: 20,
-              ),
-              onPressed: () => setState(() => _showTotp = !_showTotp),
-            ),
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner, size: 20),
-              tooltip: 'Scanner QR',
-              onPressed: _scanQrForTotp,
-            ),
-          ],
-        ),
-      ),
-    ),
-    const SizedBox(height: 16),
-
-    _label('Notes (optionnel)'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _notesCtrl,
-      maxLines: 3,
-      decoration: const InputDecoration(
-        hintText: 'Informations supplémentaires…',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.notes, size: 20),
-      ),
-    ),
-    const SizedBox(height: 16),
-  ];
-
-  List<Widget> _buildNoteFields() => [
-    _label('Contenu'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _notesCtrl,
-      maxLines: 12,
-      minLines: 6,
-      textCapitalization: TextCapitalization.sentences,
-      decoration: const InputDecoration(
-        hintText: 'Texte chiffré confidentiel…',
-        border: OutlineInputBorder(),
-        alignLabelWithHint: true,
-      ),
-    ),
-    const SizedBox(height: 16),
-  ];
-
-  List<Widget> _buildCardFields() => [
-    _label('Titulaire de la carte'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _holderCtrl,
-      textCapitalization: TextCapitalization.words,
-      decoration: const InputDecoration(
-        hintText: 'Nom Prénom',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.person_outline, size: 20),
-      ),
-    ),
-    const SizedBox(height: 16),
-
-    _label('Numéro de carte'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _numberCtrl,
-      keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(19),
-        _CardNumberFormatter(),
-      ],
-      decoration: const InputDecoration(
-        hintText: '0000 0000 0000 0000',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.credit_card, size: 20),
-      ),
-    ),
-    const SizedBox(height: 16),
-
-    Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      _label(t.entryEditFieldPassword),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _passCtrl,
+        obscureText: !_showPass,
+        enableSuggestions: false,
+        autocorrect: false,
+        keyboardType: TextInputType.visiblePassword,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldPassword,
+          hintText: t.entryEditHintPassword,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.lock_outline, size: 20),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _label('Expiration'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _expiryCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(4),
-                  _ExpiryFormatter(),
-                ],
-                decoration: const InputDecoration(
-                  hintText: 'MM/AA',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_today, size: 18),
+              IconButton(
+                icon: Icon(
+                  _showPass ? Icons.visibility_off : Icons.visibility,
+                  size: 20,
                 ),
+                onPressed: () => setState(() => _showPass = !_showPass),
+              ),
+              IconButton(
+                icon: const Icon(Icons.auto_fix_high, size: 20),
+                tooltip: t.entryEditTooltipGenerate,
+                onPressed: _pickGenerated,
               ),
             ],
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      const SizedBox(height: 16),
+
+      _label(t.entryEditFieldUrlOptional),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _urlCtrl,
+        keyboardType: TextInputType.url,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldUrlOptional,
+          hintText: t.entryEditHintUrl,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.link, size: 20),
+        ),
+      ),
+      const SizedBox(height: 16),
+
+      // TOTP / 2FA
+      _label(t.entryEditField2faOptional),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _totpCtrl,
+        obscureText: !_showTotp,
+        enableSuggestions: false,
+        autocorrect: false,
+        onChanged: (_) {
+          if (_totpError != null) setState(() => _totpError = null);
+        },
+        decoration: InputDecoration(
+          labelText: t.entryEditField2faOptional,
+          hintText: t.entryEditHint2fa,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.shield_outlined, size: 20),
+          errorText: _totpError,
+          helperText: t.entryEditHelper2fa,
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _label('CVV'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _cvvCtrl,
-                obscureText: !_showCvv,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(4),
-                ],
-                decoration: InputDecoration(
-                  hintText: '000',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _showCvv ? Icons.visibility_off : Icons.visibility,
-                      size: 20,
-                    ),
-                    onPressed: () => setState(() => _showCvv = !_showCvv),
+              IconButton(
+                icon: Icon(
+                  _showTotp ? Icons.visibility_off : Icons.visibility,
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _showTotp = !_showTotp),
+              ),
+              IconButton(
+                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                tooltip: t.entryEditTooltipScanQr,
+                onPressed: _scanQrForTotp,
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+
+      _label(t.entryEditFieldNotesOptional),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _notesCtrl,
+        maxLines: 3,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldNotesOptional,
+          hintText: t.entryEditHintNotes,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.notes, size: 20),
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  List<Widget> _buildNoteFields() {
+    final t = AppLocalizations.of(context);
+    return [
+      _label(t.entryEditFieldContent),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _notesCtrl,
+        maxLines: 12,
+        minLines: 6,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldContent,
+          hintText: t.entryEditHintNoteContent,
+          border: const OutlineInputBorder(),
+          alignLabelWithHint: true,
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  List<Widget> _buildCardFields() {
+    final t = AppLocalizations.of(context);
+    return [
+      _label(t.entryEditFieldCardholder),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _holderCtrl,
+        textCapitalization: TextCapitalization.words,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldCardholder,
+          hintText: t.entryEditHintCardholder,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.person_outline, size: 20),
+        ),
+      ),
+      const SizedBox(height: 16),
+
+      _label(t.entryEditFieldCardNumber),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _numberCtrl,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(19),
+          _CardNumberFormatter(),
+        ],
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldCardNumber,
+          hintText: t.entryEditHintCardNumber,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.credit_card, size: 20),
+        ),
+      ),
+      const SizedBox(height: 16),
+
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _label(t.entryEditFieldExpiry),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _expiryCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                    _ExpiryFormatter(),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: t.entryEditFieldExpiry,
+                    hintText: t.entryEditHintExpiry,
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.calendar_today, size: 18),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _label(t.entryEditFieldCvv),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _cvvCtrl,
+                  obscureText: !_showCvv,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: t.entryEditFieldCvv,
+                    hintText: t.entryEditHintCvv,
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _showCvv ? Icons.visibility_off : Icons.visibility,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _showCvv = !_showCvv),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+
+      _label(t.entryEditFieldPinOptional),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _pinCtrl,
+        obscureText: !_showPin,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(8),
+        ],
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldPinOptional,
+          hintText: t.entryEditHintPin,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.pin_outlined, size: 20),
+          suffixIcon: IconButton(
+            icon: Icon(
+              _showPin ? Icons.visibility_off : Icons.visibility,
+              size: 20,
+            ),
+            onPressed: () => setState(() => _showPin = !_showPin),
           ),
         ),
-      ],
-    ),
-    const SizedBox(height: 16),
+      ),
+      const SizedBox(height: 16),
 
-    _label('Code PIN (optionnel)'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _pinCtrl,
-      obscureText: !_showPin,
-      keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(8),
-      ],
-      decoration: InputDecoration(
-        hintText: '0000',
-        border: const OutlineInputBorder(),
-        prefixIcon: const Icon(Icons.pin_outlined, size: 20),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _showPin ? Icons.visibility_off : Icons.visibility,
-            size: 20,
-          ),
-          onPressed: () => setState(() => _showPin = !_showPin),
+      _label(t.entryEditFieldIssuerOptional),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _issuerCtrl,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldIssuerOptional,
+          hintText: t.entryEditHintIssuer,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.account_balance_outlined, size: 20),
         ),
       ),
-    ),
-    const SizedBox(height: 16),
+      const SizedBox(height: 16),
 
-    _label('Banque / Émetteur (optionnel)'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _issuerCtrl,
-      decoration: const InputDecoration(
-        hintText: 'BNP Paribas, Boursorama, N26…',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.account_balance_outlined, size: 20),
+      _label(t.entryEditFieldNotesOptional),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _notesCtrl,
+        maxLines: 2,
+        decoration: InputDecoration(
+          labelText: t.entryEditFieldNotesOptional,
+          hintText: t.entryEditHintCardNotes,
+          border: const OutlineInputBorder(),
+        ),
       ),
-    ),
-    const SizedBox(height: 16),
-
-    _label('Notes (optionnel)'),
-    const SizedBox(height: 6),
-    TextField(
-      controller: _notesCtrl,
-      maxLines: 2,
-      decoration: const InputDecoration(
-        hintText: 'Plafond, type de carte…',
-        border: OutlineInputBorder(),
-      ),
-    ),
-    const SizedBox(height: 16),
-  ];
+      const SizedBox(height: 16),
+    ];
+  }
 
   Widget _label(String text) => Align(
     alignment: Alignment.centerLeft,

@@ -320,19 +320,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: locked
-                        ? cs.error.withValues(alpha: 0.15)
-                        : cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    locked ? Icons.lock_clock : Icons.lock,
-                    size: 44,
-                    color: locked ? cs.error : cs.primary,
+                ExcludeSemantics(
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: locked
+                          ? cs.error.withValues(alpha: 0.15)
+                          : cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      locked ? Icons.lock_clock : Icons.lock,
+                      size: 44,
+                      color: locked ? cs.error : cs.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -398,6 +400,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                           _show ? Icons.visibility_off : Icons.visibility,
                           size: 20,
                         ),
+                        tooltip: _show
+                            ? t.unlockHidePassword
+                            : t.unlockShowPassword,
                         onPressed: () => setState(() => _show = !_show),
                       ),
                       border: const OutlineInputBorder(),
@@ -443,7 +448,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                             icon: const Icon(Icons.fingerprint, size: 18),
                             label: Text(t.unlockBiometricCta),
                             style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
+                              minimumSize: const Size.fromHeight(48),
                             ),
                           ),
                         ],

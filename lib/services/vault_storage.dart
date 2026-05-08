@@ -99,7 +99,10 @@ extension VaultStorage on VaultService {
         'algo': 'AES-GCM-256',
         'nonce': base64Encode(aead.nonce),
         'data': base64Encode(cipherAndTag),
-        'aad': utf8.decode(aad),
+        // v2.3.2 : champ 'aad' supprimé. L'AAD est recalculée depuis
+        // _aadV4(alias) au déchiffrement, jamais lue depuis le JSON. Stocker
+        // une copie informationnelle créait une confusion potentielle pour
+        // un dev futur qui croirait ce champ autoritaire.
       },
     };
 

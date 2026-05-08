@@ -85,9 +85,13 @@ extension VaultUnlock on VaultService {
         // attaquant qui chronomètre l'unlock peut déduire l'absence du
         // coffre leurre — ce qui briserait le déni plausible.
         // Mêmes paramètres (m=19 MiB, t=2, p=1) que les vrais slots.
+        // P2-fix v2.3.2 : password constant, indépendant du masterPassword.
+        // Évite le timing oracle marginal sur passwords très courts (le coût
+        // Argon2id varie linéairement avec la longueur du password). Le but
+        // ici est juste de consommer ~1 Argon2id, pas de hasher quelque chose.
         final dummySalt = SecretBytes.randomBytes(32);
         final dummyOut = await KdfService.argon2id(
-          password: 'dummy_$masterPassword',
+          password: 'pt_dummy_noop_v2',
           salt: dummySalt,
         );
         SecretBytes.wipe(dummyOut);

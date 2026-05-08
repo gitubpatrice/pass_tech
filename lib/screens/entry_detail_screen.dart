@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+// ignore: unnecessary_import
+import 'package:flutter/semantics.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/anti_phishing_service.dart';
@@ -41,6 +44,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     bool sensitive = false,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
 
     // Anti-phishing : sur les champs sensibles (mot de passe, 2FA), on vérifie
     // que le navigateur frontal est bien sur le bon domaine avant de copier.
@@ -61,12 +65,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         if (!mounted) return;
         messenger.showSnackBar(
           SnackBar(
-            content: const Text(
-              '⚠ Anti-phishing inactif — vérifiez l\'accessibilité dans Réglages',
-            ),
+            content: Text(t.entryDetailAntiPhishingInactive),
             duration: const Duration(seconds: 4),
             action: SnackBarAction(
-              label: 'Réglages',
+              label: t.entryDetailAntiPhishingSettings,
               onPressed: () => svc.openAccessibilitySettings(),
             ),
           ),
@@ -78,41 +80,56 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          '$label copié — effacé dans ${ClipboardService.clearAfterSeconds}s',
+          t.entryDetailCopiedSnack(label, ClipboardService.clearAfterSeconds),
         ),
         duration: const Duration(seconds: 3),
       ),
     );
+    if (mounted) {
+      // ignore: deprecated_member_use — sendAnnouncement requires FlutterView API non-stable.
+      SemanticsService.announce(t.snackbarCopied, Directionality.of(context));
+    }
   }
 
   Future<bool?> _showPhishingDialog(PhishingCheck check) {
     final isTypo = check.verdict == PhishingVerdict.typosquatting;
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         icon: Icon(Icons.warning_amber_rounded, size: 40, color: cs.error),
-        title: Text(isTypo ? 'Domaine suspect' : 'Domaine ne correspond pas'),
+        title: Text(
+          isTypo
+              ? t.entryDetailPhishingTypoTitle
+              : t.entryDetailPhishingMismatchTitle,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               isTypo
-                  ? 'Le domaine actif ressemble au vôtre — typosquatting probable. '
-                        'Cela peut être un faux positif, mais soyez prudent(e).'
-                  : 'Le navigateur est sur un domaine totalement différent. '
-                        'La copie a été bloquée pour votre sécurité.',
+                  ? t.entryDetailPhishingTypoBody
+                  : t.entryDetailPhishingMismatchBody,
             ),
             const SizedBox(height: 12),
-            _domainRow('Attendu', check.expectedDomain ?? '—', cs.primary),
+            _domainRow(
+              t.entryDetailPhishingExpected,
+              check.expectedDomain ?? '—',
+              cs.primary,
+            ),
             const SizedBox(height: 4),
-            _domainRow('Actif', check.activeDomain ?? '—', cs.error),
+            _domainRow(
+              t.entryDetailPhishingActive,
+              check.activeDomain ?? '—',
+              cs.error,
+            ),
             if (check.distance != null) ...[
               const SizedBox(height: 8),
               Text(
-                'Distance : ${check.distance}',
+                t.entryDetailPhishingDistance(check.distance!),
                 style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
@@ -121,7 +138,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(isTypo ? 'Annuler' : 'Fermer'),
+            child: Text(isTypo ? t.actionCancel : t.entryDetailPhishingClose),
           ),
           // Sur typosquatting, on garde l'override (peut être un faux positif).
           // Sur mismatch sévère, on retire le bouton — l'utilisateur doit
@@ -130,7 +147,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: TextButton.styleFrom(foregroundColor: cs.error),
-              child: const Text('Copier quand même'),
+              child: Text(t.entryDetailPhishingCopyAnyway),
             ),
         ],
       ),
@@ -170,20 +187,21 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
   Future<void> _delete() async {
     final nav = Navigator.of(context);
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Supprimer ?'),
-        content: Text('Supprimer "${_entry.title}" définitivement ?'),
+        title: Text(t.entryDetailDeleteTitle),
+        content: Text(t.entryDetailDeleteConfirm(_entry.title)),
         actions: [
           TextButton(
             onPressed: () => nav.pop(false),
-            child: const Text('Annuler'),
+            child: Text(t.actionCancel),
           ),
           TextButton(
             onPressed: () => nav.pop(true),
             style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: const Text('Supprimer'),
+            child: Text(t.actionDelete),
           ),
         ],
       ),
@@ -205,9 +223,21 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     if (updated != null && mounted) setState(() => _entry = updated);
   }
 
+  String _entryTypeLabelLocalized(EntryType type, AppLocalizations t) {
+    switch (type) {
+      case EntryType.password:
+        return t.entryTypePassword;
+      case EntryType.note:
+        return t.entryTypeNote;
+      case EntryType.card:
+        return t.entryTypeCard;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final catColor = categoryColor(_entry.category);
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
 
@@ -220,11 +250,17 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
               _entry.isFavorite ? Icons.star : Icons.star_border,
               color: _entry.isFavorite ? Colors.amber.shade400 : null,
             ),
+            tooltip: t.entryDetailFavoriteTooltip,
             onPressed: _toggleFav,
           ),
-          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: _edit),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: t.entryDetailEditTooltip,
+            onPressed: _edit,
+          ),
           IconButton(
             icon: Icon(Icons.delete_outline, color: cs.error),
+            tooltip: t.entryDetailDeleteTooltip,
             onPressed: _delete,
           ),
         ],
@@ -254,7 +290,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                   spacing: 6,
                   alignment: WrapAlignment.center,
                   children: [
-                    _badge(entryTypeLabel(_entry.type), catColor),
+                    _badge(_entryTypeLabelLocalized(_entry.type, t), catColor),
                     _badge(_entry.category, cs.onSurfaceVariant),
                   ],
                 ),
@@ -270,11 +306,11 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
           const Divider(),
           const SizedBox(height: 6),
           Text(
-            'Créé le ${fmt.format(_entry.createdAt)}',
+            t.entryDetailCreatedAt(fmt.format(_entry.createdAt)),
             style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
           Text(
-            'Modifié le ${fmt.format(_entry.updatedAt)}',
+            t.entryDetailUpdatedAt(fmt.format(_entry.updatedAt)),
             style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
         ],
@@ -293,162 +329,183 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     }
   }
 
-  List<Widget> _buildPasswordView() => [
-    _Field(
-      label: 'Identifiant',
-      value: _entry.username.isEmpty ? '—' : _entry.username,
-      onCopy: _entry.username.isEmpty
-          ? null
-          : () => _copy(_entry.username, 'Identifiant'),
-    ),
-    const SizedBox(height: 10),
-
-    _PasswordField(
-      password: _entry.password,
-      show: _showPassword,
-      onToggle: () => setState(() => _showPassword = !_showPassword),
-      onCopy: () => _copy(_entry.password, 'Mot de passe', sensitive: true),
-    ),
-    const SizedBox(height: 10),
-
-    if (_entry.totpSecret.isNotEmpty) ...[
-      _TotpCard(
-        secret: _entry.totpSecret,
-        onCopy: (code) => _copy(code, 'Code 2FA', sensitive: true),
-      ),
-      const SizedBox(height: 10),
-    ],
-
-    if (_entry.url.isNotEmpty) ...[
+  List<Widget> _buildPasswordView() {
+    final t = AppLocalizations.of(context);
+    return [
       _Field(
-        label: 'URL',
-        value: _entry.url,
-        onCopy: () => _copy(_entry.url, 'URL'),
+        label: t.entryDetailFieldUsername,
+        value: _entry.username.isEmpty ? '—' : _entry.username,
+        onCopy: _entry.username.isEmpty
+            ? null
+            : () => _copy(_entry.username, t.entryDetailFieldUsername),
       ),
       const SizedBox(height: 10),
-    ],
 
-    if (_entry.notes.isNotEmpty) ...[
-      _Field(label: 'Notes', value: _entry.notes),
+      _PasswordField(
+        password: _entry.password,
+        label: t.entryDetailFieldPassword,
+        copyTooltip: t.entryDetailCopyTooltip,
+        show: _showPassword,
+        onToggle: () => setState(() => _showPassword = !_showPassword),
+        onCopy: () =>
+            _copy(_entry.password, t.entryDetailFieldPassword, sensitive: true),
+      ),
       const SizedBox(height: 10),
-    ],
-  ];
 
-  List<Widget> _buildNoteView() => [
-    Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Contenu',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4,
+      if (_entry.totpSecret.isNotEmpty) ...[
+        _TotpCard(
+          secret: _entry.totpSecret,
+          label: t.entryDetailField2faTotp,
+          copyTooltip: t.entryDetailCopyTooltip,
+          onCopy: (code) =>
+              _copy(code, t.entryDetailField2faCode, sensitive: true),
+        ),
+        const SizedBox(height: 10),
+      ],
+
+      if (_entry.url.isNotEmpty) ...[
+        _Field(
+          label: t.entryDetailFieldUrl,
+          value: _entry.url,
+          onCopy: () => _copy(_entry.url, t.entryDetailFieldUrl),
+        ),
+        const SizedBox(height: 10),
+      ],
+
+      if (_entry.notes.isNotEmpty) ...[
+        _Field(label: t.entryDetailFieldNotes, value: _entry.notes),
+        const SizedBox(height: 10),
+      ],
+    ];
+  }
+
+  List<Widget> _buildNoteView() {
+    final t = AppLocalizations.of(context);
+    return [
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t.entryDetailFieldContent,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 18),
-                  onPressed: _entry.notes.isEmpty
-                      ? null
-                      : () => _copy(_entry.notes, 'Contenu'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            SelectableText(
-              _entry.notes.isEmpty ? '(vide)' : _entry.notes,
-              style: const TextStyle(fontSize: 14, height: 1.4),
-            ),
-          ],
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: t.entryDetailCopyNotesTooltip,
+                    onPressed: _entry.notes.isEmpty
+                        ? null
+                        : () => _copy(_entry.notes, t.entryDetailFieldContent),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SelectableText(
+                _entry.notes.isEmpty ? t.entryDetailNoteEmpty : _entry.notes,
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-    const SizedBox(height: 10),
-  ];
+      const SizedBox(height: 10),
+    ];
+  }
 
-  List<Widget> _buildCardView() => [
-    _CardVisual(entry: _entry, showNumber: _showCardNumber),
-    const SizedBox(height: 12),
+  List<Widget> _buildCardView() {
+    final t = AppLocalizations.of(context);
+    return [
+      _CardVisual(entry: _entry, showNumber: _showCardNumber),
+      const SizedBox(height: 12),
 
-    if (_entry.cardholderName.isNotEmpty)
-      _Field(
-        label: 'Titulaire',
-        value: _entry.cardholderName,
-        onCopy: () => _copy(_entry.cardholderName, 'Titulaire'),
-      ),
-    if (_entry.cardholderName.isNotEmpty) const SizedBox(height: 10),
+      if (_entry.cardholderName.isNotEmpty)
+        _Field(
+          label: t.entryDetailFieldHolder,
+          value: _entry.cardholderName,
+          onCopy: () => _copy(_entry.cardholderName, t.entryDetailFieldHolder),
+        ),
+      if (_entry.cardholderName.isNotEmpty) const SizedBox(height: 10),
 
-    _MaskableField(
-      label: 'Numéro',
-      value: _entry.cardNumber,
-      formattedValue: _formatCardNumber(_entry.cardNumber),
-      maskedValue: _maskCardNumber(_entry.cardNumber),
-      show: _showCardNumber,
-      onToggle: () => setState(() => _showCardNumber = !_showCardNumber),
-      onCopy: () => _copy(_entry.cardNumber, 'Numéro de carte'),
-      monospace: true,
-    ),
-    const SizedBox(height: 10),
-
-    Row(
-      children: [
-        if (_entry.cardExpiry.isNotEmpty)
-          Expanded(
-            child: _Field(
-              label: 'Expiration',
-              value: _entry.cardExpiry,
-              onCopy: () => _copy(_entry.cardExpiry, 'Expiration'),
-            ),
-          ),
-        if (_entry.cardExpiry.isNotEmpty && _entry.cardCvv.isNotEmpty)
-          const SizedBox(width: 10),
-        if (_entry.cardCvv.isNotEmpty)
-          Expanded(
-            child: _MaskableField(
-              label: 'CVV',
-              value: _entry.cardCvv,
-              formattedValue: _entry.cardCvv,
-              maskedValue: '•' * _entry.cardCvv.length,
-              show: _showCvv,
-              onToggle: () => setState(() => _showCvv = !_showCvv),
-              onCopy: () => _copy(_entry.cardCvv, 'CVV'),
-            ),
-          ),
-      ],
-    ),
-    const SizedBox(height: 10),
-
-    if (_entry.cardPin.isNotEmpty) ...[
       _MaskableField(
-        label: 'Code PIN',
-        value: _entry.cardPin,
-        formattedValue: _entry.cardPin,
-        maskedValue: '•' * _entry.cardPin.length,
-        show: _showPin,
-        onToggle: () => setState(() => _showPin = !_showPin),
-        onCopy: () => _copy(_entry.cardPin, 'PIN'),
+        label: t.entryDetailFieldNumber,
+        value: _entry.cardNumber,
+        copyTooltip: t.entryDetailCopyTooltip,
+        formattedValue: _formatCardNumber(_entry.cardNumber),
+        maskedValue: _maskCardNumber(_entry.cardNumber),
+        show: _showCardNumber,
+        onToggle: () => setState(() => _showCardNumber = !_showCardNumber),
+        onCopy: () =>
+            _copy(_entry.cardNumber, t.entryDetailFieldCardNumberCopy),
+        monospace: true,
       ),
       const SizedBox(height: 10),
-    ],
 
-    if (_entry.cardIssuer.isNotEmpty) ...[
-      _Field(label: 'Banque', value: _entry.cardIssuer),
+      Row(
+        children: [
+          if (_entry.cardExpiry.isNotEmpty)
+            Expanded(
+              child: _Field(
+                label: t.entryDetailFieldExpiry,
+                value: _entry.cardExpiry,
+                onCopy: () =>
+                    _copy(_entry.cardExpiry, t.entryDetailFieldExpiry),
+              ),
+            ),
+          if (_entry.cardExpiry.isNotEmpty && _entry.cardCvv.isNotEmpty)
+            const SizedBox(width: 10),
+          if (_entry.cardCvv.isNotEmpty)
+            Expanded(
+              child: _MaskableField(
+                label: t.entryDetailFieldCvv,
+                value: _entry.cardCvv,
+                copyTooltip: t.entryDetailCopyTooltip,
+                formattedValue: _entry.cardCvv,
+                maskedValue: '•' * _entry.cardCvv.length,
+                show: _showCvv,
+                onToggle: () => setState(() => _showCvv = !_showCvv),
+                onCopy: () => _copy(_entry.cardCvv, t.entryDetailFieldCvv),
+              ),
+            ),
+        ],
+      ),
       const SizedBox(height: 10),
-    ],
 
-    if (_entry.notes.isNotEmpty) ...[
-      _Field(label: 'Notes', value: _entry.notes),
-      const SizedBox(height: 10),
-    ],
-  ];
+      if (_entry.cardPin.isNotEmpty) ...[
+        _MaskableField(
+          label: t.entryDetailFieldPin,
+          value: _entry.cardPin,
+          copyTooltip: t.entryDetailCopyTooltip,
+          formattedValue: _entry.cardPin,
+          maskedValue: '•' * _entry.cardPin.length,
+          show: _showPin,
+          onToggle: () => setState(() => _showPin = !_showPin),
+          onCopy: () => _copy(_entry.cardPin, t.entryDetailFieldPinCopy),
+        ),
+        const SizedBox(height: 10),
+      ],
+
+      if (_entry.cardIssuer.isNotEmpty) ...[
+        _Field(label: t.entryDetailFieldIssuer, value: _entry.cardIssuer),
+        const SizedBox(height: 10),
+      ],
+
+      if (_entry.notes.isNotEmpty) ...[
+        _Field(label: t.entryDetailFieldNotes, value: _entry.notes),
+        const SizedBox(height: 10),
+      ],
+    ];
+  }
 
   Widget _badge(String text, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -489,6 +546,7 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
@@ -516,7 +574,7 @@ class _Field extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.copy, size: 18),
                 onPressed: onCopy,
-                tooltip: 'Copier',
+                tooltip: t.entryDetailCopyTooltip,
               ),
           ],
         ),
@@ -527,11 +585,15 @@ class _Field extends StatelessWidget {
 
 class _PasswordField extends StatelessWidget {
   final String password;
+  final String label;
+  final String copyTooltip;
   final bool show;
   final VoidCallback onToggle;
   final VoidCallback onCopy;
   const _PasswordField({
     required this.password,
+    required this.label,
+    required this.copyTooltip,
     required this.show,
     required this.onToggle,
     required this.onCopy,
@@ -540,6 +602,7 @@ class _PasswordField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
@@ -550,7 +613,7 @@ class _PasswordField extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Mot de passe',
+                    label,
                     style: TextStyle(
                       fontSize: 11,
                       color: cs.onSurfaceVariant,
@@ -575,12 +638,13 @@ class _PasswordField extends StatelessWidget {
                 show ? Icons.visibility_off : Icons.visibility,
                 size: 18,
               ),
+              tooltip: t.entryDetailToggleVisibility,
               onPressed: onToggle,
             ),
             IconButton(
               icon: const Icon(Icons.copy, size: 18),
               onPressed: onCopy,
-              tooltip: 'Copier',
+              tooltip: copyTooltip,
             ),
           ],
         ),
@@ -594,6 +658,7 @@ class _MaskableField extends StatelessWidget {
   final String value;
   final String formattedValue;
   final String maskedValue;
+  final String? copyTooltip;
   final bool show;
   final VoidCallback onToggle;
   final VoidCallback onCopy;
@@ -606,12 +671,14 @@ class _MaskableField extends StatelessWidget {
     required this.show,
     required this.onToggle,
     required this.onCopy,
+    this.copyTooltip,
     this.monospace = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
@@ -647,11 +714,13 @@ class _MaskableField extends StatelessWidget {
                 show ? Icons.visibility_off : Icons.visibility,
                 size: 18,
               ),
+              tooltip: t.entryDetailToggleVisibility,
               onPressed: onToggle,
             ),
             IconButton(
               icon: const Icon(Icons.copy, size: 18),
               onPressed: onCopy,
+              tooltip: copyTooltip,
             ),
           ],
         ),
@@ -662,8 +731,15 @@ class _MaskableField extends StatelessWidget {
 
 class _TotpCard extends StatefulWidget {
   final String secret;
+  final String label;
+  final String copyTooltip;
   final void Function(String code) onCopy;
-  const _TotpCard({required this.secret, required this.onCopy});
+  const _TotpCard({
+    required this.secret,
+    required this.label,
+    required this.copyTooltip,
+    required this.onCopy,
+  });
 
   @override
   State<_TotpCard> createState() => _TotpCardState();
@@ -733,7 +809,7 @@ class _TotpCardState extends State<_TotpCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Code 2FA — TOTP',
+                    widget.label,
                     style: TextStyle(
                       fontSize: 11,
                       color: cs.onSurfaceVariant,
@@ -758,7 +834,7 @@ class _TotpCardState extends State<_TotpCard> {
             IconButton(
               icon: const Icon(Icons.copy, size: 18),
               onPressed: () => widget.onCopy(code.replaceAll(' ', '')),
-              tooltip: 'Copier',
+              tooltip: widget.copyTooltip,
             ),
           ],
         ),
@@ -774,6 +850,7 @@ class _CardVisual extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final clean = entry.cardNumber.replaceAll(' ', '');
     final masked = clean.length > 4
         ? '•••• •••• •••• ${clean.substring(clean.length - 4)}'
@@ -811,7 +888,7 @@ class _CardVisual extends StatelessWidget {
             children: [
               Text(
                 entry.cardIssuer.isEmpty
-                    ? 'CARTE'
+                    ? t.entryDetailCardLabel
                     : entry.cardIssuer.toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
@@ -840,9 +917,9 @@ class _CardVisual extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'TITULAIRE',
-                    style: TextStyle(
+                  Text(
+                    t.entryDetailCardHolderLabel,
+                    style: const TextStyle(
                       color: Colors.white60,
                       fontSize: 9,
                       letterSpacing: 1,
@@ -864,9 +941,9 @@ class _CardVisual extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'EXPIRE',
-                    style: TextStyle(
+                  Text(
+                    t.entryDetailCardExpiryLabel,
+                    style: const TextStyle(
                       color: Colors.white60,
                       fontSize: 9,
                       letterSpacing: 1,

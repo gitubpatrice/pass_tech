@@ -1,5 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+// ignore: unnecessary_import
+import 'package:flutter/semantics.dart';
+import '../l10n/app_localizations.dart';
 import '../services/clipboard_service.dart';
 import '../services/diceware_fr.dart';
 
@@ -92,6 +95,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     final strength = _strengthScore();
     final sColor = strength < 0.4
         ? const Color(0xFFE53935)
@@ -99,24 +103,24 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
         ? const Color(0xFFFF7043)
         : const Color(0xFF43A047);
     final sLabel = strength < 0.4
-        ? 'Faible'
+        ? t.strengthWeak
         : strength < 0.7
-        ? 'Moyen'
-        : 'Fort';
+        ? t.strengthMedium
+        : t.strengthStrong;
     final bits = _entropyBits().round();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Générateur'),
+        title: Text(t.generatorTitle),
         actions: [
           if (widget.returnPassword)
             TextButton(
               onPressed: _password.isNotEmpty
                   ? () => Navigator.pop(context, _password)
                   : null,
-              child: const Text(
-                'Utiliser',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                t.generatorUse,
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
         ],
@@ -164,7 +168,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '$sLabel · $bits bits',
+                        t.generatorStrengthSuffix(sLabel, bits),
                         style: TextStyle(
                           fontSize: 11,
                           color: sColor,
@@ -184,7 +188,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _generate,
                     icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Générer'),
+                    label: Text(t.generatorGenerate),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -192,16 +196,19 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                   child: FilledButton.icon(
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
+                      final dir = Directionality.of(context);
                       await ClipboardService.copyWithAutoClear(_password);
                       messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Copié ✓'),
-                          duration: Duration(seconds: 2),
+                        SnackBar(
+                          content: Text(t.generatorCopiedSnack),
+                          duration: const Duration(seconds: 2),
                         ),
                       );
+                      // ignore: deprecated_member_use — sendAnnouncement requires FlutterView API non-stable.
+                      SemanticsService.announce(t.snackbarCopied, dir);
                     },
                     icon: const Icon(Icons.copy, size: 18),
-                    label: const Text('Copier'),
+                    label: Text(t.generatorCopy),
                   ),
                 ),
               ],
@@ -210,16 +217,16 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
             // ── Sélecteur de mode ──────────────────────────────────────────
             SegmentedButton<_Mode>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: _Mode.chars,
-                  label: Text('Caractères'),
-                  icon: Icon(Icons.tag, size: 16),
+                  label: Text(t.generatorModeChars),
+                  icon: const Icon(Icons.tag, size: 16),
                 ),
                 ButtonSegment(
                   value: _Mode.phrase,
-                  label: Text('Phrase'),
-                  icon: Icon(Icons.translate, size: 16),
+                  label: Text(t.generatorModePhrase),
+                  icon: const Icon(Icons.translate, size: 16),
                 ),
               ],
               selected: {_mode},
@@ -231,18 +238,18 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
             const SizedBox(height: 16),
 
             if (_mode == _Mode.chars)
-              ..._buildCharsOptions(cs)
+              ..._buildCharsOptions(cs, t)
             else
-              ..._buildPhraseOptions(cs),
+              ..._buildPhraseOptions(cs, t),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _buildCharsOptions(ColorScheme cs) => [
+  List<Widget> _buildCharsOptions(ColorScheme cs, AppLocalizations t) => [
     Text(
-      'Longueur : ${_length.round()}',
+      t.generatorLength(_length.round()),
       style: const TextStyle(fontWeight: FontWeight.w600),
     ),
     Slider(
@@ -258,7 +265,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     ),
     const SizedBox(height: 8),
     Text(
-      'Caractères',
+      t.generatorCharsHeader,
       style: TextStyle(
         fontWeight: FontWeight.w600,
         fontSize: 13,
@@ -266,27 +273,27 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
       ),
     ),
     const SizedBox(height: 8),
-    _OptionTile('A–Z  Majuscules', _upper, (v) {
+    _OptionTile(t.generatorCharsUpper, _upper, (v) {
       setState(() => _upper = v);
       _generate();
     }),
-    _OptionTile('a–z  Minuscules', _lower, (v) {
+    _OptionTile(t.generatorCharsLower, _lower, (v) {
       setState(() => _lower = v);
       _generate();
     }),
-    _OptionTile('0–9  Chiffres', _digits, (v) {
+    _OptionTile(t.generatorCharsDigits, _digits, (v) {
       setState(() => _digits = v);
       _generate();
     }),
-    _OptionTile('!@#  Symboles', _symbols, (v) {
+    _OptionTile(t.generatorCharsSymbols, _symbols, (v) {
       setState(() => _symbols = v);
       _generate();
     }),
   ];
 
-  List<Widget> _buildPhraseOptions(ColorScheme cs) => [
+  List<Widget> _buildPhraseOptions(ColorScheme cs, AppLocalizations t) => [
     Text(
-      'Nombre de mots : $_phraseWords',
+      t.generatorPhraseWords(_phraseWords),
       style: const TextStyle(fontWeight: FontWeight.w600),
     ),
     Slider(
@@ -302,7 +309,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     ),
     const SizedBox(height: 8),
     Text(
-      'Options',
+      t.generatorOptionsHeader,
       style: TextStyle(
         fontWeight: FontWeight.w600,
         fontSize: 13,
@@ -310,7 +317,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
       ),
     ),
     const SizedBox(height: 8),
-    _OptionTile('Ajouter un nombre 10–99', _phraseAppendNumber, (v) {
+    _OptionTile(t.generatorPhraseAppendNumber, _phraseAppendNumber, (v) {
       setState(() => _phraseAppendNumber = v);
       _generate();
     }),
@@ -318,7 +325,10 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         dense: true,
-        title: const Text('Séparateur', style: TextStyle(fontSize: 14)),
+        title: Text(
+          t.generatorPhraseSeparator,
+          style: const TextStyle(fontSize: 14),
+        ),
         trailing: SegmentedButton<String>(
           showSelectedIcon: false,
           style: const ButtonStyle(visualDensity: VisualDensity.compact),
@@ -349,8 +359,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Une phrase de passe est plus simple à mémoriser '
-              'qu\'un mot de passe complexe, et peut être tout aussi forte.',
+              t.generatorPhraseHint,
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
           ),

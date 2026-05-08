@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
+import '../l10n/app_localizations.dart';
 import '../models/entry.dart';
 import '../services/clipboard_service.dart';
 
@@ -17,6 +18,7 @@ class HeirViewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -26,13 +28,13 @@ class HeirViewScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('Accès héritier (lecture seule)'),
+          title: Text(t.heirViewTitle),
           backgroundColor: cs.errorContainer,
           foregroundColor: cs.onErrorContainer,
           actions: [
             IconButton(
               icon: const Icon(Icons.close),
-              tooltip: 'Fermer l\'app',
+              tooltip: t.heirViewClose,
               onPressed: () => SystemNavigator.pop(),
             ),
           ],
@@ -44,16 +46,14 @@ class HeirViewScreen extends StatelessWidget {
               color: cs.errorContainer.withValues(alpha: 0.40),
               padding: const EdgeInsets.all(12),
               child: Text(
-                'Vous accédez au snapshot du coffre transmis par son '
-                'propriétaire. Les modifications ne sont pas possibles. '
-                '${entries.length} entrée${entries.length > 1 ? "s" : ""}.',
+                t.heirViewBanner(entries.length),
                 style: TextStyle(fontSize: 12, color: cs.onErrorContainer),
                 textAlign: TextAlign.center,
               ),
             ),
             Expanded(
               child: entries.isEmpty
-                  ? const Center(child: Text('Snapshot vide'))
+                  ? Center(child: Text(t.heirViewEmpty))
                   : ListView.separated(
                       itemCount: entries.length,
                       separatorBuilder: (_, i) => const Divider(height: 1),
@@ -74,10 +74,11 @@ class _EntryTile extends StatelessWidget {
   Future<void> _copy(BuildContext context, String label, String value) async {
     if (value.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
     await ClipboardService.copyWithAutoClear(value);
     messenger.showSnackBar(
       SnackBar(
-        content: Text('$label copié (effacement auto)'),
+        content: Text(t.heirViewCopiedSnack(label)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -85,6 +86,7 @@ class _EntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return ExpansionTile(
       leading: const Icon(Icons.lock_outline),
       title: Text(
@@ -103,35 +105,46 @@ class _EntryTile extends StatelessWidget {
           ListTile(
             dense: true,
             leading: const Icon(Icons.person_outline, size: 18),
-            title: const Text('Identifiant', style: TextStyle(fontSize: 12)),
+            title: Text(
+              t.heirViewFieldUsername,
+              style: const TextStyle(fontSize: 12),
+            ),
             subtitle: SelectableText(
               entry.username,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
-              onPressed: () => _copy(context, 'Identifiant', entry.username),
+              onPressed: () =>
+                  _copy(context, t.heirViewFieldUsername, entry.username),
             ),
           ),
         if (entry.password.isNotEmpty)
           ListTile(
             dense: true,
             leading: const Icon(Icons.key_outlined, size: 18),
-            title: const Text('Mot de passe', style: TextStyle(fontSize: 12)),
+            title: Text(
+              t.heirViewFieldPassword,
+              style: const TextStyle(fontSize: 12),
+            ),
             subtitle: SelectableText(
               entry.password,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
-              onPressed: () => _copy(context, 'Mot de passe', entry.password),
+              onPressed: () =>
+                  _copy(context, t.heirViewFieldPassword, entry.password),
             ),
           ),
         if (entry.url.isNotEmpty)
           ListTile(
             dense: true,
             leading: const Icon(Icons.link, size: 18),
-            title: const Text('URL', style: TextStyle(fontSize: 12)),
+            title: Text(
+              t.heirViewFieldUrl,
+              style: const TextStyle(fontSize: 12),
+            ),
             subtitle: SelectableText(
               entry.url,
               style: const TextStyle(fontSize: 12),
@@ -143,9 +156,9 @@ class _EntryTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Notes',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                Text(
+                  t.heirViewFieldNotes,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 4),
                 SelectableText(
