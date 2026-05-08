@@ -11,7 +11,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '2.3.5';
+  static const _version = '2.3.6';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
@@ -371,6 +371,12 @@ class _AboutScreenState extends State<AboutScreen> {
           LegalSupportSections(
             appName: 'Pass Tech',
             version: _version,
+            privacyAsset: Localizations.localeOf(context).languageCode == 'en'
+                ? 'assets/legal/PRIVACY.en.md'
+                : 'assets/legal/PRIVACY.fr.md',
+            termsAsset: Localizations.localeOf(context).languageCode == 'en'
+                ? 'assets/legal/TERMS.en.md'
+                : 'assets/legal/TERMS.fr.md',
             helpSectionTitle: t.legalHelpSection,
             legalSectionTitle: t.legalLegalSection,
             contactSupportTitle: t.legalContactSupport,
