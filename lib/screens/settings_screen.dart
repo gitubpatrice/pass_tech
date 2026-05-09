@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/material.dart';
 // ignore: unnecessary_import
 import 'package:flutter/semantics.dart';
@@ -622,10 +623,18 @@ class _SettingsScreenState extends State<SettingsScreen>
         XFile(file.path, mimeType: 'application/json'),
       ], subject: t.exportShareSubject);
     } finally {
-      // Suppression best-effort : sur Android, share_plus copie le fichier
-      // au consommateur via FileProvider donc on peut supprimer la source.
+      // F20 v2.3.7 — overwrite plaintext avec random bytes AVANT delete
+      // (best-effort — F2FS/SSD wear-leveling ne garantit pas l'effacement
+      // physique, mais empêche la récupération via lecture brute fichier).
       try {
-        if (file.existsSync()) file.deleteSync();
+        if (file.existsSync()) {
+          final len = file.lengthSync();
+          if (len > 0) {
+            final rand = SecretBytes.randomBytes(len);
+            file.writeAsBytesSync(rand, flush: true);
+          }
+          file.deleteSync();
+        }
       } catch (_) {}
     }
   }

@@ -19,6 +19,7 @@
 // classe. Tout le reste de l'app n'a JAMAIS besoin d'importer les parts —
 // l'unique import autorisé reste `package:pass_tech/services/vault_service.dart`.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -56,27 +57,38 @@ Uint8List pbkdf2Worker(List<dynamic> args) {
   final blocks = (keyLen / hLen).ceil();
   final dk = BytesBuilder();
 
-  for (int i = 1; i <= blocks; i++) {
-    final saltI = Uint8List(salt.length + 4);
-    saltI.setRange(0, salt.length, salt);
-    saltI[salt.length] = (i >> 24) & 0xFF;
-    saltI[salt.length + 1] = (i >> 16) & 0xFF;
-    saltI[salt.length + 2] = (i >> 8) & 0xFF;
-    saltI[salt.length + 3] = i & 0xFF;
+  try {
+    for (int i = 1; i <= blocks; i++) {
+      final saltI = Uint8List(salt.length + 4);
+      saltI.setRange(0, salt.length, salt);
+      saltI[salt.length] = (i >> 24) & 0xFF;
+      saltI[salt.length + 1] = (i >> 16) & 0xFF;
+      saltI[salt.length + 2] = (i >> 8) & 0xFF;
+      saltI[salt.length + 3] = i & 0xFF;
 
-    var u = Uint8List.fromList(hmacGen.convert(saltI).bytes);
-    final t = Uint8List.fromList(u);
+      var u = Uint8List.fromList(hmacGen.convert(saltI).bytes);
+      final t = Uint8List.fromList(u);
 
-    for (int j = 1; j < iterations; j++) {
-      u = Uint8List.fromList(hmacGen.convert(u).bytes);
-      for (int k = 0; k < t.length; k++) {
-        t[k] ^= u[k];
+      for (int j = 1; j < iterations; j++) {
+        u = Uint8List.fromList(hmacGen.convert(u).bytes);
+        for (int k = 0; k < t.length; k++) {
+          t[k] ^= u[k];
+        }
+      }
+      dk.add(t);
+    }
+    return dk.toBytes().sublist(0, keyLen);
+  } finally {
+    // F9 v2.3.7 — wipe le password reçu côté worker isolate (la copie
+    // transférée par compute() restait en RAM jusqu'à GC sinon).
+    if (password is Uint8List) {
+      try {
+        password.fillRange(0, password.length, 0);
+      } catch (_) {
+        // List<int> non-modifiable possible : best-effort.
       }
     }
-    dk.add(t);
   }
-
-  return dk.toBytes().sublist(0, keyLen);
 }
 
 enum UnlockResult { success, wrongPassword, lockedOut }
@@ -234,7 +246,28 @@ class VaultService {
 
   // ── Unlock ──────────────────────────────────────────────────────────────────
 
+  /// F5 v2.3.7 — mutex re-entrant : `unlock()` est lourd (2× PBKDF2 +
+  /// 2× Argon2id pour le déni plausible). Un double-tap UI rapide pouvait
+  /// lancer 2 unlocks en parallèle, doublant la conso CPU/RAM (OOM
+  /// possible sur Redmi 9C 3GB) et créant des races sur `_key`/`_entries`
+  /// pendant l'itération du déni plausible.
+  Completer<void>? _unlockGate;
+
   Future<UnlockResult> unlock(String masterPassword) async {
+    // F5 — refus immédiat si un unlock concurrent tourne déjà.
+    if (_unlockGate != null) {
+      return UnlockResult.wrongPassword;
+    }
+    final gate = _unlockGate = Completer<void>();
+    try {
+      return await _unlockInternal(masterPassword);
+    } finally {
+      gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  Future<UnlockResult> _unlockInternal(String masterPassword) async {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     // Déni plausible : on tente PBKDF2 sur CHAQUE slot, même si un slot
     // précédent a matché. Sinon le timing révèle l'existence du decoy
@@ -305,6 +338,10 @@ class VaultService {
     _entries = [];
     _isOpen = false;
     _activeSlot = null;
+    // F17 v2.3.7 — reset la référence BiometricStorageFile pour qu'un
+    // unlock biométrique post-panic re-acquière le storage proprement
+    // (sinon référence dangling vers un fichier potentiellement supprimé).
+    _bioFile = null;
   }
 
   // ── CRUD ────────────────────────────────────────────────────────────────────

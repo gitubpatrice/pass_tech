@@ -94,7 +94,9 @@ class HeritageService {
         await prefs.remove(_thresholdKey);
       }
     } catch (e) {
-      debugPrint('HeritageService._migrateFromPrefsIfNeeded failed: $e');
+      if (kDebugMode) {
+        debugPrint('HeritageService._migrateFromPrefsIfNeeded failed: $e');
+      }
     }
   }
 
@@ -127,7 +129,7 @@ class HeritageService {
       );
       await _storage.delete(key: _graceStartKey);
     } catch (e) {
-      debugPrint('HeritageService.markActive failed: $e');
+      if (kDebugMode) debugPrint('HeritageService.markActive failed: $e');
     }
   }
 
@@ -323,10 +325,12 @@ class HeritageService {
     };
 
     // Écriture atomique : tmp + rename (anti corruption sur crash mid-write)
+    // F26 v2.3.7 : POSIX rename() overwrite atomique. Le delete préalable
+    // créait une fenêtre où un kill OS entre delete et rename perdait le
+    // snapshot. rename() seul est l'invariant correct.
     final target = await _heirFile();
     final tmp = File('${target.path}.tmp');
     tmp.writeAsStringSync(jsonEncode(out), flush: true);
-    if (target.existsSync()) target.deleteSync();
     tmp.renameSync(target.path);
   }
 

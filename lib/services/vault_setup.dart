@@ -110,5 +110,17 @@ extension VaultSetup on VaultService {
     if (slot == _Slot.primary) {
       await deleteBiometricKey();
     }
+
+    // F27 v2.3.7 — purge du `.bak` v3 orphelin créé par `_migrateV3ToV4`.
+    // Reste sur disque chiffré avec l'ANCIEN password ; si l'utilisateur
+    // change le master parce qu'il pense l'ancien compromis, le .bak
+    // serait toujours brute-forçable avec ce password leaké.
+    try {
+      final src = await _vaultFileFor(slot);
+      final bak = File('${src.path}_v3.enc.bak');
+      if (await bak.exists()) await bak.delete();
+    } catch (_) {
+      // Best-effort : le bak n'existe peut-être plus (jamais migré v3).
+    }
   }
 }
