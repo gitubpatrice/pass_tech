@@ -93,7 +93,12 @@ class PassTechApp extends StatefulWidget {
 }
 
 class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
-  DateTime? _pausedAt;
+  /// B2 v2.3.8 — `Stopwatch` monotonique pour l'auto-lock après pause.
+  /// `DateTime.now()` suit l'horloge système : un attaquant root qui
+  /// recule la date après pause empêche l'auto-lock de déclencher.
+  /// `Stopwatch.elapsedMilliseconds` ne se laisse pas tromper.
+  int? _pausedAtMonoMs;
+  static final Stopwatch _stopwatch = Stopwatch()..start();
 
   @override
   void initState() {
@@ -118,8 +123,14 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   }
 
   Future<void> _handleLifecycle(AppLifecycleState state) async {
-    if (state == AppLifecycleState.paused) {
-      _pausedAt = DateTime.now();
+    // B3 v2.3.8 — étendu à `inactive` et `hidden` en plus de `paused`
+    // (Android 14+ predictive back gesture peut rester en `inactive`
+    // plusieurs secondes avec clipboard populé).
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      // B2 — horodatage monotonique (Stopwatch) immune au clock-skew.
+      _pausedAtMonoMs ??= _stopwatch.elapsedMilliseconds;
       // Wipe clipboard immediately on background : don't risk leaving secrets
       // in the clipboard if the OS kills the process before the timer fires.
       await ClipboardService.cancelAndClear();
@@ -128,8 +139,8 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // Immediate lock: wipe key now, navigate on resume
       if (lockSec == 0 && VaultService().isOpen) VaultService().lock();
     } else if (state == AppLifecycleState.resumed) {
-      final paused = _pausedAt;
-      _pausedAt = null;
+      final pausedMs = _pausedAtMonoMs;
+      _pausedAtMonoMs = null;
 
       // If vault was locked while paused (immediate option) → go to unlock
       if (!VaultService().isOpen) {
@@ -143,8 +154,8 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final lockSec = prefs.getInt('auto_lock_seconds') ?? 300;
       if (lockSec < 0) return; // never
-      if (paused != null &&
-          DateTime.now().difference(paused).inSeconds >= lockSec &&
+      if (pausedMs != null &&
+          _stopwatch.elapsedMilliseconds - pausedMs >= lockSec * 1000 &&
           VaultService().isOpen) {
         VaultService().lock();
         _navigatorKey.currentState?.pushAndRemoveUntil(

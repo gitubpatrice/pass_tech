@@ -92,6 +92,11 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("OPEN_ERROR", e.message, null)
                         }
                     }
+                    "clearSnapshot" -> {
+                        // A5 v2.3.8 — purge le domaine en cours (panic + vault lock).
+                        PhishingDetectorService.clearSnapshot()
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

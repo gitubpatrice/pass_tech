@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import 'aead_service.dart';
 import 'kdf_service.dart';
+import 'monotonic_clock.dart';
 import 'vault_service.dart';
 
 /// Héritage / dead man's switch — accès aux données du coffre par un héritier
@@ -123,10 +124,9 @@ class HeritageService {
     // ne se reset pas → l'héritier accède plus tôt que prévu, ce qui est
     // moins grave qu'un échec d'unlock visible à l'utilisateur.
     try {
-      await _storage.write(
-        key: _lastActiveKey,
-        value: DateTime.now().millisecondsSinceEpoch.toString(),
-      );
+      // A6 v2.3.8 — horloge monotone (anti clock-skew root).
+      final now = await MonotonicClock.nowMs();
+      await _storage.write(key: _lastActiveKey, value: now.toString());
       await _storage.delete(key: _graceStartKey);
     } catch (e) {
       if (kDebugMode) debugPrint('HeritageService.markActive failed: $e');
@@ -140,7 +140,9 @@ class HeritageService {
     final v = await _storage.read(key: _lastActiveKey);
     final ts = int.tryParse(v ?? '');
     if (ts == null) return -1;
-    final diff = DateTime.now().millisecondsSinceEpoch - ts;
+    final now = await MonotonicClock.nowMs();
+    final diff = now - ts;
+    if (diff < 0) return 0;
     return diff ~/ (1000 * 60 * 60 * 24);
   }
 
@@ -148,10 +150,8 @@ class HeritageService {
   /// chaque ouverture de l'app si l'inactivité dépasse le seuil.
   Future<void> startGraceIfNeeded() async {
     if (await _storage.containsKey(key: _graceStartKey)) return;
-    await _storage.write(
-      key: _graceStartKey,
-      value: DateTime.now().millisecondsSinceEpoch.toString(),
-    );
+    final now = await MonotonicClock.nowMs();
+    await _storage.write(key: _graceStartKey, value: now.toString());
   }
 
   /// Jours restants de la période de grâce. -1 si pas démarrée.
@@ -160,7 +160,8 @@ class HeritageService {
     final v = await _storage.read(key: _graceStartKey);
     final ts = int.tryParse(v ?? '');
     if (ts == null) return -1;
-    final elapsed = DateTime.now().millisecondsSinceEpoch - ts;
+    final now = await MonotonicClock.nowMs();
+    final elapsed = now - ts;
     final remainingMs = _gracePeriodDays * 24 * 60 * 60 * 1000 - elapsed;
     if (remainingMs <= 0) return 0;
     return (remainingMs / (1000 * 60 * 60 * 24)).ceil();

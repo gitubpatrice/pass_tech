@@ -1300,6 +1300,12 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
 
   @override
   void dispose() {
+    // B8 v2.3.8 — clear AVANT dispose : signal d'intention de wipe
+    // (String Dart reste immutable, mais ça libère la référence du
+    // controller plus tôt et fait écrire du vide dans toute couche
+    // d'observabilité Flutter qui sniffe le controller).
+    _ctrl1.clear();
+    _ctrl2.clear();
     _ctrl1.dispose();
     _ctrl2.dispose();
     super.dispose();
@@ -1387,6 +1393,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
 
   @override
   void dispose() {
+    // B9 v2.3.8 — clear master password ctrls avant dispose.
+    _ctrl1.clear();
+    _ctrl2.clear();
     _ctrl1.dispose();
     _ctrl2.dispose();
     super.dispose();

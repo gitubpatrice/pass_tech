@@ -19,6 +19,13 @@ class PanicService {
 
   /// Action panique complète : lock + clipboard + disguise.
   /// Best-effort sur chaque étape — un échec n'empêche pas les autres.
+  /// A5 v2.3.8 — channel anti-phishing pour purger le snapshot du domaine
+  /// en cours (qui survivait à `panic()` jusqu'à expiration des 15s
+  /// `FRESHNESS_MS` côté Kotlin).
+  static const _phishingChannel = MethodChannel(
+    'com.passtech.pass_tech/antiphishing',
+  );
+
   static Future<void> panic({bool disguise = true}) async {
     // 1. Lock vault (synchrone, garanti)
     try {
@@ -28,7 +35,13 @@ class PanicService {
     try {
       await ClipboardService.cancelAndClear();
     } catch (_) {}
-    // 3. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
+    // 3. A5 v2.3.8 — purge du snapshot du domaine anti-phishing.
+    try {
+      await _phishingChannel.invokeMethod('clearSnapshot');
+    } catch (_) {
+      /* AS désactivée, ignore */
+    }
+    // 4. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
     if (disguise) {
       try {
         await _channel.invokeMethod('setDisguised', {'disguised': true});

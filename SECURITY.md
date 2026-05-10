@@ -8,9 +8,9 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 | Version       | Supportée  |
 | ------------- | ---------- |
-| 2.0.x         | ✅          |
-| 1.12.x        | ⚠️ migration uniquement (lecture v3 → v4) |
-| < 1.12.0      | ❌          |
+| 2.3.x         | ✅          |
+| 2.0.x – 2.2.x | ⚠️ migration uniquement |
+| < 2.0.0       | ❌          |
 
 ## Signaler une vulnérabilité
 

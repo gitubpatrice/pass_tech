@@ -70,6 +70,16 @@ class PhishingDetectorService : AccessibilityService() {
             }
 
         /**
+         * A5 v2.3.8 — purge le snapshot du domaine en cours.
+         * Appelé par `PanicService` (Dart → MethodChannel) et par
+         * `VaultService.lock()` pour s'assurer qu'aucun domaine sensible
+         * (banque, etc.) ne survit après lock du coffre.
+         */
+        fun clearSnapshot() {
+            _snapshot = null
+        }
+
+        /**
          * Mapping resourceId → package navigateur. Ajouts simples pour
          * supporter de nouveaux navigateurs.
          *

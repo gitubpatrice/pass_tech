@@ -30,14 +30,19 @@ class PasswordStrengthService {
 
   /// Estime l'entropie en bits pour une chaîne donnée :
   /// log2(pool^len) = len * log2(pool), où pool est la somme des
-  /// classes de caractères présentes (26+26+10+~32).
+  /// classes de caractères présentes (26+26+10+26).
+  ///
+  /// D7 v2.3.8 — pool symboles aligné à 26 (vs 32 auparavant) pour
+  /// matcher le set effectif du générateur (`_syms` = 26 chars).
+  /// Avant : entropie surestimée d'environ 16% pour les mots de passe
+  /// générés (différence cohérente cross-écran maintenant).
   static double entropyBits(String pwd) {
     if (pwd.isEmpty) return 0;
     var pool = 0;
     if (_upper.hasMatch(pwd)) pool += 26;
     if (_lower.hasMatch(pwd)) pool += 26;
     if (_digit.hasMatch(pwd)) pool += 10;
-    if (_symbol.hasMatch(pwd)) pool += 32;
+    if (_symbol.hasMatch(pwd)) pool += 26;
     if (pool == 0) return 0;
     return pwd.length * (log(pool) / ln2);
   }

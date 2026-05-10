@@ -75,6 +75,14 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
 
   @override
   void dispose() {
+    // B12 v2.3.8 — clear AVANT dispose pour tous les controllers tenant
+    // des secrets (password, TOTP, CVV, PIN, card number, notes).
+    _passCtrl.clear();
+    _totpCtrl.clear();
+    _cvvCtrl.clear();
+    _pinCtrl.clear();
+    _numberCtrl.clear();
+    _notesCtrl.clear();
     _titleCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();

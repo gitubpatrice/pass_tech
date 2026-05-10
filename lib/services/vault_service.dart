@@ -81,13 +81,23 @@ Uint8List pbkdf2Worker(List<dynamic> args) {
   } finally {
     // F9 v2.3.7 — wipe le password reçu côté worker isolate (la copie
     // transférée par compute() restait en RAM jusqu'à GC sinon).
+    // A8 v2.3.8 — pattern aligné `SecretBytes.wipe` (handle Uint8List
+    // non-modifiable retourné par certains FFI). Pour les List<int>
+    // autres que Uint8List, on tente un overwrite via setRange best-effort.
     if (password is Uint8List) {
+      SecretBytes.wipe(password);
+    } else {
       try {
-        password.fillRange(0, password.length, 0);
+        for (var i = 0; i < password.length; i++) {
+          password[i] = 0;
+        }
       } catch (_) {
-        // List<int> non-modifiable possible : best-effort.
+        // List<int> immutable (rare via compute) : best-effort, GC nettoiera.
       }
     }
+    // Wipe aussi le buffer dérivé intermédiaire (dk.toBytes() retourne une
+    // copie ; le sublist final est seul retenu). On n'a pas accès au
+    // buffer du BytesBuilder, mais return + immutable view minimise.
   }
 }
 

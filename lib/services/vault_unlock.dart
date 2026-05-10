@@ -198,6 +198,14 @@ extension VaultUnlock on VaultService {
     final wrapNonce = base64Decode(kek['wrapNonce'] as String);
     final alias = kek['alias'] as String;
 
+    // A3 v2.3.8 — défense en profondeur : refuse les blobs cross-slot.
+    // Avant : un attaquant root copiant pt_vault_decoy.enc sur le chemin
+    // pt_vault.enc faisait quand même tourner un unwrap KEK decoy (la
+    // protection AEAD finale neutralisait l'attaque mais on consommait
+    // un appel TEE → side channel mineur). Maintenant : refuse immédiat
+    // si alias ne match pas le slot tenté.
+    if (alias != _aliasFor(slot)) return null;
+
     Uint8List? pwHash;
     Uint8List? hwSecret;
     Uint8List? finalKey;
