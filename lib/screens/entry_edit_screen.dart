@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
+import '../services/secure_window.dart';
 import '../services/totp_service.dart';
 import '../services/vault_service.dart';
 import '../widgets/password_text_field.dart';
@@ -71,10 +72,23 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       // Sensible default categories per type
       _category = _type == EntryType.card ? 'Banque' : 'Autres';
     }
+    // v2.3.8 — sur l'écran d'édition d'une **Note**, on relâche
+    // FLAG_SECURE pour permettre copier/coller/sélectionner du système
+    // (bloqué par Samsung Knox quand FLAG_SECURE est actif). Les autres
+    // types (password, card, identity) gardent FLAG_SECURE actif pour
+    // protéger les secrets contre les screenshots.
+    if (_type == EntryType.note) {
+      SecureWindow.relax();
+    }
   }
 
   @override
   void dispose() {
+    // v2.3.8 — restaure FLAG_SECURE si on l'avait relâché pour le type Note.
+    // À faire AVANT le wipe controllers pour rester symétrique avec initState.
+    if (_type == EntryType.note) {
+      SecureWindow.restore();
+    }
     // B12 v2.3.8 — clear AVANT dispose pour tous les controllers tenant
     // des secrets (password, TOTP, CVV, PIN, card number, notes).
     _passCtrl.clear();

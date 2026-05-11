@@ -24,12 +24,19 @@ class MainActivity : FlutterFragmentActivity() {
     private val raspChannel = "com.passtech.pass_tech/rasp"
     private val disguiseChannel = "com.passtech.pass_tech/disguise"
     private val antiPhishingChannel = "com.passtech.pass_tech/antiphishing"
+    private val secureWindowChannel = "com.passtech.pass_tech/secure_window"
     // v4 hardening : KeystoreBridge enregistré via registerKeystoreBridge()
     // (constante CHANNEL_NAME = "com.passtech.pass_tech/keystore").
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Block screenshots, screen recording, and the recent-apps preview thumbnail
+        // v2.3.8 — FLAG_SECURE posé au boot par défaut (bloque screenshots,
+        // enregistrement écran, aperçu Recent Apps). Désactivable
+        // dynamiquement via le MethodChannel `secure_window/setSecure`
+        // sur les écrans où FLAG_SECURE casse une UX critique — typiquement
+        // l'éditeur de Notes sécurisées où Samsung Knox + FLAG_SECURE bloque
+        // copier/coller/sélectionner du système. Le flag reste posé sur
+        // tous les écrans qui affichent un mot de passe en clair.
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE
@@ -42,6 +49,36 @@ class MainActivity : FlutterFragmentActivity() {
         // v4 hardening : MethodChannel "com.passtech.pass_tech/keystore" pour
         // enveloppe AES/GCM Keystore-bound (KEK 256 bits, AndroidKeyStore).
         registerKeystoreBridge(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
+        // v2.3.8 — setSecure dynamique : active/désactive FLAG_SECURE
+        // sur la fenêtre courante. Doit être appelé sur le thread UI
+        // (runOnUiThread). Utilisé par `SecureWindow` Dart pour relâcher
+        // le flag sur l'éditeur de Notes (texte libre, copier/coller
+        // nécessaire) et le re-poser à la sortie de l'écran.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, secureWindowChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setSecure" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: true
+                        runOnUiThread {
+                            try {
+                                if (enabled) {
+                                    window.setFlags(
+                                        WindowManager.LayoutParams.FLAG_SECURE,
+                                        WindowManager.LayoutParams.FLAG_SECURE,
+                                    )
+                                } else {
+                                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                }
+                                result.success(null)
+                            } catch (e: Exception) {
+                                result.error("SECURE_WINDOW_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, secureClipboardChannel)
             .setMethodCallHandler { call, result ->
