@@ -76,6 +76,20 @@ extension VaultStorage on VaultService {
       plaintext: ptBytes,
       aad: aad,
     );
+    // P1-9 v2.4.0 — wipe le plaintext en RAM dès que le ciphertext est
+    // obtenu. Avant : `ptBytes` (JSON sérialisé contenant tous les mots
+    // de passe en clair) traînait jusqu'au prochain GC. `plainText`
+    // (Uint8List vue de utf8.encode) wipée aussi best-effort.
+    try {
+      ptBytes.fillRange(0, ptBytes.length, 0);
+    } catch (_) {
+      /* unmodifiable view possible — cf. memory secretbytes_wipe_unmodifiable */
+    }
+    try {
+      plainText.fillRange(0, plainText.length, 0);
+    } catch (_) {
+      /* best-effort */
+    }
     // GCM "data" field = ciphertext || tag, mirrors Android Cipher.doFinal.
     final cipherAndTag = aead.cipherAndTag;
 

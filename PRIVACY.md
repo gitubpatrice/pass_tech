@@ -1,6 +1,6 @@
 # Privacy Policy — Pass Tech
 
-**Document version** : 10 May 2026 (Pass Tech v2.3.11)
+**Document version** : 11 May 2026 (Pass Tech v2.4.0)
 **App** : Pass Tech
 **Website** : https://www.files-tech.com
 **Contact** : contact@files-tech.com

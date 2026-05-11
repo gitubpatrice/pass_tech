@@ -67,6 +67,18 @@ class SecureWindow {
         /* silent */
       }
       _initialized = true; // bloque tout futur init()
+    } else {
+      // P0-2 v2.4.0 — re-activation à chaud : on reset `_initialized` pour
+      // que `init()` puisse re-poser FLAG_SECURE. Et on tente immédiatement
+      // de le reposer ici (évite la fenêtre entre setUserDisabled=false et
+      // le prochain `init()` qui pourrait être omis).
+      _initialized = false;
+      try {
+        await _channel.invokeMethod('setSecure', {'enabled': true});
+        _initialized = true;
+      } catch (_) {
+        /* silent — init() pourra ré-essayer */
+      }
     }
   }
 

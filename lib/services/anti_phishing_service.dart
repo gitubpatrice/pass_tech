@@ -67,6 +67,21 @@ class AntiPhishingService {
     await prefs.setBool(_prefsKey, enabled);
   }
 
+  /// v2.4.0 / P0-1 — Purge le snapshot (domaine bancaire courant) côté
+  /// natif. À appeler depuis `VaultService.lock()` et `PanicService.panic()` :
+  /// sans ça, un domaine sensible reste en RAM jusqu'à 15 s après lock,
+  /// récupérable par instrumentation native.
+  ///
+  /// Statique car appelable depuis n'importe quel contexte sans instance ;
+  /// best-effort si le channel n'est pas joignable (non bloquant).
+  static Future<void> clearSnapshot() async {
+    try {
+      await _channel.invokeMethod('clearSnapshot');
+    } catch (_) {
+      /* silent — best-effort */
+    }
+  }
+
   /// True si l'AccessibilityService est activé côté Réglages Android.
   /// L'utilisateur DOIT l'activer manuellement (sécurité système).
   Future<bool> get isAccessibilityServiceActive async {

@@ -70,10 +70,16 @@ class PhishingDetectorService : AccessibilityService() {
             }
 
         /**
-         * A5 v2.3.8 — purge le snapshot du domaine en cours.
-         * Appelé par `PanicService` (Dart → MethodChannel) et par
-         * `VaultService.lock()` pour s'assurer qu'aucun domaine sensible
-         * (banque, etc.) ne survit après lock du coffre.
+         * A5 v2.3.8 / P0-1 v2.4.0 — purge le snapshot du domaine en cours.
+         * Appelé via MethodChannel `com.passtech.pass_tech/antiphishing`
+         * action `clearSnapshot` depuis :
+         * - `PanicService.panic()` (mode panique)
+         * - `VaultService.lock()` (auto-lock, lock explicite, lifecycle paused)
+         *   via le wrapper Dart `AntiPhishingService.clearSnapshot()`.
+         *
+         * Sans cet appel, le dernier domaine sensible visité (ex. URL bancaire)
+         * resterait dans `_snapshot` jusqu'à expiration de FRESHNESS_MS (~15 s),
+         * exploitable par instrumentation native juste après lock.
          */
         fun clearSnapshot() {
             _snapshot = null

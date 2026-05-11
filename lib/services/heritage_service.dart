@@ -56,10 +56,10 @@ class HeritageService {
   static const _defaultThresholdDays = 90;
   static const _gracePeriodDays = 7;
 
-  // Argon2id baseline (cohérent avec VaultService v4).
-  static const _argon2M = 19456;
-  static const _argon2T = 2;
-  static const _argon2P = 1;
+  // Argon2id baseline — source unique : KdfParams.owaspMobile2024.
+  static final _argon2M = KdfParams.owaspMobile2024.memoryKiB;
+  static final _argon2T = KdfParams.owaspMobile2024.iterations;
+  static final _argon2P = KdfParams.owaspMobile2024.parallelism;
 
   /// True si un snapshot héritage a déjà été configuré.
   Future<bool> get isEnabled async {

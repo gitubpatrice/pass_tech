@@ -35,8 +35,10 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/entry.dart';
 import 'aead_service.dart';
+import 'anti_phishing_service.dart';
 import 'kdf_service.dart';
 import 'keystore_service.dart';
+import 'monotonic_clock.dart';
 
 part 'vault_brute_force.dart';
 part 'vault_crypto.dart';
@@ -202,10 +204,11 @@ class VaultService {
   static const _currentVersion = 4;
   static const _vaultMagic = 'PTVAULT';
 
-  // Argon2id baseline (decision verrouillée — ROADMAP_HARDENING.md §3).
-  static const _argon2M = 19456; // KiB
-  static const _argon2T = 2;
-  static const _argon2P = 1;
+  // Argon2id baseline — source unique : KdfParams.owaspMobile2024.
+  // (decision verrouillée — ROADMAP_HARDENING.md §3).
+  static final _argon2M = KdfParams.owaspMobile2024.memoryKiB;
+  static final _argon2T = KdfParams.owaspMobile2024.iterations;
+  static final _argon2P = KdfParams.owaspMobile2024.parallelism;
 
   // Brute-force protection: progressive lockout after 5 fails
   static const _failThreshold = 5;
@@ -352,6 +355,11 @@ class VaultService {
     // unlock biométrique post-panic re-acquière le storage proprement
     // (sinon référence dangling vers un fichier potentiellement supprimé).
     _bioFile = null;
+    // P0-1 v2.4.0 — purge le snapshot anti-phishing (domaine bancaire
+    // courant) côté natif. Sans ça, le domaine reste en RAM ~15 s post-lock,
+    // récupérable par instrumentation. Fire-and-forget : le lock() reste
+    // synchrone côté caller (auto-lock timer, lifecycle), best-effort.
+    unawaited(AntiPhishingService.clearSnapshot());
   }
 
   // ── CRUD ────────────────────────────────────────────────────────────────────

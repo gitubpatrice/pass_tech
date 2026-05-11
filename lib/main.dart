@@ -85,9 +85,12 @@ void main() async {
   // Pose FLAG_SECURE depuis Dart APRÈS création de la window si l'utilisateur
   // n'a pas désactivé la protection. Sans ce timing post-window-creation,
   // Samsung One UI + Knox refuse de propager les clearFlags ultérieurs.
-  // Fire-and-forget : non bloquant pour le boot.
-  // ignore: unawaited_futures
-  SecureWindow.init();
+  //
+  // P0-3 v2.4.0 — `await` (au lieu de fire-and-forget v2.3.11) : sans ce
+  // await, un utilisateur rapide pourrait naviguer entre `runApp` et la
+  // propagation effective de `setSecure(true)` côté UI thread (~50 ms),
+  // créant une fenêtre brève où screenshot serait possible.
+  await SecureWindow.init();
 
   ClipboardService.clearAfterSeconds = prefs.getInt('clipboard_clear') ?? 30;
   themeNotifier.value = parseThemeMode(

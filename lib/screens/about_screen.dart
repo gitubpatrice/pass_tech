@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:files_tech_core/files_tech_core.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_update.dart';
-import 'package:files_tech_core/files_tech_core.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -11,10 +12,22 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _version = '2.3.11';
+  /// P1-13 v2.4.0 — version lue dynamiquement via PackageInfo (pas de
+  /// constante hardcodée). Empêche la désynchronisation pubspec ↔ écran
+  /// "À propos" lors d'un bump oublié.
+  String _version = '';
   static const _author = 'Patrice Haltaya';
 
   bool _checkingUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (!mounted) return;
+      setState(() => _version = info.version);
+    });
+  }
 
   List<({IconData icon, String label, String desc})> _featuresFor(
     AppLocalizations t,

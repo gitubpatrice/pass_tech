@@ -45,6 +45,12 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
   bool _saving = false;
   String? _totpError;
 
+  /// P0-4 v2.4.0 — flag posé quand on appelle `SecureWindow.relax()` en
+  /// initState pour garantir que `restore()` n'est appelé QUE si on a
+  /// effectivement relaxé. Si une future itération mute `_type` en cours
+  /// d'édition, la symétrie reste préservée.
+  bool _relaxedFlagSecure = false;
+
   bool get _isEdit => widget.entry != null;
 
   @override
@@ -77,8 +83,14 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     // (bloqué par Samsung Knox quand FLAG_SECURE est actif). Les autres
     // types (password, card, identity) gardent FLAG_SECURE actif pour
     // protéger les secrets contre les screenshots.
+    //
+    // P0-4 v2.4.0 — on mémorise `_relaxedFlagSecure` AU MOMENT de l'appel
+    // à `relax()`, pour que `restore()` soit appelé en dispose UNIQUEMENT
+    // si on avait effectivement relâché. Sans ce flag, si `_type` mutait
+    // entre initState et dispose, le refcount SecureWindow divergerait.
     if (_type == EntryType.note) {
       SecureWindow.relax();
+      _relaxedFlagSecure = true;
     }
   }
 
@@ -86,7 +98,8 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
   void dispose() {
     // v2.3.8 — restaure FLAG_SECURE si on l'avait relâché pour le type Note.
     // À faire AVANT le wipe controllers pour rester symétrique avec initState.
-    if (_type == EntryType.note) {
+    // P0-4 v2.4.0 — symétrie garantie par le flag posé en initState.
+    if (_relaxedFlagSecure) {
       SecureWindow.restore();
     }
     // B12 v2.3.8 — clear AVANT dispose pour tous les controllers tenant

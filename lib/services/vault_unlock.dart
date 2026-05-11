@@ -244,6 +244,23 @@ extension VaultUnlock on VaultService {
   /// biometric_storage et utilisée directement (pas d'Argon2id ni d'unwrap KEK).
   /// Le tag GCM lié à l'AAD garantit fail-closed si la clé ne correspond pas.
   Future<UnlockResult> unlockWithBiometric() async {
+    // P1-27 v2.4.0 — mutex `_unlockGate` étendu à la bio. Avant : un user
+    // qui tape password puis fingerprint avant que le 1er unlock complète
+    // déclenchait 2 paths en parallèle (`_key`, `_entries` mutables) →
+    // corruption possible. Refus immédiat si un unlock concurrent tourne.
+    if (_unlockGate != null) {
+      return UnlockResult.wrongPassword;
+    }
+    final gate = _unlockGate = Completer<void>();
+    try {
+      return await _unlockWithBiometricInternal();
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  Future<UnlockResult> _unlockWithBiometricInternal() async {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     try {
       final store = await _bioStorage();

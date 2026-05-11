@@ -8,7 +8,8 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 | Version       | Supportée  |
 | ------------- | ---------- |
-| 2.3.x         | ✅          |
+| 2.4.x         | ✅          |
+| 2.3.x         | ⚠️ legacy (mettre à jour) |
 | 2.0.x – 2.2.x | ⚠️ migration uniquement |
 | < 2.0.0       | ❌          |
 
