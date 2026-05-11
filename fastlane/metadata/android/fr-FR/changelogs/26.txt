@@ -1,0 +1,20 @@
+v2.4.0 — Audit zéro-vuln zéro-faille + bascule FLAG_SECURE (mai 2026)
+
+Audit sécurité
+* Revue expert zéro-vuln zéro-faille : A1-A20 + B1-B24 corrigés
+* Service MonotonicClock partagé (anti rollback root)
+* Version dynamique via PackageInfo (anti désync constante statique)
+* clear() + dispose() sur contrôleurs sensibles (passphrase, change pwd,
+  édition d'entrée) pour effacer les SecretBytes immédiatement
+* Purge du snapshot anti-phishing en mode panique (clearSnapshot)
+* Vérification d'alias _v4Unlock, motif wipe SecretBytes pour pbkdf2Worker
+
+UX
+* FLAG_SECURE dynamique (MethodChannel Kotlin avec refcount) : relâché
+  pour l'édition des Notes afin que Samsung Knox n'occulte pas la
+  suggestion « Coller » ; conservé actif sur les entrées mot de passe
+  / carte / identité
+* Toggle Paramètres « Bloquer les captures d'écran » depuis v2.3.11
+* Boutons explicites Coller / Copier / Tout sélectionner sur les Notes
+
+flutter analyze : 0 erreur, 0 warning. 38/38 tests verts.

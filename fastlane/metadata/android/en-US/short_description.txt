@@ -1,0 +1,1 @@
+100% local password manager. Argon2id + AES-256-GCM + Keystore-bound KEK.

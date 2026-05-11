@@ -1,0 +1,1 @@
+Gestionnaire de mots de passe 100 % local. Argon2id + AES-256-GCM.

@@ -1,0 +1,32 @@
+Pass Tech est un gestionnaire de mots de passe 100 % local pour Android.
+Aucun cloud, aucun compte, aucun serveur, aucun tracker, aucune publicité.
+
+<b>Cryptographie (v4)</b>
+* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
+* AES-256-GCM avec AAD anti-downgrade
+* KEK Keystore-bound (StrongBox/TEE) avec HKDF-SHA256
+* CSPRNG via Random.secure
+* Vérification HMAC en temps constant
+* Brute-force lockout exponentiel (1, 2, 4, 8, 16 minutes) basé sur une
+  horloge monotonique (anti rollback root)
+
+<b>Confidentialité</b>
+* Anti-phishing par domaine (AccessibilityService minimal)
+* Coffre leurre anti-coercition (déni plausible avec timing aligné)
+* Mode panique : destruction immédiate de la KEK Keystore
+* Camouflage launcher (icône déguisée en Calculatrice)
+* Héritage post-inactivité (dead-man's switch)
+* FLAG_SECURE actif par défaut sur les entrées mot de passe / carte /
+  identité (réglable dans les Paramètres depuis v2.3.11) — les entrées
+  Note relâchent FLAG_SECURE pour que Samsung Knox n'occulte pas la
+  suggestion de coller
+* Permission INTERNET utilisée uniquement pour la vérification de mise
+  à jour anonyme via l'API GitHub Releases ; aucune collecte de données
+
+<b>Audit (v2.3.8 → v2.4.0)</b>
+Audit expert zéro-vuln zéro-faille : A1-A20 + B1-B24 corrigés.
+FLAG_SECURE dynamique via Kotlin MethodChannel avec refcount, service
+MonotonicClock partagé, version dynamique via PackageInfo, contrôleurs
+sensibles clear()+dispose(), purge du snapshot anti-phishing en panique.
+
+<b>Open source</b> Apache 2.0 — code intégral sur GitHub.

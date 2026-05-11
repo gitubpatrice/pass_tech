@@ -1,0 +1,19 @@
+v2.4.0 — Zero-vuln zero-flaw audit + FLAG_SECURE toggle (May 2026)
+
+Security audit
+* Zero-vuln zero-flaw expert review: A1-A20 + B1-B24 findings closed
+* MonotonicClock service shared across services (anti root rollback)
+* PackageInfo-driven version display (no static const drift)
+* clear() + dispose() on sensitive controllers (passphrase, change pwd,
+  entry edit) to wipe SecretBytes promptly
+* Panic phishing-snapshot purge (clearSnapshot in PanicService)
+* _v4Unlock alias check, pbkdf2Worker SecretBytes wipe pattern
+
+UX
+* Dynamic FLAG_SECURE (Kotlin MethodChannel with refcount): relaxed for
+  Notes entry editing so Samsung Knox doesn't hide "Paste" suggestion;
+  kept active on password / card / identity entries
+* Settings toggle "Block screenshots" since v2.3.11
+* Explicit Paste / Copy / Select All buttons on Notes entries
+
+flutter analyze: 0 error 0 warning. 38/38 tests pass.
