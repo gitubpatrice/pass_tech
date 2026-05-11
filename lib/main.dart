@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
-import 'services/clipboard_service.dart';
 import 'services/app_update.dart';
+import 'services/clipboard_service.dart';
+import 'services/secure_window.dart';
 import 'services/vault_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/setup_screen.dart';
@@ -63,6 +64,15 @@ String themeModeToString(ThemeMode m) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // v2.3.9 — pose FLAG_SECURE depuis Dart APRÈS création de la window.
+  // MainActivity.onCreate ne pose plus le flag — Samsung Knox refuse de
+  // propager un `clearFlags(FLAG_SECURE)` ultérieur si le flag était
+  // appliqué à la création. Init depuis Dart contourne le piège tout en
+  // gardant les screenshots / aperçu Recent Apps bloqués sur tous les
+  // écrans (sauf relâchement explicite via `SecureWindow.relax()`).
+  // Fire-and-forget : non bloquant pour le boot.
+  // ignore: unawaited_futures
+  SecureWindow.init();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );

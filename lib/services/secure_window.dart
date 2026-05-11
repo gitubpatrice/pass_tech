@@ -40,6 +40,31 @@ class SecureWindow {
   /// quand il retombe à 0.
   static int _relaxCount = 0;
 
+  /// True après le premier `init()`. Re-entrance safe.
+  static bool _initialized = false;
+
+  /// Pose FLAG_SECURE sur la window APRÈS sa création (depuis Dart).
+  /// À appeler une fois au démarrage dans `main()` juste après
+  /// `WidgetsFlutterBinding.ensureInitialized()`.
+  ///
+  /// Pourquoi pas dans `MainActivity.onCreate` ? Sur Samsung One UI +
+  /// Knox, l'état initial de la window au moment de sa création est
+  /// mémorisé par les composants système (clipboard, IME, toolbar de
+  /// sélection). Si FLAG_SECURE est posé à `onCreate`, un
+  /// `clearFlags(FLAG_SECURE)` ultérieur ne propage pas vers ces
+  /// composants → copier/coller restent bloqués. Poser FLAG_SECURE
+  /// APRÈS la création (depuis Dart, post-runApp) évite ce piège tout
+  /// en préservant la protection screenshots / aperçu Recent Apps.
+  static Future<void> init() async {
+    if (_initialized) return;
+    try {
+      await _channel.invokeMethod('setSecure', {'enabled': true});
+      _initialized = true;
+    } catch (_) {
+      /* silent — non bloquant */
+    }
+  }
+
   /// Demande la désactivation temporaire de FLAG_SECURE pour permettre
   /// les opérations clipboard / sélection système. À appeler dans
   /// `initState` d'un écran qui nécessite ces interactions.

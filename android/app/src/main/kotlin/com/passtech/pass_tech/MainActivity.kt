@@ -30,17 +30,20 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // v2.3.8 — FLAG_SECURE posé au boot par défaut (bloque screenshots,
-        // enregistrement écran, aperçu Recent Apps). Désactivable
-        // dynamiquement via le MethodChannel `secure_window/setSecure`
-        // sur les écrans où FLAG_SECURE casse une UX critique — typiquement
-        // l'éditeur de Notes sécurisées où Samsung Knox + FLAG_SECURE bloque
-        // copier/coller/sélectionner du système. Le flag reste posé sur
-        // tous les écrans qui affichent un mot de passe en clair.
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // v2.3.9 — FLAG_SECURE n'est PLUS posé à onCreate.
+        //
+        // Raison : sur Samsung One UI + Knox, quand FLAG_SECURE est appliqué
+        // à la création de la window, un `clearFlags(FLAG_SECURE)` ultérieur
+        // ne propage PAS aux composants système (clipboard manager, IME,
+        // sélection toolbar) qui se basent sur l'état initial. Conséquence
+        // observée v2.3.8 : copier/coller/sélectionner bloqués dans
+        // l'éditeur de Notes même après relâchement explicite du flag.
+        //
+        // Pattern aligné PDF Tech v1.12.2 / Read Files Tech v2.12.x : la
+        // window démarre en "non sécurisée" et `SecureWindow.init()` côté
+        // Dart pose FLAG_SECURE via le MethodChannel APRÈS la création de
+        // la window. Le toggle dynamique fonctionne ensuite normalement
+        // (relax/restore depuis n'importe quel écran).
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
