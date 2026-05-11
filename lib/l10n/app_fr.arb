@@ -545,5 +545,12 @@
   "passphraseErrorMin": "Minimum 12 caractères",
   "passphraseErrorMismatch": "Les passphrases ne correspondent pas",
   "passphraseEncryptCta": "Chiffrer",
-  "passphraseDecryptCta": "Déchiffrer"
+  "passphraseDecryptCta": "Déchiffrer",
+  "noteActionPaste": "Coller",
+  "noteActionCopyAll": "Tout copier",
+  "noteActionSelectAll": "Tout sélectionner",
+  "noteActionClipboardEmpty": "Presse-papier vide",
+  "noteActionPasted": "Texte collé",
+  "noteActionCopied": "Note copiée",
+  "noteActionAllSelected": "Tout le texte est sélectionné"
 }

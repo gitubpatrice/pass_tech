@@ -470,6 +470,36 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     return [
       _label(t.entryEditFieldContent),
       const SizedBox(height: 6),
+      // v2.3.10 — barre d'actions explicites au-dessus du champ Note.
+      // Garantit que Coller/Copier/Tout sélectionner sont accessibles
+      // même quand Samsung Knox bloque le menu contextuel système
+      // (effet de bord de FLAG_SECURE qui interfère avec le clipboard
+      // au niveau Android). Utilise l'API `Clipboard` Dart qui opère au
+      // niveau app — fiable indépendamment de Knox/OEM.
+      Wrap(
+        spacing: 4,
+        children: [
+          TextButton.icon(
+            onPressed: _pasteIntoNote,
+            icon: const Icon(Icons.content_paste, size: 16),
+            label: Text(t.noteActionPaste),
+            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          ),
+          TextButton.icon(
+            onPressed: _selectAllNote,
+            icon: const Icon(Icons.select_all, size: 16),
+            label: Text(t.noteActionSelectAll),
+            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          ),
+          TextButton.icon(
+            onPressed: _copyAllNote,
+            icon: const Icon(Icons.copy_all, size: 16),
+            label: Text(t.noteActionCopyAll),
+            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
         maxLines: 12,
@@ -484,6 +514,91 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       ),
       const SizedBox(height: 16),
     ];
+  }
+
+  /// v2.3.10 — Coller via l'API Clipboard Dart à la position du curseur.
+  /// Marche même quand le menu contextuel système est masqué par
+  /// FLAG_SECURE/Knox, car `Clipboard.getData` opère au niveau app.
+  Future<void> _pasteIntoNote() async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final clip = data?.text ?? '';
+    if (clip.isEmpty) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(t.noteActionClipboardEmpty),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    final ctrl = _notesCtrl;
+    final sel = ctrl.selection;
+    final cur = ctrl.text;
+    if (sel.isValid && sel.start >= 0 && sel.end >= 0) {
+      final before = cur.substring(0, sel.start);
+      final after = cur.substring(sel.end);
+      final newText = '$before$clip$after';
+      final newCursor = sel.start + clip.length;
+      ctrl.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newCursor),
+      );
+    } else {
+      ctrl.text = cur + clip;
+      ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length);
+    }
+    if (mounted) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(t.noteActionPasted),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  /// Sélectionne tout le texte du champ Note (curseur étendu sur
+  /// l'ensemble du contenu).
+  void _selectAllNote() {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final ctrl = _notesCtrl;
+    if (ctrl.text.isEmpty) return;
+    ctrl.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: ctrl.text.length,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(t.noteActionAllSelected),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  /// Copie l'intégralité du contenu de la Note dans le presse-papier
+  /// (sans auto-clear : ce n'est pas un secret au sens "password",
+  /// l'utilisateur a explicitement demandé à copier).
+  Future<void> _copyAllNote() async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final text = _notesCtrl.text;
+    if (text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(t.noteActionCopied),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   List<Widget> _buildCardFields() {

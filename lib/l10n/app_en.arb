@@ -562,5 +562,12 @@
   "passphraseErrorMin": "Minimum 12 characters",
   "passphraseErrorMismatch": "Passphrases do not match",
   "passphraseEncryptCta": "Encrypt",
-  "passphraseDecryptCta": "Decrypt"
+  "passphraseDecryptCta": "Decrypt",
+  "noteActionPaste": "Paste",
+  "noteActionCopyAll": "Copy all",
+  "noteActionSelectAll": "Select all",
+  "noteActionClipboardEmpty": "Clipboard is empty",
+  "noteActionPasted": "Pasted",
+  "noteActionCopied": "Note copied",
+  "noteActionAllSelected": "All text selected"
 }
