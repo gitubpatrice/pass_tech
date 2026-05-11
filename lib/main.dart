@@ -62,22 +62,33 @@ String themeModeToString(ThemeMode m) {
   }
 }
 
+/// v2.3.11 — clé SharedPreferences pour la protection captures d'écran
+/// (FLAG_SECURE). Default = true (protection active). L'utilisateur peut
+/// désactiver via Réglages → Sécurité pour permettre le paste cross-app
+/// sur Samsung (Knox bloque le clipboard quand FLAG_SECURE est actif).
+const String prefKeyScreenshotProtection = 'screenshot_protection_enabled';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // v2.3.9 — pose FLAG_SECURE depuis Dart APRÈS création de la window.
-  // MainActivity.onCreate ne pose plus le flag — Samsung Knox refuse de
-  // propager un `clearFlags(FLAG_SECURE)` ultérieur si le flag était
-  // appliqué à la création. Init depuis Dart contourne le piège tout en
-  // gardant les screenshots / aperçu Recent Apps bloqués sur tous les
-  // écrans (sauf relâchement explicite via `SecureWindow.relax()`).
-  // Fire-and-forget : non bloquant pour le boot.
-  // ignore: unawaited_futures
-  SecureWindow.init();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
 
   final prefs = await SharedPreferences.getInstance();
+  // v2.3.11 — lit la pref AVANT init() pour que la valeur user-controlée
+  // soit appliquée dès le boot. Si l'utilisateur a explicitement désactivé
+  // la protection, on n'applique PAS FLAG_SECURE → Knox ne marque pas
+  // l'app comme "secure" → le clipboard cross-app fonctionne.
+  final screenshotProtection =
+      prefs.getBool(prefKeyScreenshotProtection) ?? true;
+  await SecureWindow.applyUserPreference(enabled: screenshotProtection);
+  // Pose FLAG_SECURE depuis Dart APRÈS création de la window si l'utilisateur
+  // n'a pas désactivé la protection. Sans ce timing post-window-creation,
+  // Samsung One UI + Knox refuse de propager les clearFlags ultérieurs.
+  // Fire-and-forget : non bloquant pour le boot.
+  // ignore: unawaited_futures
+  SecureWindow.init();
+
   ClipboardService.clearAfterSeconds = prefs.getInt('clipboard_clear') ?? 30;
   themeNotifier.value = parseThemeMode(
     prefs.getString('theme_mode') ?? 'system',

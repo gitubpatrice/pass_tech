@@ -569,5 +569,10 @@
   "noteActionClipboardEmpty": "Clipboard is empty",
   "noteActionPasted": "Pasted",
   "noteActionCopied": "Note copied",
-  "noteActionAllSelected": "All text selected"
+  "noteActionAllSelected": "All text selected",
+  "settingsScreenshotProtectionTitle": "Block screenshots",
+  "settingsScreenshotProtectionSubtitle": "Enabled by default (recommended). Blocks screenshots, screen recording, Recent Apps thumbnail and external display projection. Disable ONLY if you need to paste text from another app on Samsung — Knox blocks the cross-app clipboard when protection is active.",
+  "settingsScreenshotProtectionRestart": "Restart Pass Tech to fully apply the change.",
+  "settingsScreenshotProtectionConfirmOffTitle": "Disable protection?",
+  "settingsScreenshotProtectionConfirmOffBody": "Without protection, your passwords may appear in screenshots, the Recent Apps preview and screen recordings. Use only temporarily to paste text from another app."
 }

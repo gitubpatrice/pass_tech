@@ -11,11 +11,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
+import '../main.dart' show prefKeyScreenshotProtection;
 import '../services/anti_phishing_service.dart';
 import '../services/clipboard_service.dart';
 import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
 import '../services/panic_service.dart';
+import '../services/secure_window.dart';
 import '../services/vault_service.dart';
 import '../widgets/password_text_field.dart';
 import '../l10n/app_localizations.dart';
@@ -44,6 +46,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     with WidgetsBindingObserver {
   bool _biometricEnabled = false;
   bool _biometricAvailable = false;
+
+  /// v2.3.11 — état du toggle FLAG_SECURE persisté.
+  bool _screenshotProtectionEnabled = true;
   int _clipboardClear = 30;
   int _autoLockSeconds = 300;
   ThemeMode _themeMode = ThemeMode.system;
@@ -108,6 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final apSvc = AntiPhishingService();
     final apEnabled = await apSvc.isEnabled;
     final apASActive = await apSvc.isAccessibilityServiceActive;
+    final screenshotProt = prefs.getBool(prefKeyScreenshotProtection) ?? true;
     ClipboardService.clearAfterSeconds = clip;
     if (mounted) {
       setState(() {
@@ -119,8 +125,69 @@ class _SettingsScreenState extends State<SettingsScreen>
         _locale = loc;
         _antiPhishingEnabled = apEnabled;
         _antiPhishingASActive = apASActive;
+        _screenshotProtectionEnabled = screenshotProt;
       });
     }
+  }
+
+  /// v2.3.11 — toggle FLAG_SECURE. Demande confirmation avant désactivation.
+  /// La désactivation marque la window comme "user-disabled" via
+  /// [SecureWindow.applyUserPreference] qui retire le flag immédiatement
+  /// ET bloque tout futur `init/relax/restore`. La réactivation requiert
+  /// un redémarrage de l'app pour que Knox ré-applique sa logique sécurité.
+  Future<void> _toggleScreenshotProtection(bool v) async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Désactivation : confirmation explicite (impact sécu).
+    if (!v) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            Icons.warning_amber_outlined,
+            color: Theme.of(ctx).colorScheme.error,
+          ),
+          title: Text(t.settingsScreenshotProtectionConfirmOffTitle),
+          content: Text(t.settingsScreenshotProtectionConfirmOffBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t.actionCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+                foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
+              ),
+              child: Text(t.heritageDisable),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(prefKeyScreenshotProtection, v);
+    // Applique immédiatement côté window (best-effort — Knox peut retenir
+    // l'état marqué initialement, d'où le rappel "redémarrez" ci-dessous).
+    await SecureWindow.applyUserPreference(enabled: v);
+    if (v) {
+      // Si on remet la protection, on relance init() pour reposer le flag.
+      // ignore: unawaited_futures
+      SecureWindow.init();
+    }
+    if (!mounted) return;
+    setState(() => _screenshotProtectionEnabled = v);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(t.settingsScreenshotProtectionRestart),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _toggleAntiPhishing(bool v) async {
@@ -924,6 +991,29 @@ class _SettingsScreenState extends State<SettingsScreen>
       body: ListView(
         children: [
           _section(t.settingsSectionSecurity),
+          // v2.3.11 — toggle FLAG_SECURE. Activé par défaut. L'utilisateur
+          // peut désactiver pour permettre le paste cross-app sur Samsung
+          // (Knox bloque le clipboard quand FLAG_SECURE est actif).
+          // Confirmation requise avant désactivation pour éviter les
+          // clics accidentels.
+          SwitchListTile(
+            title: Text(t.settingsScreenshotProtectionTitle),
+            subtitle: Text(
+              t.settingsScreenshotProtectionSubtitle,
+              style: const TextStyle(fontSize: 12),
+            ),
+            secondary: Icon(
+              _screenshotProtectionEnabled
+                  ? Icons.shield_outlined
+                  : Icons.shield_outlined,
+              color: _screenshotProtectionEnabled
+                  ? null
+                  : Theme.of(context).colorScheme.error,
+            ),
+            value: _screenshotProtectionEnabled,
+            isThreeLine: true,
+            onChanged: _toggleScreenshotProtection,
+          ),
           if (_biometricAvailable)
             SwitchListTile(
               title: Text(t.settingsBiometricTitle),

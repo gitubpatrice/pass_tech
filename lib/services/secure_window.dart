@@ -43,6 +43,33 @@ class SecureWindow {
   /// True après le premier `init()`. Re-entrance safe.
   static bool _initialized = false;
 
+  /// v2.3.11 — quand l'utilisateur a explicitement désactivé la protection
+  /// dans Réglages, tous les appels deviennent des no-op : ni `init()`, ni
+  /// `relax()`, ni `restore()` ne posent ou retirent FLAG_SECURE. Ainsi
+  /// la window reste 100 % "non-secure" → aucun marquage Knox → le
+  /// clipboard inter-apps fonctionne. À l'utilisateur de réactiver la
+  /// protection après usage. Default = false (= protection active).
+  static bool _userDisabled = false;
+
+  /// Doit être appelé au boot AVANT [init] pour propager la valeur
+  /// persistée (SharedPreferences `screenshot_protection_enabled`).
+  /// Si l'utilisateur a choisi "off", on bascule en mode no-op
+  /// définitivement pour la session, et on retire le flag s'il était
+  /// déjà posé.
+  static Future<void> applyUserPreference({required bool enabled}) async {
+    _userDisabled = !enabled;
+    if (_userDisabled) {
+      // Retire le flag s'il avait été posé par un init() précédent
+      // (cas où l'utilisateur toggle off à chaud).
+      try {
+        await _channel.invokeMethod('setSecure', {'enabled': false});
+      } catch (_) {
+        /* silent */
+      }
+      _initialized = true; // bloque tout futur init()
+    }
+  }
+
   /// Pose FLAG_SECURE sur la window APRÈS sa création (depuis Dart).
   /// À appeler une fois au démarrage dans `main()` juste après
   /// `WidgetsFlutterBinding.ensureInitialized()`.
@@ -57,6 +84,7 @@ class SecureWindow {
   /// en préservant la protection screenshots / aperçu Recent Apps.
   static Future<void> init() async {
     if (_initialized) return;
+    if (_userDisabled) return;
     try {
       await _channel.invokeMethod('setSecure', {'enabled': true});
       _initialized = true;
@@ -69,6 +97,7 @@ class SecureWindow {
   /// les opérations clipboard / sélection système. À appeler dans
   /// `initState` d'un écran qui nécessite ces interactions.
   static Future<void> relax() async {
+    if (_userDisabled) return;
     _relaxCount++;
     if (_relaxCount == 1) {
       try {
@@ -82,6 +111,7 @@ class SecureWindow {
   /// Restaure FLAG_SECURE quand le dernier écran qui demandait sa
   /// désactivation se ferme. À appeler dans `dispose`.
   static Future<void> restore() async {
+    if (_userDisabled) return;
     if (_relaxCount <= 0) return;
     _relaxCount--;
     if (_relaxCount == 0) {
