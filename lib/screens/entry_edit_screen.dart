@@ -6,6 +6,7 @@ import '../models/entry.dart';
 import '../services/secure_window.dart';
 import '../services/totp_service.dart';
 import '../services/vault_service.dart';
+import '../utils/snack_utils.dart';
 import '../widgets/password_text_field.dart';
 import 'generator_screen.dart';
 import 'qr_scanner_screen.dart';
@@ -126,11 +127,12 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
   }
 
   Future<void> _save() async {
+    // P0 v2.4.0 — capturer `messenger` AVANT tout `await` (anti
+    // `Looking up a deactivated widget's ancestor` post-dispose).
+    final messenger = ScaffoldMessenger.of(context);
     final t = AppLocalizations.of(context);
     if (_titleCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(t.entryEditTitleRequired)));
+      SnackUtils.showInfo(messenger, t.entryEditTitleRequired);
       return;
     }
 

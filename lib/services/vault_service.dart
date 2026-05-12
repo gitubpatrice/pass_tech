@@ -222,6 +222,14 @@ class VaultService {
   List<Entry> _entries = [];
   bool _isOpen = false;
 
+  // QW2 v2.4.0 — cache des méta v4 (salt + KEK wrap) post-unlock. Sans ce
+  // cache, chaque CRUD relisait le fichier complet pour récupérer ces 3
+  // champs stables → ~30-50 ms d'I/O+parse JSON par save sur S9. Wipé au
+  // lock() avec le reste.
+  Uint8List? _cachedSalt;
+  Uint8List? _cachedWrappedDek;
+  Uint8List? _cachedWrapNonce;
+
   bool get isOpen => _isOpen;
   List<Entry> get entries => List.unmodifiable(_entries);
 
@@ -351,6 +359,11 @@ class VaultService {
     _entries = [];
     _isOpen = false;
     _activeSlot = null;
+    // QW2 v2.4.0 — wipe cache méta (le salt et wrap n'ont pas valeur de
+    // secret crypto mais leur knowledge facilite l'inférence offline).
+    _cachedSalt = null;
+    _cachedWrappedDek = null;
+    _cachedWrapNonce = null;
     // F17 v2.3.7 — reset la référence BiometricStorageFile pour qu'un
     // unlock biométrique post-panic re-acquière le storage proprement
     // (sinon référence dangling vers un fichier potentiellement supprimé).

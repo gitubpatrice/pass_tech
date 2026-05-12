@@ -20,10 +20,6 @@ extension VaultSetup on VaultService {
     await _keystore.ensureBothKeksExist();
 
     final salt = SecretBytes.randomBytes(32);
-    await VaultService._storage.write(
-      key: _saltKeyFor(slot),
-      value: base64Encode(salt),
-    );
 
     // Derive pwHash with Argon2id (isolate).
     final pwHash = await KdfService.argon2id(password: password, salt: salt);
@@ -52,6 +48,13 @@ extension VaultSetup on VaultService {
         wrappedDek: wrap.ciphertext,
         wrapNonce: wrap.nonce,
       );
+      // V1 v2.4.0 — salt en storage écrit APRÈS save vault réussi : un kill
+      // mid-flight ne laisse plus de salt orphelin pointant vers un vault
+      // chiffré avec une ancienne clé (race path v3 legacy).
+      await VaultService._storage.write(
+        key: _saltKeyFor(slot),
+        value: base64Encode(salt),
+      );
       await _onUnlockSuccess();
     } finally {
       SecretBytes.wipe(pwHash);
@@ -69,10 +72,6 @@ extension VaultSetup on VaultService {
     // v4 : Argon2id + re-wrap fresh hwSecret. Le slot opposé n'est pas affecté.
     final slot = _activeSlot ?? _Slot.primary;
     final salt = SecretBytes.randomBytes(32);
-    await VaultService._storage.write(
-      key: _saltKeyFor(slot),
-      value: base64Encode(salt),
-    );
 
     final hwSecret = SecretBytes.randomBytes(32);
     Uint8List? pwHash;
@@ -96,6 +95,13 @@ extension VaultSetup on VaultService {
         salt: salt,
         wrappedDek: wrap.ciphertext,
         wrapNonce: wrap.nonce,
+      );
+      // V1 v2.4.0 — salt en storage écrit APRÈS save vault réussi : si le
+      // process est tué entre les deux, on garde l'ancien salt cohérent
+      // avec l'ancien vault au lieu d'un salt orphelin.
+      await VaultService._storage.write(
+        key: _saltKeyFor(slot),
+        value: base64Encode(salt),
       );
     } finally {
       if (pwHash != null) SecretBytes.wipe(pwHash);

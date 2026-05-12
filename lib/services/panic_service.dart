@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'anti_phishing_service.dart';
 import 'clipboard_service.dart';
 import 'vault_service.dart';
 
@@ -19,12 +20,10 @@ class PanicService {
 
   /// Action panique complète : lock + clipboard + disguise.
   /// Best-effort sur chaque étape — un échec n'empêche pas les autres.
-  /// A5 v2.3.8 — channel anti-phishing pour purger le snapshot du domaine
-  /// en cours (qui survivait à `panic()` jusqu'à expiration des 15s
-  /// `FRESHNESS_MS` côté Kotlin).
-  static const _phishingChannel = MethodChannel(
-    'com.passtech.pass_tech/antiphishing',
-  );
+  /// A5 v2.3.8 — purge du snapshot anti-phishing (qui survivait à `panic()`
+  /// jusqu'à expiration des 15 s `FRESHNESS_MS` côté Kotlin).
+  /// QW5 v2.4.0 — délégué à `AntiPhishingService.clearSnapshot()` qui possède
+  /// déjà le channel — supprime la duplication du `MethodChannel` ici.
 
   static Future<void> panic({bool disguise = true}) async {
     // 1. Lock vault (synchrone, garanti)
@@ -37,7 +36,7 @@ class PanicService {
     } catch (_) {}
     // 3. A5 v2.3.8 — purge du snapshot du domaine anti-phishing.
     try {
-      await _phishingChannel.invokeMethod('clearSnapshot');
+      await AntiPhishingService.clearSnapshot();
     } catch (_) {
       /* AS désactivée, ignore */
     }

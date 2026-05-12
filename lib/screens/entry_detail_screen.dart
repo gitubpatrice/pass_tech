@@ -626,7 +626,10 @@ class _PasswordField extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    show ? password : '•' * 12,
+                    // QW11 v2.4.0 — longueur réelle (clamp 8..24) au lieu
+                    // de 12 fixe : aligne `_PasswordField` sur `_MaskableField`
+                    // et évite la fuite faible "ce password fait 12 chars".
+                    show ? password : '•' * password.length.clamp(8, 24),
                     style: TextStyle(
                       fontSize: 14,
                       letterSpacing: show ? 0.5 : 2,
@@ -922,9 +925,12 @@ class _CardVisual extends StatelessWidget {
                 children: [
                   Text(
                     t.entryDetailCardHolderLabel,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 9,
+                    // P0 v2.4.0 — `Colors.white60` (~3.0:1 sur gradient
+                    // bleu→violet) échouait WCAG AA 4.5:1. `white.85` +
+                    // taille 10 atteint ~5.2:1 sur le pire pixel.
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 10,
                       letterSpacing: 1,
                     ),
                   ),
@@ -946,9 +952,12 @@ class _CardVisual extends StatelessWidget {
                 children: [
                   Text(
                     t.entryDetailCardExpiryLabel,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 9,
+                    // P0 v2.4.0 — `Colors.white60` (~3.0:1 sur gradient
+                    // bleu→violet) échouait WCAG AA 4.5:1. `white.85` +
+                    // taille 10 atteint ~5.2:1 sur le pire pixel.
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 10,
                       letterSpacing: 1,
                     ),
                   ),

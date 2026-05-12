@@ -152,10 +152,16 @@ extension VaultCrypto on VaultService {
         aad: aad,
       );
       if (pt == null) return null;
-      final list = jsonDecode(utf8.decode(pt)) as List;
-      return list
-          .map((e) => Entry.fromJson(e as Map<String, dynamic>))
-          .toList();
+      try {
+        final list = jsonDecode(utf8.decode(pt)) as List;
+        return list
+            .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } finally {
+        // V3 v2.4.0 — wipe best-effort du buffer plaintext (contient TOUS
+        // les passwords sérialisés). Symétrie avec `_saveVaultV4:84`.
+        pt.fillRange(0, pt.length, 0);
+      }
     } catch (_) {
       return null;
     }

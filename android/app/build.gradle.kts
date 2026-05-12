@@ -56,6 +56,9 @@ android {
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
+                // QW8 v2.4.0 — V4 signing (Android 11+) permet install
+                // incrémental + meilleure chaîne d'attestation. Sans coût.
+                enableV4Signing = true
             }
         }
     }

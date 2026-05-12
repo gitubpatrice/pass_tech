@@ -370,7 +370,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onPressed: () => Navigator.pop(context, 'disable'),
             child: Text(
               t.heritageDisable,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
           FilledButton(
@@ -518,7 +518,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onPressed: () => Navigator.pop(context, 'delete'),
             child: Text(
               t.decoyDelete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
         ],
@@ -537,26 +537,31 @@ class _SettingsScreenState extends State<SettingsScreen>
     final t = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        icon: const Icon(
-          Icons.warning_amber_rounded,
-          size: 36,
-          color: Colors.red,
-        ),
-        title: Text(t.panicDialogTitle),
-        content: Text(t.panicDialogBody, style: const TextStyle(fontSize: 14)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(t.actionCancel),
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          icon: Icon(Icons.warning_amber_rounded, size: 36, color: cs.error),
+          title: Text(t.panicDialogTitle),
+          content: Text(
+            t.panicDialogBody,
+            style: const TextStyle(fontSize: 14),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(t.panicDialogActivate),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t.actionCancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.error,
+                foregroundColor: cs.onError,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t.panicDialogActivate),
+            ),
+          ],
+        );
+      },
     );
     if (confirm != true || !mounted) return;
     await PanicService.panic();
@@ -629,55 +634,48 @@ class _SettingsScreenState extends State<SettingsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(
-          Icons.warning_amber_rounded,
-          color: Colors.red,
-          size: 40,
-        ),
-        title: Text(
-          t.exportPlainDialogTitle,
-          style: const TextStyle(
-            color: Colors.red,
-            fontWeight: FontWeight.bold,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          icon: Icon(Icons.warning_amber_rounded, color: cs.error, size: 40),
+          title: Text(
+            t.exportPlainDialogTitle,
+            style: TextStyle(color: cs.error, fontWeight: FontWeight.bold),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              t.exportPlainWarningHeadline,
-              style: const TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.w600,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.exportPlainWarningHeadline,
+                style: TextStyle(color: cs.error, fontWeight: FontWeight.w600),
               ),
+              const SizedBox(height: 12),
+              Text(t.exportPlainWarningBullet1),
+              const SizedBox(height: 6),
+              Text(t.exportPlainWarningBullet2),
+              const SizedBox(height: 6),
+              Text(t.exportPlainWarningBullet3),
+              const SizedBox(height: 12),
+              Text(
+                t.exportPlainWarningTip,
+                style: const TextStyle(fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(t.actionCancel),
             ),
-            const SizedBox(height: 12),
-            Text(t.exportPlainWarningBullet1),
-            const SizedBox(height: 6),
-            Text(t.exportPlainWarningBullet2),
-            const SizedBox(height: 6),
-            Text(t.exportPlainWarningBullet3),
-            const SizedBox(height: 12),
-            Text(
-              t.exportPlainWarningTip,
-              style: const TextStyle(fontStyle: FontStyle.italic),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: cs.error),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(t.exportPlainConfirm),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(t.actionCancel),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(t.exportPlainConfirm),
-          ),
-        ],
-      ),
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
 
@@ -1138,7 +1136,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ListTile(
             leading: Icon(
               Icons.warning_amber_rounded,
-              color: Colors.red.shade700,
+              color: Theme.of(context).colorScheme.error,
             ),
             title: Text(t.panicTriggerTitle),
             subtitle: Text(

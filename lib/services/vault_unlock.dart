@@ -230,6 +230,11 @@ extension VaultUnlock on VaultService {
       // v2.2.0, l'assignation revient à l'appelant.
       _entries = entries;
       _isOpen = true;
+      // QW2 v2.4.0 — peuple le cache méta : prochain `_saveVault` skip
+      // la re-lecture du fichier (gain ~30-50 ms/CRUD).
+      _cachedSalt = Uint8List.fromList(salt);
+      _cachedWrappedDek = Uint8List.fromList(wrappedDek);
+      _cachedWrapNonce = Uint8List.fromList(wrapNonce);
       // Caller takes ownership of the buffer.
       final out = Uint8List.fromList(finalKey);
       SecretBytes.wipe(finalKey);

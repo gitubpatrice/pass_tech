@@ -22,9 +22,25 @@ extension VaultStorage on VaultService {
     if (_key == null) return;
     final slot = _activeSlot ?? _Slot.primary;
 
-    // Read kdf.salt + kek block from current file. If missing (should never
-    // happen post-creation), bail out silently — refusing to write a vault
-    // we can't reload is safer than producing an inconsistent file.
+    // QW2 v2.4.0 — fast path : utilise les méta cachées en RAM post-unlock
+    // (salt + KEK wrap) au lieu de relire+parser le fichier complet à
+    // chaque CRUD. Gain ~30-50 ms par save sur S9.
+    final cSalt = _cachedSalt;
+    final cWrap = _cachedWrappedDek;
+    final cNonce = _cachedWrapNonce;
+    if (cSalt != null && cWrap != null && cNonce != null) {
+      await _saveVaultV4(
+        slot: slot,
+        salt: cSalt,
+        wrappedDek: cWrap,
+        wrapNonce: cNonce,
+      );
+      return;
+    }
+
+    // Slow path (fallback) : cache miss → lire depuis disque. Sécurise
+    // les cas où _saveVault est appelé sans passer par unlock/setup
+    // (improbable mais possible en chemin de migration).
     final file = await _vaultFileFor(slot);
     if (!await file.exists()) return;
     Map<String, dynamic> prev;
@@ -127,5 +143,11 @@ extension VaultStorage on VaultService {
     // intermédiaire delete+rename qui pouvait laisser le vault perdu en
     // cas de crash entre les deux opérations.
     await tmp.rename(target.path);
+    // QW2 v2.4.0 — peuple/rafraîchit le cache méta DÈS que le write est
+    // confirmé. Ainsi le prochain `_saveVault` court-circuite la lecture
+    // disque. On stocke des copies (anti-aliasing avec les buffers passés).
+    _cachedSalt = Uint8List.fromList(salt);
+    _cachedWrappedDek = Uint8List.fromList(wrappedDek);
+    _cachedWrapNonce = Uint8List.fromList(wrapNonce);
   }
 }

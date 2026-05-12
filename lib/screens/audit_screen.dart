@@ -354,18 +354,25 @@ class _AuditScreenState extends State<AuditScreen> {
       _breached = null;
     });
 
+    // QW1 v2.4.0 — batch parallèle + dédup. Gain typique 5× (50 entries
+    // : ~30 s → ~6 s) sans rate-limiter HIBP (concurrency 6 = courtois).
+    final results = await BreachService.checkPasswordsBatch(
+      candidates.map((e) => e.password),
+      concurrency: 6,
+      onProgress: (done, total) {
+        if (mounted) setState(() => _breachProgress = done);
+      },
+    );
+
     final breached = <Entry>[];
     bool networkOk = true;
-
     for (final e in candidates) {
-      if (!mounted) return;
-      final n = await BreachService.checkPassword(e.password);
+      final n = results[e.password] ?? -1;
       if (n < 0) {
         networkOk = false;
         break;
       }
       if (n > 0) breached.add(e);
-      if (mounted) setState(() => _breachProgress++);
     }
 
     if (!mounted) return;
