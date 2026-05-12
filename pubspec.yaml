@@ -47,4 +47,5 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
+    - assets/icon.png
     - assets/legal/
