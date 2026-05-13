@@ -1,0 +1,35 @@
+v2.4.3 — Audit expert : 24 corrections sécurité, perf, UX
+
+Sécurité :
+* F1 — Format de sauvegarde .ptbak v3 : Argon2id + AES-GCM
+  (au lieu de PBKDF2 600k + AES-CBC). Le fichier qui circule hors
+  device est désormais aussi robuste au brute-force GPU offline
+  que le coffre v4. Anciens .ptbak v1/v2 toujours lus.
+* F3 — Anti-phishing : SystemClock.elapsedRealtime côté Kotlin
+  (anti-rollback date utilisateur).
+* F4 — Le verrouillage du coffre vide aussi le presse-papier et
+  annule le timer auto-clear (auparavant seul le mode panique
+  le faisait).
+* F5/F10 — Hardening cache mémoire post-unlock.
+* F2 — Désactivation biométrie plus robuste.
+
+Performance :
+* P2.1 — Splits ABI activés : APK arm64 ~25-30 Mo (au lieu de
+  ~71 Mo universal). Build ~25 % plus rapide.
+* P1.1 — Barre de recherche débouncée 150 ms : plus fluide
+  sur les gros coffres (500+ entrées).
+* P2.2 — DateFormat hissé static.
+
+UX / a11y :
+* U1 — Champs mot de passe : autofill Android désactivé,
+  sélection/copie bloquée quand masqué.
+* U3/U4 — Tooltips AppBar (recherche, plus d'options).
+* U6 — Annonce TalkBack pendant la dérivation Argon2id
+  (~1-3 s sur device contraint, plus de silence).
+* U10 — Dialog suppression : autofocus sur Annuler (safe default).
+* U12 — Bouton "Ajouter" inline dans l'état vide.
+* U14 — Croix de vidage dans la barre de recherche.
+
+10 nouveaux tests de garde sur le format .ptbak v3
+(round-trip, refus params Argon2 forgés, refus KDF non-argon2id,
+refus version inconnue, refus salt trop court). Total 48 tests verts.

@@ -234,12 +234,18 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     }
   }
 
+  // P2.2 v2.4.3 — DateFormat hissé static : entry_detail rebuild fréquent
+  // (TOTPCard force `setState` 1× / s pour la barre de progression OTP).
+  // Recréer un DateFormat ICU à chaque build = allocation+lookup l10n
+  // gaspillée.
+  static final _dfDMYHm = DateFormat('dd/MM/yyyy HH:mm');
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final catColor = categoryColor(_entry.category);
-    final fmt = DateFormat('dd/MM/yyyy HH:mm');
+    final fmt = _dfDMYHm;
 
     return Scaffold(
       appBar: AppBar(

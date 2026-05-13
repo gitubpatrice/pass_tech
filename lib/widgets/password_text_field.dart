@@ -81,6 +81,16 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
       autofocus: widget.autofocus,
       enableSuggestions: false,
       autocorrect: false,
+      // U1 v2.4.3 — bloque le service Autofill Android pour qu'il ne tente
+      // pas de capturer / proposer la valeur. Pour un master password ou un
+      // password applicatif, la collecte par un Autofill tiers est un risque
+      // de fuite cross-app non maîtrisé.
+      autofillHints: const <String>[],
+      // U1 v2.4.3 — désactive la sélection et la copie quand la valeur est
+      // masquée. Empêche un long-press → "Tout sélectionner" → "Copier"
+      // qui exposerait le password en clair au clipboard (capté par les
+      // clipboard managers tiers sur Android 13-).
+      enableInteractiveSelection: _show,
       keyboardType: widget.keyboardType,
       inputFormatters: widget.inputFormatters,
       onChanged: widget.onChanged,

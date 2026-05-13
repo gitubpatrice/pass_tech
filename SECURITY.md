@@ -15,6 +15,88 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 ### Historique des correctifs récents
 
+- **v2.4.3** (2026-05-13) — Audit expert post-v2.4.2 : 24 corrections
+  (F1-F6+F10 sécu / U1 U3 U4 U6 U10 U12 U14 UX / P1.1 P2.1 P2.2 perf).
+
+  **Sécurité (haute priorité)** :
+  - **F1** — Format `.ptbak` v3 (Argon2id + AES-GCM) remplace v2 (PBKDF2 600k
+    + AES-CBC + HMAC). Le `.ptbak` est le seul fichier qui circule
+    *hors device* (export pour backup cloud, transfert) — il est donc
+    le plus exposé au brute-force GPU offline (~50 M tries/s contre
+    PBKDF2 vs ~10/s contre Argon2id même sur RTX 4090). AAD `ptbak:v=3|
+    kdf=argon2id|m=...|t=...|p=...|salt=...` anti-downgrade. Lecture
+    v1/v2 préservée pour rétro-compat ; écriture v3 uniquement.
+    Bornes strictes sur params Argon2 lus (`4096 ≤ m ≤ 1 048 576 KiB`,
+    `1 ≤ t ≤ 16`, `1 ≤ p ≤ 4`) — refus immédiat d'un `.ptbak` forgé
+    avec m=2 Go destiné à OOM le device au déchiffrement.
+  - **F2** — `deleteBiometricKey()` ordre inversé : le flag UI
+    (`pt_biometric_enabled` dans flutter_secure_storage) est désormais
+    supprimé en PREMIER, le storage Keystore best-effort en second.
+    Évite le cas où une suppression partielle laissait le bouton
+    biométrique affiché alors qu'aucun storage utilisable n'existait.
+  - **F3** — `PhishingDetectorService.kt` : `System.currentTimeMillis()`
+    → `SystemClock.elapsedRealtime()` (boot-based monotone). Un user
+    rooté pouvait faire reculer la wall-clock entre la création d'un
+    snapshot et son lookup, rendant la fenêtre de fraîcheur 15 s
+    réutilisable indéfiniment. Aligné sur `MonotonicClock` côté Dart.
+  - **F4** — `VaultService.lock()` appelle désormais
+    `ClipboardService.cancelAndClear()` (fire-and-forget). Auparavant
+    seul `PanicService.panic()` le faisait : un lock manuel depuis
+    Settings, un auto-lock par timer, laissait un timer pendant qui
+    pouvait retirer un callback sur un context disposé, et la valeur
+    copiée restait dans le presse-papier jusqu'à expiration.
+  - **F5** — `VaultService.lock()` wipe désormais cryptographiquement
+    les bytes du cache méta v4 (`_cachedSalt`, `_cachedWrappedDek`,
+    `_cachedWrapNonce`) avant nullification. Ces 3 champs ne sont pas
+    secrets *stricto sensu* mais leur concaténation est un fingerprint
+    unique du vault, exploitable pour corréler des dumps mémoire
+    cross-sessions.
+  - **F6** — `_decryptVaultV3(null)` retournait `true` avec 0 entry
+    (path mort post-v2.0 mais qui ouvrait le vault SANS authentification
+    si un futur appelant passait null). Désormais refus strict.
+  - **F10** — `_v4Unlock` : la clé `out` est désormais clonée et
+    `finalKey` wipée AVANT le peuplement du cache méta. Évite qu'une
+    exception OOM/GC entre `_cachedSalt = ...` et `SecretBytes.wipe`
+    laisse à la fois la clé brute et un cache partiel.
+
+  **UX / a11y** :
+  - **U1** — `PasswordTextField` : `autofillHints: const <String>[]`
+    désactive le service Autofill Android (pas de capture cross-app
+    d'un master password) + `enableInteractiveSelection: _show` bloque
+    la sélection/copie quand masqué (anti clipboard manager tiers).
+  - **U3** — Search IconButton AppBar : tooltip Flutter built-in
+    (`closeButtonTooltip` / `searchFieldLabel`).
+  - **U4** — PopupMenuButton `more_vert` : `moreButtonTooltip` built-in.
+  - **U6** — Spinner Argon2id (setup + unlock) wrap `Semantics(
+    liveRegion: true, label: t.setupEncrypting/unlockDecrypting)` —
+    TalkBack annonce désormais le statut au début de la dérivation
+    (auparavant 1-3 s de silence sur device contraint).
+  - **U10** — Dialog "Supprimer entrée" : `TextButton(autofocus: true)`
+    sur Annuler (safe default) + `FilledButton.tonal` rouge sur Delete
+    avec `cs.errorContainer/onErrorContainer` au lieu de `Colors.red`.
+  - **U12** — Empty state home : ajout `FilledButton.tonalIcon` "Ajouter"
+    inline en plus du FAB, plus découvrable au premier lancement.
+  - **U14** — Search bar : `suffixIcon` croix inline pour vider le
+    champ (plus découvrable que l'action AppBar Close).
+
+  **Performance** :
+  - **P1.1** — Search bar debouncée 150 ms (avant : setState par char
+    relançait sort+filter+toLowerCase × N entries × N champs → 8-12 ms
+    par char sur S9 avec 500 entries).
+  - **P2.1** — **splits ABI + resourceConfigurations FR/EN** activés
+    (auparavant APK universel 71 Mo). Gain estimé arm64 ~25-30 Mo.
+  - **P2.2** — `DateFormat` hissé en `static final _dfDMYHm`
+    (entry_detail rebuild fréquent à cause du TOTP timer 1 Hz).
+
+  **Tests garde** : `test/ptbak_v3_test.dart` (10 tests : round-trip
+  v3, refus wrong passphrase, refus params Argon2 forgés, refus KDF
+  algo non-argon2id, refus version > 3, refus salt < 16 octets).
+  Total tests : 48/48 verts (38 + 10 nouveaux).
+
+  Aucun changement de format vault `.enc` (v3/v4 lus comme avant).
+  Aucun changement de format vault legacy `.bak`. Les `.ptbak` v2
+  existants sont toujours lus en import.
+
 - **v2.4.2** (2026-05-13) — Robustesse biométrique après ré-enrôlement
   d'empreinte Android. Avant : si l'utilisateur supprimait puis
   ré-enrôlait son empreinte, le bouton biométrique affichait « Échec

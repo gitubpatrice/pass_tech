@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +34,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchCtrl = TextEditingController();
   bool _searchOpen = false;
   String _sort = 'recent';
+  // P1.1 v2.4.3 — debounce 150 ms sur la barre de recherche. Avant : un
+  // `setState(() => _search = v)` à chaque frappe relançait le tri+filtrage
+  // complet (toLowerCase × N entries × N champs) → 8-12 ms par char sur S9
+  // avec 500 entries, jank visible. Le debounce regroupe les frappes.
+  Timer? _searchDebounce;
 
   static const _sortValues = ['recent', 'oldest', 'alpha', 'alphaDesc'];
   static const _sortIcons = {
@@ -107,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -264,18 +271,45 @@ class _HomeScreenState extends State<HomeScreen> {
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: t.homeSearchHint,
                   border: InputBorder.none,
                   isDense: true,
+                  // U14 v2.4.3 — bouton clear inline (croix) plus
+                  // découvrable que l'action AppBar Close. Disparaît quand
+                  // le champ est vide.
+                  suffixIcon: _search.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).deleteButtonTooltip,
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            _searchDebounce?.cancel();
+                            setState(() => _search = '');
+                          },
+                        )
+                      : null,
                 ),
-                onChanged: (v) => setState(() {
-                  _search = v;
-                }),
+                onChanged: (v) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(
+                    const Duration(milliseconds: 150),
+                    () {
+                      if (mounted) setState(() => _search = v);
+                    },
+                  );
+                },
               )
             : Text(t.homeTitle),
         actions: [
           IconButton(
+            // U3 v2.4.3 — tooltip explicite pour TalkBack + survol pointeur.
+            tooltip: _searchOpen
+                ? MaterialLocalizations.of(context).closeButtonTooltip
+                : MaterialLocalizations.of(context).searchFieldLabel,
             icon: Icon(_searchOpen ? Icons.close : Icons.search),
             onPressed: () => setState(() {
               _searchOpen = !_searchOpen;
@@ -329,6 +363,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
+            // U4 v2.4.3 — tooltip pour TalkBack (Flutter built-in en
+            // FR/EN/etc., évite d'ajouter une clé l10n custom).
+            tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
             itemBuilder: (_) => [
               PopupMenuItem(value: 'settings', child: Text(t.actionSettings)),
               PopupMenuItem(value: 'about', child: Text(t.actionAbout)),
@@ -423,6 +460,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          // U12 v2.4.3 — CTA bouton "Ajouter" inline plutôt
+                          // que seulement laisser l'utilisateur découvrir
+                          // le FAB en bas. Utile pour le premier lancement.
+                          const SizedBox(height: 16),
+                          FilledButton.tonalIcon(
+                            icon: const Icon(Icons.add),
+                            label: Text(t.actionAdd),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EntryEditScreen(onSaved: _refresh),
+                              ),
                             ),
                           ),
                         ],
@@ -542,14 +594,25 @@ class _EntryCard extends StatelessWidget {
                   title: Text(t.homeDeleteTitle),
                   content: Text(t.homeDeleteConfirm(entry.title)),
                   actions: [
+                    // U10 v2.4.3 — `autofocus: true` sur Annuler : un swipe
+                    // accidentel jusqu'à la zone delete + dialog s'affiche →
+                    // la touche Entrée (clavier physique / a11y) ne déclenche
+                    // plus la suppression mais l'annulation. Cancel devient
+                    // l'action par défaut (safe default).
                     TextButton(
+                      autofocus: true,
                       onPressed: () => Navigator.pop(dctx, false),
                       child: Text(t.actionCancel),
                     ),
-                    TextButton(
+                    FilledButton.tonal(
                       onPressed: () => Navigator.pop(dctx, true),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(ctx).colorScheme.error,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(
+                          ctx,
+                        ).colorScheme.errorContainer,
+                        foregroundColor: Theme.of(
+                          ctx,
+                        ).colorScheme.onErrorContainer,
                       ),
                       child: Text(t.actionDelete),
                     ),

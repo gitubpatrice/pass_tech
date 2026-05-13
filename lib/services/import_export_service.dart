@@ -6,6 +6,8 @@ import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/entry.dart';
+import 'aead_service.dart';
+import 'kdf_service.dart';
 import 'vault_service.dart' show pbkdf2Worker;
 
 class ImportResult {
@@ -313,60 +315,72 @@ class ImportExportService {
   }
 
   // ── Encrypted .ptbak format ─────────────────────────────────────────────────
-  // v2 (current): MAC = HMAC(macKey, AAD || IV || ciphertext)
+  // v3 (current, F1 v2.4.3): Argon2id (KdfParams.owaspMobile2024) + AES-GCM-256
+  //                          AAD = "ptbak:v=3|kdf=argon2id|m=19456|t=2|p=1|salt=..."
+  //                          → ~1 try/sec sur mobile, ~10/sec sur GPU offline
+  //                          (vs ~50M/sec pour PBKDF2-SHA256 600k).
+  // v2 (legacy):  MAC = HMAC(macKey, AAD || IV || ciphertext)
   //               AAD = "ptbak:v=2|iter=N|salt=..."  (covers metadata)
   // v1 (legacy):  MAC = HMAC(macKey, IV || ciphertext)
-  // PBKDF2-SHA256 600 000 (OWASP 2023) → 64 bytes (32 enc + 32 mac)
+  // v1/v2 : PBKDF2-SHA256 600 000 → 64 bytes (32 enc + 32 mac), lecture seule.
 
   static const _backupIterations = 600000;
   static const _maxBackupIterations = 2000000;
-  static const _backupVersion = 2;
+  static const _backupVersionV3 = 3;
 
+  /// Construit l'AAD canonique v3 (anti-downgrade).
+  static List<int> _aadV3(String saltB64) => utf8.encode(
+    'ptbak:v=$_backupVersionV3|kdf=argon2id'
+    '|m=${KdfParams.owaspMobile2024.memoryKiB}'
+    '|t=${KdfParams.owaspMobile2024.iterations}'
+    '|p=${KdfParams.owaspMobile2024.parallelism}'
+    '|salt=$saltB64',
+  );
+
+  /// Exporte les entrées chiffrées au format .ptbak v3 (Argon2id + AES-GCM).
+  ///
+  /// F1 v2.4.3 — Migration de PBKDF2-SHA256 600k vers Argon2id, alignant le
+  /// `.ptbak` (fichier qui circule hors device) sur la robustesse du vault
+  /// v4. Empêche le brute-force GPU offline (~50 M tries/s pour PBKDF2 vs
+  /// ~10/s pour Argon2id même sur GPU haut de gamme).
   static Future<String> exportEncrypted(
     List<Entry> entries,
     String passphrase,
   ) async {
     final salt = SecretBytes.randomBytes(32);
-    final key = await compute(pbkdf2Worker, [
-      utf8.encode(passphrase),
-      salt,
-      _backupIterations,
-      64,
-    ]);
-    // M-3 : zéroïser key + sublists en finally.
-    final iv = enc.IV.fromSecureRandom(16);
-    final encKeyBytes = key.sublist(0, 32);
-    final macKey = key.sublist(32);
+    Uint8List? key;
     try {
-      final encKey = enc.Key(encKeyBytes);
-      final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-      final plain = jsonEncode(entries.map((e) => e.toJson()).toList());
-      final encrypted = encrypter.encrypt(plain, iv: iv);
-
+      key = await KdfService.argon2id(password: passphrase, salt: salt);
       final saltB64 = base64Encode(salt);
-      final aad = utf8.encode(
-        'ptbak:v=$_backupVersion|iter=$_backupIterations|salt=$saltB64',
+      final aad = Uint8List.fromList(_aadV3(saltB64));
+      final plain = Uint8List.fromList(
+        utf8.encode(jsonEncode(entries.map((e) => e.toJson()).toList())),
       );
-      final mac = Hmac(
-        sha256,
-        macKey,
-      ).convert([...aad, ...iv.bytes, ...encrypted.bytes]).bytes;
-
+      final res = await AeadService.encryptGcm(
+        key: key,
+        plaintext: plain,
+        aad: aad,
+      );
       return jsonEncode({
         'magic': 'PTBAK',
-        'version': _backupVersion,
-        'iterations': _backupIterations,
-        'salt': saltB64,
-        'iv': base64Encode(iv.bytes),
-        'mac': base64Encode(mac),
-        'data': base64Encode(encrypted.bytes),
+        'version': _backupVersionV3,
+        'kdf': {
+          'algo': 'argon2id',
+          'm': KdfParams.owaspMobile2024.memoryKiB,
+          't': KdfParams.owaspMobile2024.iterations,
+          'p': KdfParams.owaspMobile2024.parallelism,
+          'salt': saltB64,
+        },
+        'cipher': {
+          'nonce': base64Encode(res.nonce),
+          // ciphertext || tag concaténés (compat AeadResult.cipherAndTag).
+          'data': base64Encode(res.cipherAndTag),
+        },
         'count': entries.length,
         'exportedAt': DateTime.now().toIso8601String(),
       });
     } finally {
-      SecretBytes.wipe(encKeyBytes);
-      SecretBytes.wipe(macKey);
-      SecretBytes.wipe(key);
+      if (key != null) SecretBytes.wipe(key);
     }
   }
 
@@ -382,9 +396,69 @@ class ImportExportService {
 
       final version = json['version'] as int? ?? 1;
       // M-9 : borne stricte de la version pour rejeter les .ptbak forgés avec
-      // une version inconnue (sinon branche v3+ futur potentiellement traversée
+      // une version inconnue (sinon branche future potentiellement traversée
       // sur fichier malicieux).
-      if (version < 1 || version > _backupVersion) return null;
+      if (version < 1 || version > _backupVersionV3) return null;
+
+      // ── v3 path (Argon2id + AES-GCM) ─────────────────────────────────────
+      if (version == _backupVersionV3) {
+        final kdf = json['kdf'];
+        final cipher = json['cipher'];
+        if (kdf is! Map || cipher is! Map) return null;
+        if (kdf['algo'] != 'argon2id') return null;
+        final m = kdf['m'] as int? ?? 0;
+        final t = kdf['t'] as int? ?? 0;
+        final p = kdf['p'] as int? ?? 0;
+        // F1 v2.4.3 — bornes strictes anti-DoS sur params Argon2 forgés
+        // (un fichier malicieux pourrait spécifier m=1Go t=64 pour épuiser
+        // la RAM/CPU au déchiffrement).
+        if (m < 4096 || m > 1024 * 1024) return null;
+        if (t < 1 || t > 16) return null;
+        if (p < 1 || p > 4) return null;
+        final saltB64 = kdf['salt'] as String? ?? '';
+        final salt = base64Decode(saltB64);
+        if (salt.length < 16) return null;
+        final nonce = base64Decode(cipher['nonce'] as String);
+        final dataBlob = base64Decode(cipher['data'] as String);
+        if (dataBlob.length < AeadService.tagBytes) return null;
+        final split = AeadService.splitCipherAndTag(dataBlob);
+        Uint8List? key;
+        try {
+          key = await KdfService.argon2id(
+            password: passphrase,
+            salt: salt,
+            params: KdfParams(
+              memoryKiB: m,
+              iterations: t,
+              parallelism: p,
+              outLen: 32,
+            ),
+          );
+          final aad = Uint8List.fromList(_aadV3(saltB64));
+          final plain = await AeadService.decryptGcm(
+            key: key,
+            nonce: nonce,
+            ciphertext: split.ciphertext,
+            tag: split.tag,
+            aad: aad,
+          );
+          if (plain == null) return null;
+          final list = jsonDecode(utf8.decode(plain)) as List;
+          final entries = <Entry>[];
+          for (final item in list) {
+            try {
+              entries.add(Entry.fromJson(item as Map<String, dynamic>));
+            } catch (_) {}
+          }
+          // Wipe plaintext bytes après parsing JSON.
+          SecretBytes.wipe(plain);
+          return entries;
+        } finally {
+          if (key != null) SecretBytes.wipe(key);
+        }
+      }
+
+      // ── v1/v2 path legacy (PBKDF2 + AES-CBC + HMAC-SHA256) ────────────────
       final iterations = json['iterations'] as int? ?? _backupIterations;
       if (iterations < 1 || iterations > _maxBackupIterations) return null;
 

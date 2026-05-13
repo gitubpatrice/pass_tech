@@ -1,6 +1,7 @@
 package com.passtech.pass_tech
 
 import android.os.Build
+import android.os.SystemClock
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -61,11 +62,18 @@ class PhishingDetectorService : AccessibilityService() {
          * Dernier domaine détecté, valide uniquement pendant FRESHNESS_MS.
          * Au-delà, retourne null pour éviter de "valider" un domaine périmé
          * lorsque l'utilisateur n'est plus dans le navigateur.
+         *
+         * F3 v2.4.3 — `SystemClock.elapsedRealtime()` (boot-based monotone)
+         * remplace `System.currentTimeMillis()` (wall-clock, modifiable via
+         * Réglages → Date/heure ou `adb shell date -s`). Sans ça, un user
+         * rooté pouvait faire reculer la wall-clock entre la création du
+         * snapshot et son lookup → fenêtre de fraîcheur réutilisable au-delà
+         * des 15 s prévues. Aligné sur `MonotonicClock` côté Dart.
          */
         val lastDomain: String?
             get() {
                 val s = _snapshot ?: return null
-                if (System.currentTimeMillis() - s.atMs > FRESHNESS_MS) return null
+                if (SystemClock.elapsedRealtime() - s.atMs > FRESHNESS_MS) return null
                 return s.domain
             }
 
@@ -150,7 +158,7 @@ class PhishingDetectorService : AccessibilityService() {
                     val raw = node.text?.toString() ?: continue
                     val domain = extractDomain(raw)
                     if (domain != null) {
-                        _snapshot = Snapshot(domain, System.currentTimeMillis())
+                        _snapshot = Snapshot(domain, SystemClock.elapsedRealtime())
                         return
                     }
                 }

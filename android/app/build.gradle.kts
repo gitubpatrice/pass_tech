@@ -39,7 +39,17 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // P2.1 v2.4.3 — réduction APK : seuls FR + EN embarqués (vs ~50 locales
+        // tirées par biometric_storage / mobile_scanner / Material). Gain ~3-6 Mo.
+        resourceConfigurations.addAll(listOf("en", "fr"))
     }
+
+    // P2.1 v2.4.3 — Le split par ABI est obtenu via le flag CLI Flutter
+    // `flutter build apk --release --split-per-abi` (gain ~25-30 Mo par APK
+    // arm64 vs ~71 Mo universel). Configurer un bloc `splits.abi` ici
+    // entrerait en conflit avec `ndk.abiFilters` posé automatiquement par
+    // Flutter sur les builds debug et release CI (sans --split-per-abi),
+    // cf. RFT v2.13.0 CI failure.
 
     signingConfigs {
         create("release") {

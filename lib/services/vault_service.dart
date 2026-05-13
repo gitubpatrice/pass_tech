@@ -36,6 +36,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/entry.dart';
 import 'aead_service.dart';
 import 'anti_phishing_service.dart';
+import 'clipboard_service.dart';
 import 'kdf_service.dart';
 import 'keystore_service.dart';
 import 'monotonic_clock.dart';
@@ -358,11 +359,18 @@ class VaultService {
   }
 
   Future<void> deleteBiometricKey() async {
+    // F2 v2.4.3 — Ordre inversé : on supprime D'ABORD le flag UI (source de
+    // vérité pour `hasBiometricKey` → bouton biométrie affiché ou non).
+    // Si la suppression du storage Keystore échoue ensuite (cas rare,
+    // typiquement clé déjà invalidée par l'OS), l'UI reflète quand même
+    // l'état "biométrie désactivée" et invite l'utilisateur à réactiver
+    // proprement. Avant : le flag pouvait survivre à un delete partiel, et
+    // le bouton bio s'affichait alors qu'aucun storage utilisable n'existait.
+    await _storage.delete(key: _biometricFlagKey);
     try {
       final store = await _bioStorage();
       await store.delete();
     } catch (_) {}
-    await _storage.delete(key: _biometricFlagKey);
     _bioFile = null;
   }
 
@@ -371,8 +379,13 @@ class VaultService {
     _entries = [];
     _isOpen = false;
     _activeSlot = null;
-    // QW2 v2.4.0 — wipe cache méta (le salt et wrap n'ont pas valeur de
-    // secret crypto mais leur knowledge facilite l'inférence offline).
+    // F5 v2.4.3 — wipe cryptographique des bytes (et pas seulement
+    // déréférencement) du cache méta. Salt et wrap ne sont pas secrets stricto
+    // sensu mais leur concaténation est un fingerprint unique du vault,
+    // utilisable pour corréler des dumps mémoire across sessions.
+    if (_cachedSalt != null) SecretBytes.wipe(_cachedSalt!);
+    if (_cachedWrappedDek != null) SecretBytes.wipe(_cachedWrappedDek!);
+    if (_cachedWrapNonce != null) SecretBytes.wipe(_cachedWrapNonce!);
     _cachedSalt = null;
     _cachedWrappedDek = null;
     _cachedWrapNonce = null;
@@ -385,6 +398,12 @@ class VaultService {
     // récupérable par instrumentation. Fire-and-forget : le lock() reste
     // synchrone côté caller (auto-lock timer, lifecycle), best-effort.
     unawaited(AntiPhishingService.clearSnapshot());
+    // F4 v2.4.3 — purge du clipboard ET annulation du timer auto-clear.
+    // Avant : `lock()` (auto-lock timer Settings, lock manuel) laissait un
+    // timer pendant qui pouvait re-tirer un callback sur context disposé,
+    // et la valeur copiée restait dans le presse-papier jusqu'à expiration.
+    // Seul `PanicService.panic()` faisait ce nettoyage — incohérent.
+    unawaited(ClipboardService.cancelAndClear());
   }
 
   // ── CRUD ────────────────────────────────────────────────────────────────────

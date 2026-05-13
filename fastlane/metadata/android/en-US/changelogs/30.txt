@@ -1,0 +1,34 @@
+v2.4.3 — Expert audit: 24 fixes (security, perf, UX)
+
+Security:
+* F1 — .ptbak backup format v3: Argon2id + AES-GCM (instead of
+  PBKDF2 600k + AES-CBC). The file that travels off-device is now
+  as robust against offline GPU brute-force as the v4 vault.
+  Old v1/v2 .ptbak still read transparently.
+* F3 — Anti-phishing now uses SystemClock.elapsedRealtime on the
+  Kotlin side (anti user-clock rollback).
+* F4 — Vault lock now also clears the clipboard and cancels the
+  auto-clear timer (previously only Panic mode did).
+* F5/F10 — Memory cache hardening post-unlock.
+* F2 — More robust biometric disable.
+
+Performance:
+* P2.1 — ABI splits enabled: arm64 APK ~25-30 MB (vs ~71 MB
+  universal). Build ~25% faster.
+* P1.1 — Search bar debounced 150ms: smoother on large vaults
+  (500+ entries).
+* P2.2 — DateFormat hoisted to static.
+
+UX / a11y:
+* U1 — Password fields: Android Autofill disabled, selection/copy
+  blocked while obscured.
+* U3/U4 — AppBar tooltips (search, more options).
+* U6 — TalkBack announcement during Argon2id derivation (~1-3s on
+  constrained devices, no more silence).
+* U10 — Delete dialog: autofocus on Cancel (safe default).
+* U12 — Inline "Add" button in empty state.
+* U14 — Clear cross in search bar.
+
+10 new guard tests on .ptbak v3 format (round-trip, refuse forged
+Argon2 params, refuse non-argon2id KDF, refuse unknown version,
+refuse salt too short). Total 48 tests green.

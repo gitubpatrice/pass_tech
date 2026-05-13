@@ -230,14 +230,19 @@ extension VaultUnlock on VaultService {
       // v2.2.0, l'assignation revient à l'appelant.
       _entries = entries;
       _isOpen = true;
+      // F10 v2.4.3 — ordre réorganisé : caller prend la clé en premier
+      // (`out` cloné depuis `finalKey`), `finalKey` est wipé immédiatement,
+      // PUIS le cache méta est rempli. Avant : si une exception (OOM,
+      // GC pressure) survenait entre `_cachedSalt = …` et `SecretBytes.wipe`,
+      // la clé brute survivait dans `finalKey` jusqu'au prochain GC, en
+      // plus du cache partiel.
+      final out = Uint8List.fromList(finalKey);
+      SecretBytes.wipe(finalKey);
       // QW2 v2.4.0 — peuple le cache méta : prochain `_saveVault` skip
       // la re-lecture du fichier (gain ~30-50 ms/CRUD).
       _cachedSalt = Uint8List.fromList(salt);
       _cachedWrappedDek = Uint8List.fromList(wrappedDek);
       _cachedWrapNonce = Uint8List.fromList(wrapNonce);
-      // Caller takes ownership of the buffer.
-      final out = Uint8List.fromList(finalKey);
-      SecretBytes.wipe(finalKey);
       return out;
     } finally {
       if (pwHash != null) SecretBytes.wipe(pwHash);

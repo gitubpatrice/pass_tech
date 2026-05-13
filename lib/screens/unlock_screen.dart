@@ -428,15 +428,20 @@ class _UnlockScreenState extends State<UnlockScreen> {
                   const SizedBox(height: 24),
 
                   if (_loading)
-                    Column(
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(height: 12),
-                        Text(
-                          t.unlockDecrypting,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                    // U6 v2.4.3 — Semantics.liveRegion (cf. setup_screen).
+                    Semantics(
+                      liveRegion: true,
+                      label: t.unlockDecrypting,
+                      child: Column(
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 12),
+                          Text(
+                            t.unlockDecrypting,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     )
                   else
                     Column(

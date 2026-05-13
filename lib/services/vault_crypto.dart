@@ -54,11 +54,11 @@ extension VaultCrypto on VaultService {
   /// error (corrupted file, wrong password, MAC mismatch, version > v3).
   bool _decryptVaultV3(Map<String, dynamic>? raw) {
     try {
-      if (raw == null) {
-        _entries = [];
-        _isOpen = true;
-        return true;
-      }
+      // F6 v2.4.3 — `raw == null` ne devrait pas arriver (les appelants
+      // parsent JSON en amont), mais l'ancien path ouvrait le vault avec
+      // 0 entry SANS authentification — piège pour un futur appelant.
+      // Désormais : `raw == null` = échec strict (vault verrouillé).
+      if (raw == null) return false;
 
       final ivBytes = base64Decode(raw['iv'] as String);
       final macBytes = base64Decode(raw['mac'] as String);

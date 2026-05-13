@@ -152,15 +152,23 @@ class _SetupScreenState extends State<SetupScreen> {
                 const SizedBox(height: 24),
 
                 if (_loading)
-                  Column(
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 12),
-                      Text(
-                        t.setupEncrypting,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                  // U6 v2.4.3 — Semantics.liveRegion annonce le statut à
+                  // TalkBack et inclut la phrase d'action explicite. Sans ça,
+                  // les 1-3 s d'Argon2id sur device contraint passaient sans
+                  // feedback audio pour l'utilisateur aveugle.
+                  Semantics(
+                    liveRegion: true,
+                    label: t.setupEncrypting,
+                    child: Column(
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 12),
+                        Text(
+                          t.setupEncrypting,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   )
                 else
                   FilledButton.icon(
