@@ -1,0 +1,14 @@
+v2.4.2 — Robustesse biométrique post-réenrôlement
+
+* Détection explicite de l'invalidation de la clé Keystore après un
+  ré-enrôlement d'empreinte Android. Avant : le bouton biométrique
+  affichait « Échec biométrique » sans expliquer la marche à suivre.
+  Maintenant : auto-nettoyage du wrap + message clair invitant à
+  utiliser le mot de passe principal puis à réactiver la biométrie
+  dans Réglages.
+* Snack de confirmation à l'activation et à la désactivation de la
+  biométrie dans Réglages (auparavant silence).
+* Snack distinct si l'activation biométrique est annulée par
+  l'utilisateur (geste back / cancel) ou échoue côté hardware.
+* Nouveau résultat typé UnlockResult.biometricInvalidated pour ne
+  plus avaler silencieusement les exceptions biometric_storage.

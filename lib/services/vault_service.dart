@@ -103,7 +103,19 @@ Uint8List pbkdf2Worker(List<dynamic> args) {
   }
 }
 
-enum UnlockResult { success, wrongPassword, lockedOut }
+enum UnlockResult {
+  success,
+  wrongPassword,
+  lockedOut,
+
+  /// (v2.4.2) Tentative biométrique sur une clé Keystore invalidée par
+  /// Android — typiquement après un ré-enrôlement d'empreinte. Le wrap
+  /// biométrique a été auto-nettoyé par le caller ; l'utilisateur doit
+  /// passer par le master password puis réactiver la biométrie depuis
+  /// Réglages. À distinguer de [wrongPassword] (annulation utilisateur
+  /// silencieuse) pour donner un message clair au lieu d'un échec opaque.
+  biometricInvalidated,
+}
 
 /// Identifie quel slot du vault est en cours d'utilisation.
 /// - primary : coffre historique (file pt_vault.enc, salt pt_salt)

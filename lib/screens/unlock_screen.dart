@@ -206,6 +206,20 @@ class _UnlockScreenState extends State<UnlockScreen> {
           _error = t.unlockBiometricFailed;
         });
         break;
+      case UnlockResult.biometricInvalidated:
+        // (v2.4.2) La clé Keystore est morte (ré-enrôlement d'empreinte
+        // Android typiquement). VaultService a déjà supprimé le wrap →
+        // on masque le bouton biométrique et on affiche un message clair
+        // qui invite à utiliser le master password puis à réactiver la
+        // biométrie depuis Réglages.
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _loading = false;
+          _hasBiometric = false;
+          _error = t.unlockBiometricEnrollmentChanged;
+        });
+        break;
     }
   }
 
@@ -247,6 +261,18 @@ class _UnlockScreenState extends State<UnlockScreen> {
           _error = t.unlockWrongPassword;
         });
         _checkLockout(); // may have just hit threshold
+        break;
+      case UnlockResult.biometricInvalidated:
+        // Non-émis depuis l'unlock par mot de passe ; cas inclus pour
+        // satisfaire l'exhaustivité de l'enum. Traité comme un échec
+        // standard de saisie pour éviter tout comportement bizarre si
+        // un futur refactor venait à le faire remonter ici.
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _loading = false;
+          _error = t.unlockWrongPassword;
+        });
         break;
     }
   }

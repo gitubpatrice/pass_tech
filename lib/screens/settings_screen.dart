@@ -599,6 +599,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _toggleBiometric(bool v) async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     if (v) {
       try {
         // saveBiometricKey() écrit dans biometric_storage, qui crée une
@@ -608,13 +610,47 @@ class _SettingsScreenState extends State<SettingsScreen>
         // dual-vault). On absorbe silencieusement pour ne pas trahir
         // l'existence du decoy à un attaquant attentif.
         await VaultService().saveBiometricKey();
+      } on AuthException catch (e) {
+        // (v2.4.2) Discrimine annulation (userCanceled/canceled) d'échec
+        // technique pour donner un feedback explicite à l'utilisateur,
+        // remplace le `catch(_)` silencieux qui le laissait sans retour.
+        if (!mounted) return;
+        final isCancel =
+            e.code == AuthExceptionCode.userCanceled ||
+            e.code == AuthExceptionCode.canceled;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              isCancel
+                  ? t.settingsBiometricEnableCanceled
+                  : t.settingsBiometricEnableFailed,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       } catch (_) {
+        // StateError (slot decoy actif) ou autre erreur non-biométrique.
+        // On ne donne PAS de message qui révélerait le decoy ; silence
+        // intentionnel, mais on évite de basculer le toggle vers ON.
         return;
       }
     } else {
       await VaultService().deleteBiometricKey();
     }
-    if (mounted) setState(() => _biometricEnabled = v);
+    if (!mounted) return;
+    setState(() => _biometricEnabled = v);
+    // Snack de confirmation pour activation comme désactivation — donne
+    // un feedback positif que l'opération a bien été prise en compte
+    // (la toggle visuelle seule était trop discrète, audit UX).
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          v ? t.settingsBiometricEnabled : t.settingsBiometricDisabled,
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _setClipboard(int v) async {

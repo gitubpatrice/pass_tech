@@ -319,6 +319,40 @@ extension VaultUnlock on VaultService {
       }
       _wipeKey();
       return UnlockResult.wrongPassword;
+    } on AuthException catch (e) {
+      // (v2.4.2) Discrimine les modes d'échec de biometric_storage v5.0.1
+      // (enum AuthExceptionCode : userCanceled, canceled, unknown, timeout,
+      //  linuxAppArmorDenied) :
+      //  - userCanceled : l'utilisateur a tapé Annuler / back. Pas de
+      //    cleanup, fallback silencieux vers le master password.
+      //  - canceled    : annulation par l'OS (app switch, lock écran).
+      //    Pas de cleanup non plus.
+      //  - timeout     : le prompt a expiré sans interaction. Idem.
+      //  - autre (typiquement `unknown` quand la clé Keystore a été
+      //    invalidée par un ré-enrôlement d'empreinte) : auto-cleanup du
+      //    wrap + `biometricInvalidated` pour que l'UI affiche un message
+      //    clair plutôt que « biométrie invalide » générique sans
+      //    indication de marche à suivre.
+      _wipeKey();
+      switch (e.code) {
+        case AuthExceptionCode.userCanceled:
+        case AuthExceptionCode.canceled:
+        case AuthExceptionCode.timeout:
+          return UnlockResult.wrongPassword;
+        default:
+          // Cleanup best-effort — la clé Keystore est probablement morte,
+          // tenter de la réutiliser sur la prochaine tentative donnerait
+          // la même erreur. On supprime le flag + le storage entry pour
+          // que le bouton biométrie disparaisse au prochain build du
+          // unlock screen.
+          try {
+            await deleteBiometricKey();
+          } catch (_) {
+            // ignore — le caller verra biometricInvalidated et invitera
+            // l'utilisateur à réactiver depuis Réglages.
+          }
+          return UnlockResult.biometricInvalidated;
+      }
     } catch (_) {
       _wipeKey();
       return UnlockResult.wrongPassword;

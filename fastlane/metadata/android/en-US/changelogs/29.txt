@@ -1,0 +1,13 @@
+v2.4.2 — Biometric robustness after fingerprint re-enrollment
+
+* Detects when the Keystore key has been invalidated by an Android
+  fingerprint re-enrollment. Before: the biometric button showed
+  "Biometric failure" without guidance. Now: the wrap is auto-wiped,
+  and a clear message invites the user to unlock with the master
+  password and then re-enable biometric in Settings.
+* Confirmation snack on biometric enable AND disable in Settings
+  (used to be silent).
+* Distinct snack when biometric activation is canceled by the user
+  (back / cancel gesture) or fails at the hardware level.
+* New typed UnlockResult.biometricInvalidated to stop swallowing
+  biometric_storage exceptions silently.

@@ -85,6 +85,7 @@
   "unlockDecrypting": "Decrypting…",
   "unlockWrongPassword": "Wrong password",
   "unlockBiometricFailed": "Biometric failure",
+  "unlockBiometricEnrollmentChanged": "Android fingerprints changed: biometric unlock was disabled for safety. Unlock with your master password, then re-enable biometric in Settings.",
   "unlockHeirWrongPassword": "Wrong heir password",
 
   "heirDialogTitle": "Heir access",
@@ -465,6 +466,10 @@
 
   "settingsBiometricTitle": "Biometric unlock",
   "settingsBiometricSubtitle": "Fingerprint or Face ID",
+  "settingsBiometricEnabled": "Biometric unlock enabled.",
+  "settingsBiometricDisabled": "Biometric unlock disabled.",
+  "settingsBiometricEnableCanceled": "Biometric activation canceled.",
+  "settingsBiometricEnableFailed": "Biometric activation failed.",
   "settingsChangeMasterTitle": "Change master password",
   "settingsAutoLockTitle": "Auto-lock",
   "settingsAutoLockDialogTitle": "Lock the app after",

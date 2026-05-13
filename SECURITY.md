@@ -13,6 +13,27 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 | 2.0.x – 2.2.x | ⚠️ migration uniquement |
 | < 2.0.0       | ❌          |
 
+### Historique des correctifs récents
+
+- **v2.4.2** (2026-05-13) — Robustesse biométrique après ré-enrôlement
+  d'empreinte Android. Avant : si l'utilisateur supprimait puis
+  ré-enrôlait son empreinte, le bouton biométrique affichait « Échec
+  biométrique » sans expliquer la marche à suivre, et le wrap restait
+  en place (la résolution exigeait un toggle off/on manuel dans
+  Réglages). Maintenant : détection explicite de l'exception
+  `biometric_storage.AuthException` non-cancel, auto-suppression du
+  wrap, et nouveau résultat typé `UnlockResult.biometricInvalidated`
+  qui pilote un message clair « Empreinte Android modifiée : le
+  déverrouillage biométrique a été désactivé par sécurité. Déverrouillez
+  avec votre mot de passe principal, puis réactivez la biométrie dans
+  Réglages. ». Ajout d'un snack de confirmation explicite à
+  l'activation/désactivation de la biométrie dans Réglages (auparavant
+  silencieux), avec discrimination annulation utilisateur vs échec
+  technique. Aligne le pattern avec Health Tech v1.5.5.
+- **v2.4.0** (2026-05-13) — Audit zéro-vuln zéro-faille A1-A20 +
+  B1-B24, FLAG_SECURE dynamique avec refcount, MonotonicClock partagé,
+  PanicService purge phishing snapshot.
+
 ## Signaler une vulnérabilité
 
 **Merci de ne PAS ouvrir d'issue publique sur GitHub** — un gestionnaire de mots de passe demande une divulgation strictement coordonnée.

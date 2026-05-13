@@ -85,6 +85,7 @@
   "unlockDecrypting": "Déchiffrement…",
   "unlockWrongPassword": "Mot de passe incorrect",
   "unlockBiometricFailed": "Échec biométrique",
+  "unlockBiometricEnrollmentChanged": "Empreinte Android modifiée : le déverrouillage biométrique a été désactivé par sécurité. Déverrouillez avec votre mot de passe principal, puis réactivez la biométrie dans Réglages.",
   "unlockHeirWrongPassword": "Mot de passe héritier incorrect",
 
   "heirDialogTitle": "Accès héritier",
@@ -448,6 +449,10 @@
 
   "settingsBiometricTitle": "Déverrouillage biométrique",
   "settingsBiometricSubtitle": "Empreinte digitale ou Face ID",
+  "settingsBiometricEnabled": "Déverrouillage biométrique activé.",
+  "settingsBiometricDisabled": "Déverrouillage biométrique désactivé.",
+  "settingsBiometricEnableCanceled": "Activation biométrique annulée.",
+  "settingsBiometricEnableFailed": "Activation biométrique échouée.",
   "settingsChangeMasterTitle": "Changer le mot de passe maître",
   "settingsAutoLockTitle": "Verrouillage automatique",
   "settingsAutoLockDialogTitle": "Verrouiller l'app après",
