@@ -156,11 +156,18 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
+                          // U8 v2.4.4 — Semantics value pour TalkBack.
                           child: LinearProgressIndicator(
                             value: strength,
                             minHeight: 5,
                             backgroundColor: cs.surface,
                             valueColor: AlwaysStoppedAnimation(sColor),
+                            semanticsLabel: t.generatorStrengthSuffix(
+                              sLabel,
+                              bits,
+                            ),
+                            semanticsValue:
+                                '${(strength * 100).round()}% — $sLabel',
                           ),
                         ),
                       ),

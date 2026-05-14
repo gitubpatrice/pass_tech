@@ -19,10 +19,20 @@ class _SetupScreenState extends State<SetupScreen> {
   bool _loading = false;
   String? _error;
 
+  /// P5 v2.4.4 — `ValueNotifier` lié à `_pass1.text` pour rebuilder UNIQUEMENT
+  /// la jauge de force. Avant : `onChanged: (_) => setState(() {})` sur les
+  /// 2 PasswordTextField rebuilder TOUT l'écran à chaque frappe (3-5 ms × N
+  /// frappes pour un master password 30 chars), et `_pass2.onChanged` ne
+  /// change pas la jauge donc le rebuild était gaspillé. Désormais : jauge
+  /// scope-isolée dans un `ValueListenableBuilder`, le rebuild plein écran
+  /// se limite aux clics utiles (toggle show, error reset).
+  final ValueNotifier<String> _pass1Notifier = ValueNotifier<String>('');
+
   @override
   void dispose() {
     _pass1.dispose();
     _pass2.dispose();
+    _pass1Notifier.dispose();
     super.dispose();
   }
 
@@ -62,7 +72,6 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
-    final s = PasswordStrengthService.score(_pass1.text);
 
     return Scaffold(
       body: SafeArea(
@@ -100,45 +109,63 @@ class _SetupScreenState extends State<SetupScreen> {
                   controller: _pass1,
                   labelText: t.setupMasterLabel,
                   helperText: t.setupMasterHelper,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (v) => _pass1Notifier.value = v,
                 ),
 
-                if (_pass1.text.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: s,
-                            minHeight: 6,
-                            backgroundColor: cs.surfaceContainerHighest,
-                            valueColor: AlwaysStoppedAnimation(
-                              PasswordStrengthService.color(s),
+                // P5 v2.4.4 — jauge isolée dans ValueListenableBuilder. Le
+                // rebuild plein écran ne se déclenche plus à chaque frappe.
+                ValueListenableBuilder<String>(
+                  valueListenable: _pass1Notifier,
+                  builder: (context, pass, _) {
+                    if (pass.isEmpty) return const SizedBox.shrink();
+                    final s = PasswordStrengthService.score(pass);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: s,
+                                minHeight: 6,
+                                backgroundColor: cs.surfaceContainerHighest,
+                                valueColor: AlwaysStoppedAnimation(
+                                  PasswordStrengthService.color(s),
+                                ),
+                                // U8 v2.4.4 — Semantics value% pour TalkBack
+                                // (avant : muet, l'aveugle ne sait pas que
+                                // sa frappe a renforcé / affaibli le score).
+                                semanticsLabel: t.setupMasterLabel,
+                                semanticsValue:
+                                    '${(s * 100).round()}% — '
+                                    '${PasswordStrengthService.label(s, t)}',
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 10),
+                          Text(
+                            PasswordStrengthService.label(s, t),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: PasswordStrengthService.color(s),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        PasswordStrengthService.label(s, t),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: PasswordStrengthService.color(s),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    );
+                  },
+                ),
 
                 const SizedBox(height: 16),
 
                 PasswordTextField(
                   controller: _pass2,
                   labelText: t.setupConfirmLabel,
-                  onChanged: (_) => setState(() {}),
+                  // P5 v2.4.4 — pas de setState au pass2 : la mismatch est
+                  // levée DANS `_create()`, pas pendant la frappe. Évite un
+                  // rebuild plein écran par caractère.
                 ),
 
                 if (_error != null) ...[

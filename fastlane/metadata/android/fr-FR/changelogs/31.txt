@@ -1,0 +1,48 @@
+v2.4.4 — Audit expert : 27 corrections sécurité, perf, UX
+
+Sécurité :
+* F2 — Clé biométrique : vérification stricte de longueur (32 octets)
+  AVANT toute pose en mémoire. Si la clé stockée est corrompue, le
+  wrap est auto-supprimé et un message clair invite à réactiver.
+* F3 — Refactor anti-RAM-exposure : si vous avez choisi le MÊME
+  mot de passe pour primary ET decoy (config erronée), les entrées
+  du leurre ne transitent plus en RAM lors du déverrouillage.
+* F4 — Mutex partagé entre unlock, biométrie et vérification de
+  password (anti-corruption d'état lors de gestes UI rapides).
+* F5 — User-Agent fixé et banal pour le check HIBP (anti-corrélation
+  d'installation côté observateur réseau).
+* F6 — Compteur d'échecs borné à 1000 (anti pollution storage).
+* F7 — Code TOTP masqué par défaut (anti shoulder-surfing).
+* F8 — Champ d'accès héritage : antifuite Autofill Android + sélection
+  bloquée quand masqué (aligné master password v2.4.3).
+* F9 — Refus strict des .ptbak v1/v2 forgés avec MAC tronqué.
+* F10 — Horloge monotone : sérialisation des écritures concurrentes.
+* F11/F12 — QR otpauth:// : refus scheme/host exotique + cap 2 Ko.
+* F15 — Mode panique : reset du compteur d'échecs + lockout
+  (état post-panic indistinguable d'un boot frais).
+
+Performance :
+* P1 — Liste filtrée mémoïsée : plus de recalcul à chaque rebuild
+  (gain 25-50 ms sur 500 entrées).
+* P3 — Code TOTP : cache 30 s (HMAC-SHA1 ne tourne plus 1×/s mais
+  1×/30 s — économie batterie).
+* P5 — SetupScreen : jauge de force isolée (plus de rebuild plein
+  écran à chaque frappe du master password).
+* P6 — AuditScreen : aggrégation single-pass (au lieu de 8 passes).
+
+UX / a11y :
+* U2 — Dialogs destructifs (suppression entrée, leurre, héritage,
+  export en clair, reset complet) : Annuler en focus + bouton
+  rouge container clair (aligné Notes Tech / PDF Tech).
+* U3 — Badges "À propos" : contraste WCAG AA respecté en dark+light.
+* U4 — Score audit : icône à côté du libellé (daltonien-safe).
+* U5 — Vue héritage : tooltips Copier + couleur dark mode correcte.
+* U6 — Champs username/URL : pas d'auto-correction ni capitalisation.
+* U7 — Icône À propos : cacheWidth (économie mémoire).
+* U8 — Annonces TalkBack sur les barres de force / progress.
+* U9 — Feedback haptique sur save, lock, suppression complète.
+* U10 — Dots onboarding : annonce "Page X / Y" pour TalkBack.
+* U11 — Snacks flottants par défaut (cohérence light + dark).
+
+5 nouveaux tests de garde (UA stable, refus mac forgé v1/v2,
+validation otpauth strict). Total 53 tests verts.

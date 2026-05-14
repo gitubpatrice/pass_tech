@@ -542,15 +542,20 @@ class _HeirPasswordDialogState extends State<_HeirPasswordDialog> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          TextField(
+          // F8/U1 v2.4.4 — `PasswordTextField` au lieu de `TextField` brut.
+          // Avant : pas de `autofillHints:[]` (l'héritier saisit son passphrase
+          // dans un champ où Autofill Android pouvait proposer / capter la
+          // valeur), pas de `enableInteractiveSelection: !show` (long-press
+          // → "Tout sélectionner" → "Copier" exposait le password masqué au
+          // clipboard tiers), pas de `keyboardType: visiblePassword` ni
+          // `enableSuggestions: false`. Régression par rapport à v2.4.3 U1
+          // qui a corrigé le master password mais avait oublié ce dialog.
+          PasswordTextField(
             controller: _ctrl,
-            obscureText: true,
+            labelText: t.heirPasswordLabel,
             autofocus: true,
             onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              labelText: t.heirPasswordLabel,
-              border: const OutlineInputBorder(),
-            ),
+            showPrefixIcon: false,
           ),
         ],
       ),

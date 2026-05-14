@@ -1,30 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
 /// Privacy-preserving breach check via HaveIBeenPwned k-anonymity API.
 /// Only the first 5 chars of the SHA-1 hash leave the device.
 class BreachService {
-  /// QW7 v2.4.0 — UA stable inversement utilisable comme empreinte
-  /// (UA `PassTech` constant pour tous les utilisateurs). On garde un UA
-  /// neutre type browser pour ne pas se signaler côté HIBP logs / observer
-  /// réseau, sans pour autant prétendre être un browser réel.
-  static final String _userAgent = _generateUserAgent();
-
-  static String _generateUserAgent() {
-    final r = Random.secure();
-    // Pool d'UA neutres rotatif : un attaquant qui logge ne peut pas
-    // corréler 2 installations Pass Tech distinctes via UA seul.
-    const pool = [
-      'Mozilla/5.0 (compatible)',
-      'okhttp/4.12.0',
-      'curl/8.6.0',
-      'Dart/3.5 (dart:io)',
-    ];
-    return pool[r.nextInt(pool.length)];
-  }
+  /// F5 v2.4.4 — UA fixé, banal et **constant pour tous les utilisateurs**.
+  ///
+  /// Précédente approche (QW7 v2.4.0) : pool de 4 UAs choisi aléatoirement au
+  /// démarrage de l'app. Mais `static final` = tiré UNE fois par lancement et
+  /// conservé pour toute la session — un observateur réseau (HIBP logs, MITM
+  /// non protégé par HSTS, ISP) qui voyait un même `_userAgent` sur plusieurs
+  /// requêtes pouvait corréler une installation Pass Tech avec un compte HIBP
+  /// ou une période d'activité. Avec 4 UAs, la combinaison `IP × UA` était
+  /// quasi-unique.
+  ///
+  /// Désormais : UA strictement constant (`Mozilla/5.0 (compatible)`),
+  /// identique entre toutes les installations Pass Tech, toutes les requêtes,
+  /// toutes les sessions. HIBP voit le même UA banal qu'un crawler générique
+  /// — pas de surface pour fingerprinter une installation distincte.
+  static const String _userAgent = 'Mozilla/5.0 (compatible)';
 
   /// Returns the number of times the password was found in known breaches,
   /// or 0 if not found, or -1 on network error.
@@ -38,7 +34,7 @@ class BreachService {
       final resp = await http
           .get(
             Uri.parse('https://api.pwnedpasswords.com/range/$prefix'),
-            headers: {'User-Agent': _userAgent, 'Add-Padding': 'true'},
+            headers: const {'User-Agent': _userAgent, 'Add-Padding': 'true'},
           )
           .timeout(const Duration(seconds: 8));
 

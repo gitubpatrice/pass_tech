@@ -107,23 +107,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             // Dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(pages.length, (i) {
-                final active = i == _page;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: active ? 22 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: active
-                        ? cs.primary
-                        : cs.onSurfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                );
-              }),
+            // U10 v2.4.4 — Semantics group "Page X / Y" pour TalkBack.
+            // Avant : les dots étaient purement visuels (3 AnimatedContainer
+            // sans label), le swipe entre pages ne s'annonçait pas pour les
+            // utilisateurs aveugles. Format universel `X / Y` (pas besoin
+            // d'ajouter une clé ARB).
+            Semantics(
+              label: '${_page + 1} / ${pages.length}',
+              container: true,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(pages.length, (i) {
+                  final active = i == _page;
+                  return ExcludeSemantics(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: active ? 22 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? cs.primary
+                            : cs.onSurfaceVariant.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  );
+                }),
+              ),
             ),
             const SizedBox(height: 16),
             Padding(

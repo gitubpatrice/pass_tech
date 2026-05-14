@@ -18,7 +18,24 @@ extension VaultUnlock on VaultService {
   /// que le password du leurre diffère bien du password du primary AVANT
   /// la création. Ne touche pas à _key / _entries (ne déverrouille pas
   /// vraiment l'app — le test est isolé puis nettoyé).
+  ///
+  /// F4 v2.4.4 — partage le mutex `_unlockGate` avec `unlock()` et
+  /// `unlockWithBiometric()`. Avant : un setup decoy ou heritage déclenché
+  /// pendant un unlock en cours (impossible en UI normale mais accessible
+  /// via deeplinks / Back rapide) pouvait corrompre `_key`/`_entries`
+  /// pendant le snapshot/restore du path v3.
   Future<bool> passwordMatchesPrimary(String password) async {
+    if (_unlockGate != null) return false;
+    final gate = _unlockGate = Completer<void>();
+    try {
+      return await _passwordMatchesPrimaryInternal(password);
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  Future<bool> _passwordMatchesPrimaryInternal(String password) async {
     try {
       final file = await _vaultFileFor(_Slot.primary);
       if (!await file.exists()) return false;
@@ -36,13 +53,19 @@ extension VaultUnlock on VaultService {
       final savedSlot = _activeSlot;
       try {
         if (version >= VaultService._currentVersion) {
-          final fk = await _v4Unlock(
+          final r = await _v4Unlock(
             slot: _Slot.primary,
             password: password,
             raw: raw,
           );
-          if (fk == null) return false;
-          SecretBytes.wipe(fk);
+          if (r == null) return false;
+          // F3 v2.4.4 — `_v4Unlock` est désormais pur. On wipe tous les
+          // buffers retournés ; `r.entries` est juste une `List<Entry>`
+          // référencée localement (GC). Pas de mutation du state global.
+          SecretBytes.wipe(r.finalKey);
+          SecretBytes.wipe(r.salt);
+          SecretBytes.wipe(r.wrappedDek);
+          SecretBytes.wipe(r.wrapNonce);
           return true;
         }
         // v3 path — derive PBKDF2 then attempt MAC check.
@@ -103,18 +126,35 @@ extension VaultUnlock on VaultService {
 
       if (version >= VaultService._currentVersion) {
         // ── v4 path ──
-        final fk = await _v4Unlock(
+        // F3 v2.4.4 — `_v4Unlock` est pur depuis v2.4.4 ; on assigne ici
+        // les side effects (state global + cache méta). Ce path n'est plus
+        // utilisé par `_unlockInternal` (qui appelle `_v4Unlock` directement
+        // et applique le winner après le loop, cf. F3). Il reste utilisé
+        // pour les contextes où une seule tentative de slot est faite (rare,
+        // appels de tests ou futurs callers).
+        final r = await _v4Unlock(
           slot: slot,
           password: masterPassword,
           raw: raw,
         );
-        if (fk == null) {
+        if (r == null) {
           _wipeKey();
           return UnlockResult.wrongPassword;
         }
         _wipeKey();
-        _key = fk;
+        _key = r.finalKey;
+        _entries = r.entries;
+        _isOpen = true;
         _activeSlot = slot;
+        // QW2 v2.4.0 — peuple le cache méta : prochain `_saveVault` skip
+        // la re-lecture du fichier (gain ~30-50 ms/CRUD). Pour cohérence
+        // avec F5 v2.4.3 (wipe du cache à lock), on wipe d'abord l'ancien.
+        if (_cachedSalt != null) SecretBytes.wipe(_cachedSalt!);
+        if (_cachedWrappedDek != null) SecretBytes.wipe(_cachedWrappedDek!);
+        if (_cachedWrapNonce != null) SecretBytes.wipe(_cachedWrapNonce!);
+        _cachedSalt = r.salt;
+        _cachedWrappedDek = r.wrappedDek;
+        _cachedWrapNonce = r.wrapNonce;
         await _onUnlockSuccess();
         return UnlockResult.success;
       }
@@ -180,12 +220,35 @@ extension VaultUnlock on VaultService {
     }
   }
 
-  /// Try to unlock a v4 vault for `slot`. Returns the recovered finalKey on
-  /// success, or `null` on failure. v2.2.0 : `_decryptVaultV4` est pur, donc
-  /// cette méthode mute désormais `_entries` et `_isOpen` directement après
-  /// succès — comportement attendu par les appelants (`_tryUnlockSlot`,
-  /// `unlock`). Caller wipes the returned key after use.
-  Future<Uint8List?> _v4Unlock({
+  /// Try to unlock a v4 vault for `slot`. Returns a record containing the
+  /// recovered finalKey, the decrypted entries, and the cache metadata, or
+  /// `null` on failure.
+  ///
+  /// F3 v2.4.4 — **PURE depuis v2.4.4**. Avant : mutation directe de
+  /// `_entries`/`_isOpen`/`_cachedSalt`/`_cachedWrappedDek`/`_cachedWrapNonce`
+  /// dès qu'un slot déchiffrait. Conséquence : dans `_unlockInternal` (qui
+  /// itère les 2 slots pour le déni plausible anti-timing), si l'utilisateur
+  /// avait choisi le MÊME mot de passe pour le coffre primary ET decoy
+  /// (config erronée), la 2ᵉ itération écrivait brièvement les entries du
+  /// decoy en RAM avant que `_unlockInternal` ne les écrase par le winner.
+  /// Une instrumentation pouvait alors lire `_entries` pendant cette fenêtre
+  /// ~10ms. Désormais : aucune mutation latente — le caller assigne UNIQUEMENT
+  /// pour le slot gagnant, à la fin du loop.
+  ///
+  /// Caller responsibility :
+  ///  - wipe `finalKey` après usage (clé 32B AES-GCM v4).
+  ///  - wipe `salt` / `wrappedDek` / `wrapNonce` si non promus dans le cache
+  ///    méta (pour les slots perdants du loop déni plausible).
+  Future<
+    ({
+      Uint8List finalKey,
+      List<Entry> entries,
+      Uint8List salt,
+      Uint8List wrappedDek,
+      Uint8List wrapNonce,
+    })?
+  >
+  _v4Unlock({
     required _Slot slot,
     required String password,
     required Map<String, dynamic> raw,
@@ -226,24 +289,22 @@ extension VaultUnlock on VaultService {
         SecretBytes.wipe(finalKey);
         return null;
       }
-      // Apply side effects only on success — `_decryptVaultV4` est pur depuis
-      // v2.2.0, l'assignation revient à l'appelant.
-      _entries = entries;
-      _isOpen = true;
-      // F10 v2.4.3 — ordre réorganisé : caller prend la clé en premier
-      // (`out` cloné depuis `finalKey`), `finalKey` est wipé immédiatement,
-      // PUIS le cache méta est rempli. Avant : si une exception (OOM,
-      // GC pressure) survenait entre `_cachedSalt = …` et `SecretBytes.wipe`,
-      // la clé brute survivait dans `finalKey` jusqu'au prochain GC, en
-      // plus du cache partiel.
+      // F10 v2.4.3 — caller prend la clé d'abord (`out` cloné), puis
+      // `finalKey` est wipé. Si une exception (OOM, GC) survenait entre
+      // l'assignation et le wipe, la clé brute survivait dans `finalKey`
+      // jusqu'au GC.
       final out = Uint8List.fromList(finalKey);
       SecretBytes.wipe(finalKey);
-      // QW2 v2.4.0 — peuple le cache méta : prochain `_saveVault` skip
-      // la re-lecture du fichier (gain ~30-50 ms/CRUD).
-      _cachedSalt = Uint8List.fromList(salt);
-      _cachedWrappedDek = Uint8List.fromList(wrappedDek);
-      _cachedWrapNonce = Uint8List.fromList(wrapNonce);
-      return out;
+      return (
+        finalKey: out,
+        entries: entries,
+        // F3 v2.4.4 — clones de salt/wrappedDek/wrapNonce retournés au
+        // caller, qui décidera de les promouvoir dans le cache méta
+        // (uniquement pour le slot winner) ou de les wiper.
+        salt: Uint8List.fromList(salt),
+        wrappedDek: Uint8List.fromList(wrappedDek),
+        wrapNonce: Uint8List.fromList(wrapNonce),
+      );
     } finally {
       if (pwHash != null) SecretBytes.wipe(pwHash);
       if (hwSecret != null) SecretBytes.wipe(hwSecret);
@@ -284,10 +345,26 @@ extension VaultUnlock on VaultService {
       final file = await _vaultFileFor(_Slot.primary);
       if (!await file.exists()) return UnlockResult.wrongPassword;
 
+      // F2 v2.4.4 — Décode et VALIDE la longueur AVANT de poser `_key`.
+      // Avant : `_key = base64Decode(keyB64)` directement, puis check
+      // length plus bas. Si le storage avait été corrompu (downgrade,
+      // disk error, attaque ciblée), la clé non-32B se retrouvait
+      // brièvement en RAM dans `_key` jusqu'à l'invalidation. Le wipe
+      // était correct mais inutilement étalé. Désormais : si la longueur
+      // diverge, on supprime le wrap (clé manifestement corrompue) et
+      // on signale `biometricInvalidated` à l'UI.
+      final candidate = base64Decode(keyB64);
+      if (candidate.length != 32) {
+        SecretBytes.wipe(candidate);
+        try {
+          await deleteBiometricKey();
+        } catch (_) {}
+        return UnlockResult.biometricInvalidated;
+      }
       // Wipe l'éventuelle clé résiduelle d'une session précédente AVANT
       // d'écrire la nouvelle, pour éviter une fuite mémoire transitoire.
       _wipeKey();
-      _key = base64Decode(keyB64);
+      _key = candidate;
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
 
@@ -295,18 +372,14 @@ extension VaultUnlock on VaultService {
       if (version >= VaultService._currentVersion) {
         // v4 : the cached _key IS the 32-byte finalKey, no Argon2id / KEK
         // unwrap needed. The GCM tag binds the AAD so wrong-key fails closed.
-        if (_key == null || _key!.length != 32) {
+        // v2.2.0 : `_decryptVaultV4` est pur. On assigne ici en cas de succès.
+        final entries = await _decryptVaultV4(raw, _key!);
+        if (entries == null) {
           ok = false;
         } else {
-          // v2.2.0 : `_decryptVaultV4` est pur. On assigne ici en cas de succès.
-          final entries = await _decryptVaultV4(raw, _key!);
-          if (entries == null) {
-            ok = false;
-          } else {
-            _entries = entries;
-            _isOpen = true;
-            ok = true;
-          }
+          _entries = entries;
+          _isOpen = true;
+          ok = true;
         }
       } else {
         ok = _decryptVaultV3(raw);

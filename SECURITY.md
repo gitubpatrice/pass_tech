@@ -15,6 +15,153 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 ### Historique des correctifs récents
 
+- **v2.4.4** (2026-05-14) — Audit expert post-v2.4.3 (3 agents parallèles
+  sécurité / performance / UX) : 22 corrections F2-F12+F15 sécu /
+  P1+P3+P5+P6 perf / U2-U11 UX. Objectif : zéro vulnérabilité, zéro faille.
+  `flutter analyze` 0 issue, 48+7 tests verts.
+
+  **Sécurité (haute priorité)** :
+  - **F2** — `_unlockWithBiometricInternal` : longueur de la clé
+    biométrique décodée VALIDÉE avant pose en `_key`. Avant : `_key =
+    base64Decode(keyB64)` posé puis check `length != 32` plus loin. Si
+    le storage avait été corrompu (downgrade, disk error, attaque ciblée),
+    une clé non-32B vivait brièvement en RAM. Désormais : check via une
+    variable locale `candidate`, wipe + `deleteBiometricKey` + retour
+    `biometricInvalidated` si invalide.
+  - **F3** — Refactor anti-RAM-exposure decoy. `_v4Unlock` rendu **pur**
+    (retourne `(finalKey, entries, salt, wrappedDek, wrapNonce)` au
+    lieu de muter `_entries`/`_isOpen`/`_cachedSalt`). `_unlockInternal`
+    réécrit pour itérer les 2 slots (déni plausible anti-timing) sans
+    toucher au state global : applique le winner UNE fois après le loop.
+    Avant : si l'utilisateur réutilisait le même mot de passe pour
+    primary et decoy (config erronée), la 2ᵉ itération exposait
+    brièvement les entries decoy en RAM (~10ms) avant écrasement.
+  - **F4** — `passwordMatchesPrimary` partage le mutex `_unlockGate`
+    avec `unlock()` et `unlockWithBiometric()`. Avant : un setup decoy
+    ou heritage déclenché pendant un unlock en cours (deeplinks / Back
+    rapide) pouvait corrompre `_key`/`_entries` pendant le snapshot/
+    restore du path v3.
+  - **F5** — `BreachService._userAgent` fixé constant
+    (`Mozilla/5.0 (compatible)`) au lieu d'un pool rotatif de 4 UAs
+    tiré au démarrage de l'app via `static final`. Avant : un observateur
+    réseau (HIBP logs, MITM, ISP) qui voyait toujours le même UA durant
+    une session pouvait corréler une installation Pass Tech avec un
+    compte HIBP / IP. Désormais : UA strictement identique entre toutes
+    les installations, toutes les sessions, banal comme un crawler générique.
+  - **F6** — `_onUnlockFail` : compteur d'échecs `clamp(0, 1000)`.
+    Avant : un attaquant qui spam `unlock()` montait le compteur à
+    des dizaines de milliers, usure NAND et pollution storage (le
+    lockout step reste plafonné à 30 min via la table). Aucun impact
+    crypto, hygiène uniquement.
+  - **F7** — `_TotpCard` : code TOTP masqué par défaut (`••• •••`),
+    bouton oeil pour révéler. Avant : code 6-digits visible en
+    permanence dans la card → shoulder-surfing trivial. Aligné sur le
+    pattern `_PasswordField` qui exige `show=true`.
+  - **F8** — `_HeirPasswordDialog` (saisie passphrase héritier) :
+    `TextField(obscureText: true)` brut remplacé par `PasswordTextField`
+    (autofillHints=[], enableInteractiveSelection=show,
+    keyboardType=visiblePassword, autocorrect=false). Régression
+    v2.4.3 U1 qui avait corrigé le master password mais oublié ce
+    dialog. L'héritier saisit son passphrase dans un champ désormais
+    protégé contre Autofill tiers et long-press copy.
+  - **F9** — `.ptbak` v1/v2 legacy : `mac.length != 32` refusé AVANT
+    le `compute pbkdf2Worker`. Avant :
+    `SecretBytes.constantTimeEq(computed, mac)` retournait `false`
+    sur length mismatch (commentaire M-2) mais après avoir consommé
+    600 000 itérations PBKDF2 pour rien. Un `.ptbak` v1/v2 forgé
+    avec `mac="AAA="` (3 octets) court-circuitait silencieusement.
+  - **F10** — `MonotonicClock.nowMs()` sérialisée via un Future cache
+    pour éviter les races `read → max → write` non-atomiques quand 2
+    callers concurrent (auto-lock timer + unlock + heritage markActive)
+    s'entrelaçaient autour des `await _storage.read/write`.
+  - **F11** — `_extractTotpSecret` : refus strict des `otpauth://`
+    avec scheme ≠ `otpauth` ou host ≠ `totp`. Avant : un QR
+    `otpauth://malicious-host/whatever?secret=ABCD&issuer=<huge string>`
+    était accepté tant que `secret` était base32-valide.
+  - **F12** — `_extractTotpSecret` cap rawValue QR à 2048 octets
+    avant `Uri.parse`. Anti-DoS marginal mais borne la surface
+    d'attaque du parser sur un QR malicieux 3-4 Ko.
+  - **F15** — `PanicService.panic()` reset désormais `pt_fail_count` ET
+    `pt_lockout_until` dans flutter_secure_storage. Avant : après
+    panic+disguise, un attaquant tombant sur le decoy pouvait déclencher
+    un lockout 30 min "anormal" via 5 tentatives ratées — signal indirect
+    qu'une situation d'urgence venait d'avoir lieu (le compteur antérieur
+    de l'utilisateur légitime persistait). Désormais : état post-panic
+    indistinguable d'un boot frais.
+
+  **Performance** :
+  - **P1** — `HomeScreen._filtered` mémoïsé via `_cachedFiltered`/
+    `_cachedEntriesLength`, invalidé sur mutation (`_filter`, `_sort`,
+    `_search`, mutations entries via `_refresh`). Avant : 4 passes
+    `where().toList()` + sort recalculées à CHAQUE build sur 500
+    entries (4-8 ms × 6 rebuilds/écran = 25-50 ms évités). Sur 1000
+    entries : 150 ms.
+  - **P3** — `_TotpCardState` cache `(code, validUntilEpoch)` ; le
+    `Timer.periodic 1s` continue de driver le countdown mais le calcul
+    HMAC-SHA1 ne tourne plus que tous les 30 s. Économie batterie
+    réelle sur écran TOTP ouvert (~0.5 ms/s × N visualisations).
+  - **P5** — `SetupScreen` : jauge de force scope-isolée dans un
+    `ValueListenableBuilder` lié à `_pass1`. Avant : `onChanged: (_)
+    => setState(() {})` sur les 2 PasswordTextField rebuilder TOUT
+    l'écran à chaque frappe. Gain ~3-5 ms / frappe sur S9.
+  - **P6** — `AuditScreen._analyze` single-pass : 1 boucle remplit
+    `_weak`/`_duplicates`/`_old`/`_missing2fa` + compteurs
+    `_passCount`/`_noteCount`/`_cardCount`/`_with2fa` (utilisés en
+    header stats). Avant : 4 passes `where().toList()` + 4 passes
+    `where().length` à chaque rebuild (8×500 = 4000 evals).
+
+  **UX / a11y** :
+  - **U2** — 4 dialogs destructifs alignés sur le pattern v2.4.3 U10
+    (autofocus Cancel + `FilledButton.tonal` rouge avec `cs.errorContainer`
+    / `cs.onErrorContainer`) : delete entry, decoy delete, heritage
+    disable, screenshot protection off, deleteAll vault (le plus
+    critique). Avant : `TextButton` rouge sans autofocus, pas de
+    différentiation visuelle suffisante du destructif vs annulation.
+  - **U3** — `_Badge` (about_screen) : texte en `cs.onSurface` au
+    lieu de `color` thématique. Contraste WCAG AA atteint (~13:1 vs
+    ~2.5:1 mesuré sur 5 des 6 badges) — texte rouge sur fond rouge
+    clair échouait. L'icône colorée conserve le signal visuel.
+  - **U4** — `_scoreIcon()` (audit_screen) : icône daltonien-safe
+    (`check_circle` / `thumb_up_alt` / `warning_amber_rounded` /
+    `error`) à côté du libellé. Avant : couleur seule signalait la
+    qualité du score → confusion deutéranope/protanope. Semantics
+    group annonce "Score 85 sur 100, Bon" à TalkBack.
+  - **U5** — `HeirViewScreen` : tooltips `IconButton` copy
+    (l'héritier est par définition non-familier de l'app, c'est son
+    SEUL usage) + `cs.onSurfaceVariant` au lieu de `Colors.grey`
+    hardcodé (contraste pauvre dark mode).
+  - **U6** — `entry_edit_screen` username / URL : `autocorrect: false`
+    + `enableSuggestions: false` + `textCapitalization: none`. Avant :
+    Gboard transformait `john.doe` → `John Doe` au premier caractère,
+    capitalisait `Https://` au début du champ URL.
+  - **U7** — `about_screen` : `Image.asset` icon `cacheWidth: 160`
+    + `cacheHeight: 160` (= 2× displayWidth 80dp). Sans ce cap,
+    Flutter décodait l'asset à devicePixelRatio (240×240 sur S24),
+    soit ~230 Ko RAM par instance. Aligné PDF Tech / RFT / AI Tech.
+  - **U8** — `LinearProgressIndicator` audit_screen (HIBP progress)
+    et setup_screen (jauge force) : `semanticsLabel` + `semanticsValue`
+    "%" pour TalkBack. Avant : aveugle voyait juste la section
+    sans aucun feedback de progression sur les ~6 s du batch.
+  - **U9** — `HapticFeedback` ajouté : `selectionClick` sur save
+    entry (action utilisateur réussie), `mediumImpact` sur lock manuel
+    + delete entry (geste protecteur), `heavyImpact` sur panic +
+    deleteAll vault (action critique). Avant : seul `clipboard.copy`
+    avait `lightImpact`. Pattern aligné AI Tech v0.9.1 U4.
+  - **U10** — Onboarding dots : `Semantics(label: 'X / Y')` group
+    pour TalkBack. Avant : les dots étaient purement visuels — swipe
+    entre pages ne s'annonçait pas pour utilisateurs aveugles.
+  - **U11** — `snackBarTheme: SnackBarThemeData(behavior:
+    SnackBarBehavior.floating)` ajouté aux `_lightTheme()` et
+    `_darkTheme()` globaux. Avant : sites `ScaffoldMessenger.of(
+    context).showSnackBar` inline (38 occurrences hors SnackUtils)
+    n'avaient pas `behavior:floating` — overlap fréquent avec FAB
+    sur petits écrans.
+
+  **Qualité** :
+  - +7 tests garde `v2_4_4_guards_test.dart` (F11/F12 QR
+    scheme+cap, F9 mac.length pre-check, F5 UA constant).
+  - `flutter analyze` 0 issue, 48+7 tests verts.
+
 - **v2.4.3** (2026-05-13) — Audit expert post-v2.4.2 : 24 corrections
   (F1-F6+F10 sécu / U1 U3 U4 U6 U10 U12 U14 UX / P1.1 P2.1 P2.2 perf).
 

@@ -303,30 +303,116 @@ class VaultService {
 
   Future<UnlockResult> _unlockInternal(String masterPassword) async {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
-    // Déni plausible : on tente PBKDF2 sur CHAQUE slot, même si un slot
-    // précédent a matché. Sinon le timing révèle l'existence du decoy
-    // (1× PBKDF2 = matché primary, 2× PBKDF2 = matché decoy ou échec
-    // avec decoy présent, etc.). Toujours 2× PBKDF2 → pas de side-channel.
+    // Déni plausible : on tente UNE PASSE Argon2id sur CHAQUE slot, même si
+    // un slot précédent a matché. Sinon le timing révèle l'existence du
+    // decoy (1× Argon2id = matché primary, 2× = matché decoy ou échec avec
+    // decoy présent). Toujours 2× Argon2id → pas de side-channel.
+    //
+    // F3 v2.4.4 — Refactor anti-RAM-exposure decoy. Auparavant `_tryUnlockSlot`
+    // mute `_entries`/`_isOpen` dès qu'un slot déchiffrait, donc dans le cas
+    // (rare) où l'utilisateur avait choisi le MÊME password pour primary et
+    // decoy, la 2ᵉ itération exposait brièvement les entries decoy en RAM
+    // avant l'écrasement par le winner. Désormais : `_v4Unlock` est pur,
+    // on capture le winner (key + entries + cache méta) localement, et on
+    // applique l'état AU FINAL pour le winner uniquement.
     _Slot? matchedSlot;
     Uint8List? winnerKey;
     List<Entry>? winnerEntries;
+    Uint8List? winnerSalt;
+    Uint8List? winnerWrappedDek;
+    Uint8List? winnerWrapNonce;
+    bool winnerIsV3 = false;
+
     for (final slot in _Slot.values) {
-      final r = await _tryUnlockSlot(slot, masterPassword);
-      if (r == UnlockResult.success && matchedSlot == null) {
-        // Capture l'état du slot gagnant AVANT que la prochaine itération
-        // l'écrase. On clone la clé pour ne pas la perdre quand _wipeKey
-        // sera appelé pendant l'itération suivante.
-        matchedSlot = slot;
-        winnerKey = Uint8List.fromList(_key!);
-        winnerEntries = List<Entry>.from(_entries);
+      final file = await _vaultFileFor(slot);
+      if (!await file.exists()) {
+        // Anti-timing : consomme ~1 Argon2id même si le slot n'existe pas.
+        // Password constant (pt_dummy_noop_v2) pour éviter une dépendance
+        // linéaire du coût Argon2id avec la longueur du masterPassword
+        // (timing oracle marginal sinon).
+        final dummySalt = SecretBytes.randomBytes(32);
+        final dummyOut = await KdfService.argon2id(
+          password: 'pt_dummy_noop_v2',
+          salt: dummySalt,
+        );
+        SecretBytes.wipe(dummyOut);
+        continue;
+      }
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final version = raw['version'] as int? ?? 1;
+
+      if (version >= _currentVersion) {
+        // ── Path v4 pur (refactor F3 v2.4.4) ────────────────────────────
+        final r = await _v4Unlock(
+          slot: slot,
+          password: masterPassword,
+          raw: raw,
+        );
+        if (r == null) continue;
+        if (matchedSlot == null) {
+          matchedSlot = slot;
+          winnerKey = r.finalKey;
+          winnerEntries = r.entries;
+          winnerSalt = r.salt;
+          winnerWrappedDek = r.wrappedDek;
+          winnerWrapNonce = r.wrapNonce;
+        } else {
+          // 2ᵉ slot déchiffre aussi (user a réutilisé le même password —
+          // erreur de config). Wipe immédiatement TOUS les buffers du
+          // perdant : sa clé v4, son cache méta, et ses entries (liste de
+          // String laissée à la merci du GC, mais on déréférence vite).
+          SecretBytes.wipe(r.finalKey);
+          SecretBytes.wipe(r.salt);
+          SecretBytes.wipe(r.wrappedDek);
+          SecretBytes.wipe(r.wrapNonce);
+          // r.entries sera GC après cette itération (référence locale).
+        }
+      } else {
+        // ── Path v3 legacy (rare, vault non-migré depuis v2.0.0) ───────
+        // Si on a déjà un winner v4, on skip la migration v3 du perdant —
+        // on ne migre que pour le winner (cas v3 winner ci-dessous).
+        // Anti-timing : consomme ~1 Argon2id dummy pour ne pas révéler
+        // qu'on a déjà un winner.
+        if (matchedSlot != null) {
+          final dummySalt = SecretBytes.randomBytes(32);
+          final dummyOut = await KdfService.argon2id(
+            password: 'pt_dummy_noop_v2',
+            salt: dummySalt,
+          );
+          SecretBytes.wipe(dummyOut);
+          continue;
+        }
+        final r = await _tryUnlockSlot(slot, masterPassword);
+        if (r == UnlockResult.success) {
+          // Le path v3 mute déjà `_key`/`_entries`/`_isOpen`/`_activeSlot`
+          // et déclenche la migration v3→v4 inline. On capture juste un
+          // marqueur pour ne pas réécrire l'état au final.
+          matchedSlot = slot;
+          winnerKey = Uint8List.fromList(_key!);
+          winnerEntries = List<Entry>.from(_entries);
+          winnerIsV3 = true;
+        }
       }
     }
+
     if (matchedSlot != null && winnerKey != null) {
-      _wipeKey();
-      _key = winnerKey;
-      _entries = winnerEntries!;
-      _isOpen = true;
-      _activeSlot = matchedSlot;
+      if (!winnerIsV3) {
+        // F3 v2.4.4 — Application des side effects UNIQUEMENT pour le
+        // winner v4. Aucune mutation n'a eu lieu pendant le loop pour ce
+        // path : pas de fenêtre d'exposition RAM des entries decoy.
+        _wipeKey();
+        _key = winnerKey;
+        _entries = winnerEntries!;
+        _isOpen = true;
+        _activeSlot = matchedSlot;
+        if (_cachedSalt != null) SecretBytes.wipe(_cachedSalt!);
+        if (_cachedWrappedDek != null) SecretBytes.wipe(_cachedWrappedDek!);
+        if (_cachedWrapNonce != null) SecretBytes.wipe(_cachedWrapNonce!);
+        _cachedSalt = winnerSalt;
+        _cachedWrappedDek = winnerWrappedDek;
+        _cachedWrapNonce = winnerWrapNonce;
+        await _onUnlockSuccess();
+      }
       return UnlockResult.success;
     }
     _wipeKey();

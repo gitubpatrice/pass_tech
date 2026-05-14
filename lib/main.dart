@@ -221,6 +221,10 @@ ThemeData _lightTheme() => ThemeData(
   useMaterial3: true,
   colorSchemeSeed: const Color(0xFF1F6FEB),
   brightness: Brightness.light,
+  // U11 v2.4.4 — snack flottant par défaut (cohérent avec SnackUtils +
+  // les ScaffoldMessenger inline qui n'avaient pas `behavior:floating`).
+  // Aligné PDF Tech v1.12.4 U2.
+  snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
 );
 
 ThemeData _darkTheme() {
@@ -280,5 +284,7 @@ ThemeData _darkTheme() {
     ),
     listTileTheme: const ListTileThemeData(tileColor: surface),
     dividerColor: border,
+    // U11 v2.4.4 — snack flottant sur dark theme.
+    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
   );
 }

@@ -87,17 +87,20 @@ class _EntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
     return ExpansionTile(
       leading: const Icon(Icons.lock_outline),
       title: Text(
         entry.title,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
+      // U5 v2.4.4 — `cs.onSurfaceVariant` au lieu de `Colors.grey` hardcodé
+      // (contraste pauvre en dark mode WCAG ~3:1, exigence AA 4.5:1).
       subtitle: entry.username.isEmpty
           ? null
           : Text(
               entry.username,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               overflow: TextOverflow.ellipsis,
             ),
       children: [
@@ -113,8 +116,11 @@ class _EntryTile extends StatelessWidget {
               entry.username,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             ),
+            // U5 v2.4.4 — tooltip explicite (l'héritier n'est par
+            // définition pas familier de l'app — c'est son SEUL usage).
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
+              tooltip: t.heirViewFieldUsername,
               onPressed: () =>
                   _copy(context, t.heirViewFieldUsername, entry.username),
             ),
@@ -133,6 +139,7 @@ class _EntryTile extends StatelessWidget {
             ),
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
+              tooltip: t.heirViewFieldPassword,
               onPressed: () =>
                   _copy(context, t.heirViewFieldPassword, entry.password),
             ),
@@ -156,9 +163,11 @@ class _EntryTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // U5 v2.4.4 — `cs.onSurfaceVariant` au lieu de `Colors.grey`
+                // hardcodé (contraste pauvre en dark mode).
                 Text(
                   t.heirViewFieldNotes,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: 4),
                 SelectableText(

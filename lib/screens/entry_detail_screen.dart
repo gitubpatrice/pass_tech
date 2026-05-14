@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 // ignore: unnecessary_import
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
 import '../models/category.dart';
@@ -194,19 +195,28 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         title: Text(t.entryDetailDeleteTitle),
         content: Text(t.entryDetailDeleteConfirm(_entry.title)),
         actions: [
+          // U2 v2.4.4 — autofocus sur Cancel + bouton destructif via
+          // FilledButton.tonal cs.errorContainer (aligné pattern home U10
+          // v2.4.3 et Notes Tech v1.0.9 U3).
           TextButton(
+            autofocus: true,
             onPressed: () => nav.pop(false),
             child: Text(t.actionCancel),
           ),
-          TextButton(
+          FilledButton.tonal(
             onPressed: () => nav.pop(true),
-            style: TextButton.styleFrom(foregroundColor: cs.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: cs.errorContainer,
+              foregroundColor: cs.onErrorContainer,
+            ),
             child: Text(t.actionDelete),
           ),
         ],
       ),
     );
     if (confirm != true) return;
+    // U9 v2.4.4 — feedback haptique sur action destructive.
+    await HapticFeedback.mediumImpact();
     await VaultService().deleteEntry(_entry.id);
     widget.onChanged();
     if (mounted) nav.pop();
@@ -759,6 +769,31 @@ class _TotpCard extends StatefulWidget {
 
 class _TotpCardState extends State<_TotpCard> {
   Timer? _timer;
+  // F7 v2.4.4 — TOTP masqué par défaut. Avant : code affiché en clair en
+  // permanence dans la card → shoulder-surfing trivial sur un détail
+  // d'entrée bancaire ouvert. Aligné sur le pattern `_PasswordField` qui
+  // exige `show=true` pour révéler.
+  bool _showTotp = false;
+
+  // P3 v2.4.4 — cache du code TOTP. Avant : `TotpService.generateCode` (HMAC-
+  // SHA1) recalculé chaque seconde alors que le code change toutes les 30s.
+  // Désormais on cache `(code, validUntilEpoch)` et on ne recalcule que
+  // lorsque la fenêtre courante expire. Le rebuild 1Hz du countdown reste
+  // mais le calcul crypto ne tourne plus que tous les 30s.
+  String? _cachedCode;
+  int _cachedValidUntilMs = 0;
+
+  String _currentCode() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (_cachedCode != null && now < _cachedValidUntilMs) {
+      return _cachedCode!;
+    }
+    _cachedCode = TotpService.generateCode(widget.secret);
+    // Fenêtre TOTP : 30s, alignée sur l'epoch (now ~/ 30 * 30).
+    final periodMs = 30 * 1000;
+    _cachedValidUntilMs = ((now ~/ periodMs) + 1) * periodMs;
+    return _cachedCode!;
+  }
 
   @override
   void initState() {
@@ -777,10 +812,12 @@ class _TotpCardState extends State<_TotpCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final code = TotpService.generateCode(widget.secret);
+    final t = AppLocalizations.of(context);
+    final code = _currentCode();
     final remaining = TotpService.secondsRemaining();
     final urgent = remaining <= 5;
     final ringColor = urgent ? cs.error : cs.primary;
+    final displayed = _showTotp ? code : '••• •••';
 
     return Card(
       child: Padding(
@@ -831,17 +868,25 @@ class _TotpCardState extends State<_TotpCard> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    code,
+                    displayed,
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 3,
-                      color: ringColor,
+                      color: _showTotp ? ringColor : cs.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
+            ),
+            IconButton(
+              icon: Icon(
+                _showTotp ? Icons.visibility_off : Icons.visibility,
+                size: 18,
+              ),
+              onPressed: () => setState(() => _showTotp = !_showTotp),
+              tooltip: t.entryDetailToggleVisibility,
             ),
             IconButton(
               icon: const Icon(Icons.copy, size: 18),

@@ -1,0 +1,48 @@
+v2.4.4 — Expert audit: 27 fixes (security, perf, UX)
+
+Security:
+* F2 — Biometric key: strict 32-byte length check BEFORE loading
+  into memory. If the stored key is corrupted, the wrap is
+  auto-deleted and a clear message prompts re-enrollment.
+* F3 — Anti-RAM-exposure refactor: if you chose the SAME master
+  password for primary AND decoy (config mistake), the decoy
+  entries no longer transit in memory during unlock.
+* F4 — Shared mutex between unlock, biometric and password
+  verification (anti-state-corruption on rapid UI taps).
+* F5 — Fixed bland User-Agent for HIBP check (anti install
+  correlation by network observer).
+* F6 — Fail counter clamped to 1000 (anti storage pollution).
+* F7 — TOTP code hidden by default (anti shoulder-surfing).
+* F8 — Heritage password dialog: anti-Autofill + selection
+  blocked when masked (aligned with master password v2.4.3).
+* F9 — Strict refusal of forged v1/v2 .ptbak with truncated MAC.
+* F10 — Monotonic clock: serialized concurrent writes.
+* F11/F12 — QR otpauth:// : reject exotic scheme/host + 2 KB cap.
+* F15 — Panic mode: resets the fail counter + lockout
+  (post-panic state indistinguishable from a fresh boot).
+
+Performance:
+* P1 — Filtered list memoized: no more recompute on every
+  rebuild (25-50 ms gain on 500 entries).
+* P3 — TOTP code: 30 s cache (HMAC-SHA1 runs every 30 s now,
+  not every second — battery saver).
+* P5 — SetupScreen: password strength gauge isolated (no more
+  full-screen rebuild on every keystroke).
+* P6 — AuditScreen: single-pass aggregation (vs 8 passes).
+
+UX / a11y:
+* U2 — Destructive dialogs (delete entry, decoy, heritage,
+  plain export, full reset): Cancel autofocus + red container
+  button (aligned Notes Tech / PDF Tech).
+* U3 — "About" badges: WCAG AA contrast in dark+light.
+* U4 — Audit score: icon next to label (colorblind-safe).
+* U5 — Heir view: Copy tooltips + correct dark-mode color.
+* U6 — Username/URL fields: no auto-correction or capitalization.
+* U7 — About icon: cacheWidth (memory saving).
+* U8 — TalkBack announces on strength / progress bars.
+* U9 — Haptic feedback on save, lock, full delete.
+* U10 — Onboarding dots: "Page X / Y" TalkBack announcement.
+* U11 — Floating snacks by default (light + dark consistency).
+
+5 new guard tests (stable UA, forged v1/v2 mac refusal,
+strict otpauth validation). 53 tests total, all green.

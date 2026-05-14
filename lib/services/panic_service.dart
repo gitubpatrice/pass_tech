@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'anti_phishing_service.dart';
 import 'clipboard_service.dart';
 import 'vault_service.dart';
@@ -25,6 +26,13 @@ class PanicService {
   /// QW5 v2.4.0 — délégué à `AntiPhishingService.clearSnapshot()` qui possède
   /// déjà le channel — supprime la duplication du `MethodChannel` ici.
 
+  /// F15 v2.4.4 — clés du compteur d'échecs / lockout (miroir de
+  /// `VaultService._failCountKey` / `_lockoutKey`). Le storage est partagé
+  /// (même `FlutterSecureStorage` par défaut côté Android).
+  static const _failCountKey = 'pt_fail_count';
+  static const _lockoutKey = 'pt_lockout_until';
+  static const _storage = FlutterSecureStorage();
+
   static Future<void> panic({bool disguise = true}) async {
     // 1. Lock vault (synchrone, garanti)
     try {
@@ -40,7 +48,18 @@ class PanicService {
     } catch (_) {
       /* AS désactivée, ignore */
     }
-    // 4. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
+    // 4. F15 v2.4.4 — reset le compteur d'échecs ET le lockout.
+    // Avant : après panic+disguise, un attaquant tombant sur le decoy
+    // pouvait déclencher un lockout 30 min "anormal" via 5 tentatives
+    // ratées sur le slot decoy — signal indirect qu'une situation
+    // d'urgence vient d'avoir lieu (le compteur d'échecs antérieur de
+    // l'utilisateur légitime persistait). Désormais : état post-panic
+    // indistinguable d'un boot frais.
+    try {
+      await _storage.delete(key: _failCountKey);
+      await _storage.delete(key: _lockoutKey);
+    } catch (_) {}
+    // 5. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
     if (disguise) {
       try {
         await _channel.invokeMethod('setDisguised', {'disguised': true});

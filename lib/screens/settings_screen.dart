@@ -6,6 +6,7 @@ import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/material.dart';
 // ignore: unnecessary_import
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:biometric_storage/biometric_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -355,30 +356,37 @@ class _SettingsScreenState extends State<SettingsScreen>
     final t = AppLocalizations.of(context);
     final action = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(t.heritageManageTitle),
-        content: Text(
-          t.heritageManageBody,
-          style: const TextStyle(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'cancel'),
-            child: Text(t.actionCancel),
+      builder: (_) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: Text(t.heritageManageTitle),
+          content: Text(
+            t.heritageManageBody,
+            style: const TextStyle(fontSize: 13),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'disable'),
-            child: Text(
-              t.heritageDisable,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+          actions: [
+            // U2 v2.4.4 — autofocus Cancel + bouton destructif via
+            // FilledButton.tonal cs.errorContainer.
+            TextButton(
+              autofocus: true,
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: Text(t.actionCancel),
             ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, 'update'),
-            child: Text(t.heritageUpdate),
-          ),
-        ],
-      ),
+            FilledButton.tonal(
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.errorContainer,
+                foregroundColor: cs.onErrorContainer,
+              ),
+              onPressed: () => Navigator.pop(context, 'disable'),
+              child: Text(t.heritageDisable),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'update'),
+              child: Text(t.heritageUpdate),
+            ),
+          ],
+        );
+      },
     );
     if (!mounted || action == null || action == 'cancel') return;
     if (action == 'disable') {
@@ -506,23 +514,33 @@ class _SettingsScreenState extends State<SettingsScreen>
     final t = AppLocalizations.of(context);
     final action = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(t.decoyDialogTitle),
-        content: Text(t.decoyManageBody, style: const TextStyle(fontSize: 13)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'cancel'),
-            child: Text(t.actionCancel),
+      builder: (_) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: Text(t.decoyDialogTitle),
+          content: Text(
+            t.decoyManageBody,
+            style: const TextStyle(fontSize: 13),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'delete'),
-            child: Text(
-              t.decoyDelete,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+          actions: [
+            // U2 v2.4.4 — autofocus Cancel + bouton destructif via
+            // FilledButton.tonal cs.errorContainer.
+            TextButton(
+              autofocus: true,
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: Text(t.actionCancel),
             ),
-          ),
-        ],
-      ),
+            FilledButton.tonal(
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.errorContainer,
+                foregroundColor: cs.onErrorContainer,
+              ),
+              onPressed: () => Navigator.pop(context, 'delete'),
+              child: Text(t.decoyDelete),
+            ),
+          ],
+        );
+      },
     );
     if (action != 'delete' || !mounted) return;
     await VaultService().deleteDecoyVault();
@@ -564,6 +582,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       },
     );
     if (confirm != true || !mounted) return;
+    // U9 v2.4.4 — heavyImpact sur action panique (le geste le plus
+    // critique de l'app : lock + clear clipboard + disguise icône).
+    await HapticFeedback.heavyImpact();
     await PanicService.panic();
     if (!mounted) return;
     // Retour à l'écran de déverrouillage (vault est lock).
@@ -584,6 +605,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   void _lockNow() {
+    // U9 v2.4.4 — haptique mediumImpact sur lock manuel (geste protecteur,
+    // intermédiaire entre l'action courante et l'action destructive).
+    HapticFeedback.mediumImpact();
     VaultService().lock();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const UnlockScreen()),
@@ -700,12 +724,18 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
           actions: [
+            // U2 v2.4.4 — autofocus Cancel + bouton destructif via
+            // FilledButton.tonal cs.errorContainer.
             TextButton(
+              autofocus: true,
               onPressed: () => Navigator.of(ctx).pop(false),
               child: Text(t.actionCancel),
             ),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: cs.error),
+            FilledButton.tonal(
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.errorContainer,
+                foregroundColor: cs.onErrorContainer,
+              ),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(t.exportPlainConfirm),
             ),
@@ -986,19 +1016,28 @@ class _SettingsScreenState extends State<SettingsScreen>
         title: Text(t.settingsDeleteAllDialogTitle),
         content: Text(t.settingsDeleteAllDialogBody),
         actions: [
+          // U2 v2.4.4 — autofocus Cancel + bouton destructif via
+          // FilledButton.tonal cs.errorContainer. Le PLUS critique des
+          // 4 sites — supprime intégralement le coffre + decoy.
           TextButton(
+            autofocus: true,
             onPressed: () => nav.pop(false),
             child: Text(t.actionCancel),
           ),
-          TextButton(
+          FilledButton.tonal(
             onPressed: () => nav.pop(true),
-            style: TextButton.styleFrom(foregroundColor: cs.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: cs.errorContainer,
+              foregroundColor: cs.onErrorContainer,
+            ),
             child: Text(t.settingsDeleteAllConfirm),
           ),
         ],
       ),
     );
     if (ok != true) return;
+    // U9 v2.4.4 — feedback haptique sur action destructive ultime.
+    await HapticFeedback.heavyImpact();
     await VaultService().deleteVault();
     if (mounted) {
       nav.pushAndRemoveUntil(

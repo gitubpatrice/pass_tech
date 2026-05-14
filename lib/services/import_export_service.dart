@@ -468,6 +468,16 @@ class ImportExportService {
       final mac = base64Decode(json['mac'] as String);
       final cipher = base64Decode(json['data'] as String);
 
+      // F9 v2.4.4 — borne stricte sur la longueur du MAC AVANT le compute.
+      // `SecretBytes.constantTimeEq` retourne tôt sur length-mismatch
+      // (commentaire M-2 ci-dessous), donc un .ptbak v1/v2 forgé avec
+      // `mac="AAA="` (3 octets) court-circuitait immédiatement la
+      // vérification sans même calculer HMAC. Inoffensif tant que les
+      // autres vérifications restent strictes (le decrypt AES-CBC échouera
+      // de toute façon), mais on évite d'exposer un oracle de longueur
+      // côté API (un futur appelant pourrait s'y fier).
+      if (mac.length != 32) return null;
+
       final key = await compute(pbkdf2Worker, [
         utf8.encode(passphrase),
         salt,

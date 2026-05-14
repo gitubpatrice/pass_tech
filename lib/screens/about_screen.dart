@@ -269,10 +269,17 @@ class _AboutScreenState extends State<AboutScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
+                  // U7 v2.4.4 — `cacheWidth: 160` (= 2× displayWidth 80dp pour
+                  // density 2-3x). Avant : Flutter décodait l'asset
+                  // `assets/icon.png` à devicePixelRatio (240×240 sur S24),
+                  // soit ~230 Ko RAM par instance et un re-décodage à chaque
+                  // changement de thème. Aligné pattern AI Tech U5 v0.9.1.
                   child: Image.asset(
                     'assets/icon.png',
                     width: 80,
                     height: 80,
+                    cacheWidth: 160,
+                    cacheHeight: 160,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -546,29 +553,36 @@ class _Badge extends StatelessWidget {
   const _Badge({required this.icon, required this.label, required this.color});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withValues(alpha: 0.3)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          // U3 v2.4.4 — texte en `cs.onSurface` (contraste WCAG AA ~13:1
+          // sur cs.surface) au lieu de la `color` thématique (~2.5:1 sur
+          // color.withAlpha(0.12)). L'icône colorée conserve le signal
+          // visuel/sémantique du badge.
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _HelpCard extends StatelessWidget {

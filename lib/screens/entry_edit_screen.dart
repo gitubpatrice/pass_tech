@@ -146,6 +146,9 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     }
 
     setState(() => _saving = true);
+    // U9 v2.4.4 — feedback haptique sur save (selectionClick = action
+    // utilisateur réussie). Pattern aligné AI Tech v0.9.1 U4 / PDF Tech U8.
+    HapticFeedback.selectionClick();
 
     Entry entry;
     if (_isEdit) {
@@ -203,9 +206,20 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
   }
 
   String? _extractTotpSecret(String raw) {
+    // F12 v2.4.4 — cap la taille du payload QR avant tout parsing. Un QR
+    // malicieux encodant ~4 Ko transitait jusqu'à `Uri.parse` ; inoffensif
+    // mais évite un mini-DoS et borne la surface d'attaque du parser.
+    if (raw.length > 2048) return null;
     if (raw.startsWith('otpauth://')) {
       try {
-        return Uri.parse(raw).queryParameters['secret'];
+        final uri = Uri.parse(raw);
+        // F11 v2.4.4 — refuse les URIs `otpauth://` avec scheme ou host
+        // exotique. Spec RFC 6238 / Google Authenticator : `otpauth://totp/`
+        // (TOTP) ou `otpauth://hotp/` (HOTP, non supporté ici). Avant : un
+        // QR `otpauth://malicious-host/whatever?secret=ABCD&issuer=<huge>`
+        // était accepté tant que `secret` était base32-valide.
+        if (uri.scheme != 'otpauth' || uri.host != 'totp') return null;
+        return uri.queryParameters['secret'];
       } catch (_) {
         return null;
       }
@@ -402,6 +416,13 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       TextField(
         controller: _userCtrl,
         keyboardType: TextInputType.emailAddress,
+        // U6 v2.4.4 — désactive autocorrect/suggestions/capitalisation
+        // sur username. Avant : Gboard auto-corrigeait `john.doe` →
+        // `John Doe` et capitalisait l'initiale (sentences par défaut),
+        // ce qui cassait les logins case-sensitive.
+        autocorrect: false,
+        enableSuggestions: false,
+        textCapitalization: TextCapitalization.none,
         decoration: InputDecoration(
           labelText: t.entryEditFieldUsername,
           hintText: t.entryEditHintUsername,
@@ -432,6 +453,11 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       TextField(
         controller: _urlCtrl,
         keyboardType: TextInputType.url,
+        // U6 v2.4.4 — URL : pas de capitalisation auto (qui
+        // produisait `Https://` en début de champ), pas d'autocorrect.
+        autocorrect: false,
+        enableSuggestions: false,
+        textCapitalization: TextCapitalization.none,
         decoration: InputDecoration(
           labelText: t.entryEditFieldUrlOptional,
           hintText: t.entryEditHintUrl,

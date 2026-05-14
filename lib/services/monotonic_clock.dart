@@ -28,7 +28,37 @@ class MonotonicClock {
   /// "Now" robuste au clock skew : retourne `max(DateTime.now(), maxSeen)`
   /// et persiste la valeur courante. Recul de l'horloge → on garde
   /// l'ancien max comme "now". Avance acceptée (fail-open).
-  static Future<int> nowMs() async {
+  ///
+  /// F10 v2.4.4 — sérialisation via un Future cache pour éviter les races
+  /// `read → max → write` non-atomiques quand 2 callers entrent en
+  /// concurrence (auto-lock timer + unlock + heritage markActive). Dart est
+  /// mono-thread sur un isolate donc le test/write SYNC est atomique, mais
+  /// les `await` autour de `_storage.read/write` ouvrent des fenêtres de
+  /// concurrence inter-microtâches. Sans guard, un write tardif pouvait
+  /// écraser une valeur plus récente d'un autre caller, brisant l'invariant
+  /// "rolling max jamais vu". Inoffensif sécuritairement (delta négligeable)
+  /// mais documente l'intention.
+  static Future<int>? _pending;
+  static Future<int> nowMs() {
+    final p = _pending;
+    if (p != null) {
+      return p.then(_continueAfter);
+    }
+    final c = _pending = _nowMsInternal();
+    return c.whenComplete(() {
+      if (identical(_pending, c)) _pending = null;
+    });
+  }
+
+  /// Quand un appel concurrent a déjà résolu la valeur "now" (a fait le
+  /// read+write storage), on peut juste relire le `realNow` actuel et le
+  /// borner par l'ancien max — pas besoin d'un 2ᵉ aller-retour storage.
+  static Future<int> _continueAfter(int previous) async {
+    final realNow = DateTime.now().millisecondsSinceEpoch;
+    return realNow > previous ? realNow : previous;
+  }
+
+  static Future<int> _nowMsInternal() async {
     final realNow = DateTime.now().millisecondsSinceEpoch;
     final s = await _storage.read(key: _kMaxSeenMs);
     final maxSeen = int.tryParse(s ?? '0') ?? 0;

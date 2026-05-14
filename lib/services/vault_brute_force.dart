@@ -25,7 +25,11 @@ extension VaultBruteForce on VaultService {
 
   Future<void> _onUnlockFail() async {
     final s = await VaultService._storage.read(key: VaultService._failCountKey);
-    final count = (int.tryParse(s ?? '0') ?? 0) + 1;
+    // F6 v2.4.4 — clamp à 1000 max. Avant : un attaquant qui spam `unlock()`
+    // pendant des heures montait le compteur à des dizaines de milliers ;
+    // aucun impact crypto (lockout step toujours plafonné à 30 min via
+    // `_lockoutSteps.length - 1`) mais usure NAND et pollution storage.
+    final count = ((int.tryParse(s ?? '0') ?? 0) + 1).clamp(0, 1000);
     await VaultService._storage.write(
       key: VaultService._failCountKey,
       value: count.toString(),
