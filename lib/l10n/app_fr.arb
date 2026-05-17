@@ -562,5 +562,14 @@
   "settingsScreenshotProtectionSubtitle": "Activé par défaut (recommandé). Bloque captures, enregistrement écran, vignette Recent Apps et projection externe. Désactivez UNIQUEMENT si vous avez besoin de coller du texte depuis une autre app sur Samsung — Knox bloque le presse-papier inter-apps quand la protection est active.",
   "settingsScreenshotProtectionRestart": "Redémarrez Pass Tech pour appliquer complètement le changement.",
   "settingsScreenshotProtectionConfirmOffTitle": "Désactiver la protection ?",
-  "settingsScreenshotProtectionConfirmOffBody": "Sans protection, vos mots de passe peuvent apparaître dans les captures d'écran, l'aperçu des apps récentes et les enregistrements écran. À n'utiliser que temporairement pour coller un texte depuis une autre app."
+  "settingsScreenshotProtectionConfirmOffBody": "Sans protection, vos mots de passe peuvent apparaître dans les captures d'écran, l'aperçu des apps récentes et les enregistrements écran. À n'utiliser que temporairement pour coller un texte depuis une autre app.",
+
+  "splashTagline": "La protection maximale\npour vos mots de passe.",
+  "@splashTagline": { "description": "Slogan affiche sous le titre sur le splash de premiere ouverture (Files Tech)." },
+  "splashSkipHint": "Toucher l'écran pour continuer",
+  "@splashSkipHint": { "description": "Hint discret en bas du splash pour skip immediat." },
+  "splashLogoContentDescription": "Logo Pass Tech",
+  "@splashLogoContentDescription": { "description": "Description TalkBack pour l'image du logo sur le splash." },
+  "splashSemanticsLabel": "Splash de présentation Pass Tech",
+  "@splashSemanticsLabel": { "description": "Annonce TalkBack pour l'ecran splash complet." }
 }

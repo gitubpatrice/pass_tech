@@ -4,10 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'services/app_update.dart';
 import 'services/clipboard_service.dart';
+import 'services/first_launch_flag.dart';
 import 'services/secure_window.dart';
 import 'services/vault_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/setup_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/unlock_screen.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -100,16 +102,27 @@ void main() async {
 
   final vaultExists = await VaultService().vaultExists;
   final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
-  runApp(PassTechApp(vaultExists: vaultExists, onboardingDone: onboardingDone));
+  // v2.4.5 — splash de presentation Files Tech au tout premier lancement
+  // uniquement. Hydratation prefs deja faite ci-dessus, lecture peu couteuse.
+  final showSplash = await FirstLaunchFlag.shouldShow();
+  runApp(
+    PassTechApp(
+      vaultExists: vaultExists,
+      onboardingDone: onboardingDone,
+      showSplash: showSplash,
+    ),
+  );
 }
 
 class PassTechApp extends StatefulWidget {
   final bool vaultExists;
   final bool onboardingDone;
+  final bool showSplash;
   const PassTechApp({
     super.key,
     required this.vaultExists,
     required this.onboardingDone,
+    required this.showSplash,
   });
 
   @override
@@ -206,11 +219,14 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: !widget.onboardingDone && !widget.vaultExists
-              ? const OnboardingScreen()
-              : (widget.vaultExists
-                    ? const UnlockScreen()
-                    : const SetupScreen()),
+          home: SplashGate(
+            showSplash: widget.showSplash,
+            nextChild: !widget.onboardingDone && !widget.vaultExists
+                ? const OnboardingScreen()
+                : (widget.vaultExists
+                      ? const UnlockScreen()
+                      : const SetupScreen()),
+          ),
         ),
       ),
     );

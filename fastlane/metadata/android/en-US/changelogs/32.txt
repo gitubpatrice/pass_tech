@@ -1,0 +1,16 @@
+v2.4.5 — Files Tech visual signature
+
+* Welcome splash on the very first launch after install
+  (logo animation + tagline, ~5 s, skip via tap or
+  Back). Visual consistency with other Files Tech apps.
+  Tagline: "Maximum protection for your passwords."
+* No file format change (.enc / .ptbak / .pt_heir).
+  No permission added. No new data collected — splash
+  is 100% offline, persisted via shared_preferences
+  only (one boolean key).
+* Splash shows only once after install. To see it
+  again: Android Settings → Pass Tech → Clear data
+  (this also wipes the vault — only do it if you
+  really want to).
+
+flutter analyze 0 issue, 60/60 tests passing.

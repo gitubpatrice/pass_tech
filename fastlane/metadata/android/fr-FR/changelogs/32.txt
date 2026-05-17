@@ -1,0 +1,17 @@
+v2.4.5 — Signature visuelle Files Tech
+
+* Splash de bienvenue au tout premier lancement après
+  installation (animation logo + slogan, ~5 s, skip au
+  tap ou via Back). Cohérence visuelle avec les autres
+  apps Files Tech. Slogan : « La protection maximale
+  pour vos mots de passe. »
+* Aucun changement de format de fichier (.enc / .ptbak /
+  .pt_heir). Aucune permission ajoutée. Aucune nouvelle
+  donnée collectée — splash 100 % hors-ligne via
+  shared_preferences uniquement (clé booléenne).
+* Le splash ne s'affiche qu'une fois après install.
+  Pour le revoir : Paramètres Android → Pass Tech →
+  Effacer données (efface aussi le coffre — à n'utiliser
+  que si vous le souhaitez).
+
+flutter analyze 0 issue, 60/60 tests verts.
