@@ -20,6 +20,7 @@ import '../services/import_export_service.dart';
 import '../services/panic_service.dart';
 import '../services/secure_window.dart';
 import '../services/vault_service.dart';
+import '../utils/snack_utils.dart';
 import '../widgets/password_text_field.dart';
 import '../l10n/app_localizations.dart';
 import '../main.dart'
@@ -182,12 +183,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
     if (!mounted) return;
     setState(() => _screenshotProtectionEnabled = v);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(t.settingsScreenshotProtectionRestart),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-      ),
+    SnackUtils.showInfo(
+      messenger,
+      t.settingsScreenshotProtectionRestart,
+      duration: const Duration(seconds: 4),
     );
   }
 
@@ -316,9 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     // Refus si pas dans le primary (l'héritage doit refléter le vrai coffre)
     if (VaultService().isDecoyActive) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(t.heritageDecoyActiveSnack)),
-      );
+      SnackUtils.showInfo(messenger, t.heritageDecoyActiveSnack);
       return;
     }
 
@@ -332,7 +329,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     // Vérifie que le password diffère du primary
     final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
     if (matchesPrimary) {
-      messenger.showSnackBar(SnackBar(content: Text(t.heirSamePasswordSnack)));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.heirSamePasswordSnack);
       return;
     }
 
@@ -340,15 +338,16 @@ class _SettingsScreenState extends State<SettingsScreen>
       await HeritageService().setupOrUpdateSnapshot(heirPassword: pwd);
       if (!mounted) return;
       setState(() {});
-      messenger.showSnackBar(
-        SnackBar(content: Text(t.heritageConfiguredSnack)),
-      );
+      SnackUtils.showInfo(messenger, t.heritageConfiguredSnack);
     } on StateError catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, e.message);
     } on ArgumentError catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('${e.message}')));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, '${e.message}');
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.genericError('$e'));
     }
   }
 
@@ -390,12 +389,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (!mounted || action == null || action == 'cancel') return;
     if (action == 'disable') {
+      final messenger = ScaffoldMessenger.of(context);
       await HeritageService().disable();
       if (!mounted) return;
       setState(() {});
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(t.heritageDisabledSnack)));
+      SnackUtils.showInfo(messenger, t.heritageDisabledSnack);
     } else if (action == 'update') {
       // Re-prompt heir password pour confirmer + sauvegarder
       final pwd = await showDialog<String>(
@@ -407,26 +405,25 @@ class _SettingsScreenState extends State<SettingsScreen>
       final messenger = ScaffoldMessenger.of(context);
       final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
       if (matchesPrimary) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(t.heirSamePasswordShortSnack)),
-        );
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, t.heirSamePasswordShortSnack);
         return;
       }
       try {
         await HeritageService().setupOrUpdateSnapshot(heirPassword: pwd);
         if (!mounted) return;
         setState(() {});
-        messenger.showSnackBar(
-          SnackBar(content: Text(t.heritageSnapshotUpdatedSnack)),
-        );
+        SnackUtils.showInfo(messenger, t.heritageSnapshotUpdatedSnack);
       } catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, t.genericError('$e'));
       }
     }
   }
 
   Future<void> _changeHeritageThreshold(int current) async {
     final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final v = await showDialog<int>(
       context: context,
       builder: (_) => SimpleDialog(
@@ -448,9 +445,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (!mounted) return;
       setState(() {});
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.genericError('$e'));
     }
   }
 
@@ -490,7 +486,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     final messenger = ScaffoldMessenger.of(context);
     final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
     if (matchesPrimary) {
-      messenger.showSnackBar(SnackBar(content: Text(t.decoySamePasswordError)));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.decoySamePasswordError);
       return;
     }
 
@@ -501,12 +498,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       VaultService().lock();
       if (!mounted) return;
       setState(() {});
-      messenger.showSnackBar(SnackBar(content: Text(t.decoyConfiguredSnack)));
+      SnackUtils.showInfo(messenger, t.decoyConfiguredSnack);
       // Retour au unlock screen
       Navigator.of(context).popUntil((r) => r.isFirst);
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
+      SnackUtils.showError(context, messenger, t.genericError('$e'));
     }
   }
 
@@ -543,12 +540,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       },
     );
     if (action != 'delete' || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     await VaultService().deleteDecoyVault();
     if (!mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(t.decoyDeletedSnack)));
+    SnackUtils.showInfo(messenger, t.decoyDeletedSnack);
   }
 
   Future<void> _triggerPanic() async {
@@ -593,14 +589,14 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _revealApp() async {
     final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     await PanicService.revealApp();
     if (!mounted) return;
     setState(() {}); // Rafraîchit le FutureBuilder
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(t.panicRevealSnack),
-        duration: const Duration(seconds: 5),
-      ),
+    SnackUtils.showInfo(
+      messenger,
+      t.panicRevealSnack,
+      duration: const Duration(seconds: 5),
     );
   }
 
@@ -642,16 +638,15 @@ class _SettingsScreenState extends State<SettingsScreen>
         final isCancel =
             e.code == AuthExceptionCode.userCanceled ||
             e.code == AuthExceptionCode.canceled;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              isCancel
-                  ? t.settingsBiometricEnableCanceled
-                  : t.settingsBiometricEnableFailed,
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (isCancel) {
+          SnackUtils.showInfo(messenger, t.settingsBiometricEnableCanceled);
+        } else {
+          SnackUtils.showError(
+            context,
+            messenger,
+            t.settingsBiometricEnableFailed,
+          );
+        }
         return;
       } catch (_) {
         // StateError (slot decoy actif) ou autre erreur non-biométrique.
@@ -667,13 +662,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     // Snack de confirmation pour activation comme désactivation — donne
     // un feedback positif que l'opération a bien été prise en compte
     // (la toggle visuelle seule était trop discrète, audit UX).
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          v ? t.settingsBiometricEnabled : t.settingsBiometricDisabled,
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+    SnackUtils.showInfo(
+      messenger,
+      v ? t.settingsBiometricEnabled : t.settingsBiometricDisabled,
     );
   }
 
@@ -809,7 +800,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(SnackBar(content: Text(t.genericError('$e'))));
+      SnackUtils.showError(context, messenger, t.genericError('$e'));
     }
   }
 
@@ -826,14 +817,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (probe == null || probe.files.isEmpty || !mounted) return;
     final probeFile = probe.files.first;
     if (probeFile.size > _kMaxImportBytes) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            t.importTooLarge(
-              (probeFile.size / 1024 / 1024).toStringAsFixed(0),
-              '${_kMaxImportBytes ~/ (1024 * 1024)}',
-            ),
-          ),
+      SnackUtils.showError(
+        context,
+        messenger,
+        t.importTooLarge(
+          (probeFile.size / 1024 / 1024).toStringAsFixed(0),
+          '${_kMaxImportBytes ~/ (1024 * 1024)}',
         ),
       );
       return;
@@ -841,7 +830,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     // 2. Le path Android est rempli par défaut → on lit directement.
     final filePath = probeFile.path;
     if (filePath == null) {
-      messenger.showSnackBar(SnackBar(content: Text(t.importReadError)));
+      SnackUtils.showError(context, messenger, t.importReadError);
       return;
     }
     final Uint8List bytes;
@@ -849,7 +838,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       bytes = await File(filePath).readAsBytes();
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(t.importReadError)));
+      SnackUtils.showError(context, messenger, t.importReadError);
       return;
     }
     final file = probeFile;
@@ -862,7 +851,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       // comme du Latin-1, corrompant silencieusement les entries.
       content = utf8.decode(bytes, allowMalformed: true);
     } catch (_) {
-      messenger.showSnackBar(SnackBar(content: Text(t.importNotText)));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.importNotText);
       return;
     }
 
@@ -904,16 +894,16 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (!mounted) return;
       Navigator.of(context).pop();
       if (imported == null) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(t.importWrongPassphrase)),
-        );
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, t.importWrongPassphrase);
         return;
       }
       formatLabel = t.importFormatEncryptedBackup;
     } else {
       final result = ImportExportService.parse(content);
       if (result.error != null) {
-        messenger.showSnackBar(SnackBar(content: Text(result.error!)));
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, result.error!);
         return;
       }
       imported = result.entries;
@@ -921,7 +911,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
 
     if (imported.isEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(t.importNoEntry)));
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.importNoEntry);
       return;
     }
 
@@ -964,9 +955,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     widget.onChanged();
     if (mounted) {
       final skippedSuffix = skipped > 0 ? t.importSkippedSuffix(skipped) : '';
-      messenger.showSnackBar(
-        SnackBar(content: Text(t.importDoneSnack(added, skippedSuffix))),
-      );
+      SnackUtils.showInfo(messenger, t.importDoneSnack(added, skippedSuffix));
     }
   }
 
@@ -986,6 +975,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _changePassword() async {
     final nav = Navigator.of(context);
     final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final result = await showDialog<String>(
       context: context,
       builder: (_) => const _ChangePasswordDialog(),
@@ -999,9 +989,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     await VaultService().changeMasterPassword(result);
     if (mounted) {
       nav.pop(); // close progress dialog
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(t.changePasswordDoneSnack)));
+      SnackUtils.showInfo(messenger, t.changePasswordDoneSnack);
       setState(() => _biometricEnabled = false);
     }
   }
@@ -1087,7 +1075,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             isThreeLine: true,
             onChanged: _toggleScreenshotProtection,
           ),
-          if (_biometricAvailable)
+          if (_biometricAvailable) ...[
             SwitchListTile(
               title: Text(t.settingsBiometricTitle),
               subtitle: Text(t.settingsBiometricSubtitle),
@@ -1095,6 +1083,25 @@ class _SettingsScreenState extends State<SettingsScreen>
               value: _biometricEnabled,
               onChanged: _toggleBiometric,
             ),
+            // F2 / ROADMAP_HARDENING M-6 — biometric_storage repose sur une
+            // clé Android Keystore configurée setUserAuthenticationRequired.
+            // Sur certains OEM, l'ajout d'une nouvelle empreinte / Face ID
+            // n'invalide PAS systématiquement la clé existante, donc tout
+            // nouveau biométrique pourrait déverrouiller Pass Tech. La seule
+            // garantie portable : forcer l'utilisateur à désactiver/réactiver
+            // la bio dans Pass Tech pour régénérer la clé (deleteBiometricKey
+            // + saveBiometricKey crée une nouvelle clé bornée à l'enrollment
+            // courant).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(72, 0, 16, 12),
+              child: Text(
+                t.settingsBiometricNewEnrollmentWarning,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+          ],
           ListTile(
             leading: const Icon(Icons.key_outlined),
             title: Text(t.settingsChangeMasterTitle),
@@ -1153,7 +1160,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ListTile(
                     leading: Icon(
                       Icons.shield_moon_outlined,
-                      color: hasDecoy ? Colors.green : null,
+                      color: hasDecoy ? cs.primary : null,
                     ),
                     title: Text(
                       hasDecoy ? t.decoyTileConfigured : t.decoyTileSetup,
@@ -1184,7 +1191,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             secondary: Icon(
               Icons.verified_user_outlined,
               color: _antiPhishingEnabled && _antiPhishingASActive
-                  ? Colors.green
+                  ? cs.primary
                   : null,
             ),
             value: _antiPhishingEnabled,
@@ -1226,7 +1233,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             builder: (_, snap) {
               if (snap.data != true) return const SizedBox.shrink();
               return ListTile(
-                leading: Icon(Icons.visibility, color: Colors.green.shade700),
+                leading: Icon(Icons.visibility, color: cs.primary),
                 title: Text(t.panicRevealTitle),
                 subtitle: Text(
                   t.panicRevealSubtitle,
@@ -1250,7 +1257,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ListTile(
                     leading: Icon(
                       Icons.family_restroom,
-                      color: enabled ? Colors.green : null,
+                      color: enabled ? cs.primary : null,
                     ),
                     title: Text(
                       enabled ? t.heritageTileConfigured : t.heritageTileSetup,

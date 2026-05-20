@@ -381,12 +381,27 @@ Le modèle de menace cible trois scénarios :
 
 ### Limitations connues
 
-- **Dart `String` non zeroizable** : la VM Dart ne permet pas d'effacer
-  fiablement une `String` en mémoire. Les master passwords sont saisis
-  dans des `TextEditingController` puis convertis le plus rapidement
-  possible en `Uint8List` zeroizables. Une fenêtre temporelle résiduelle
-  existe (quelques ms à quelques s en cas de pause GC). Mitigation :
-  auto-lock court + FLAG_SECURE.
+- **Dart `String` non zeroizable** (M-4) : la VM Dart ne permet pas
+  d'effacer fiablement une `String` en mémoire. Les master passwords
+  sont saisis dans des `TextEditingController` puis convertis le plus
+  rapidement possible en `Uint8List` zeroizables. Une fenêtre
+  temporelle résiduelle existe (quelques ms à quelques s en cas de pause
+  GC). **Cette limitation s'étend à plusieurs chemins** :
+  - **Import `.ptbak`** : après déchiffrement, `Uint8List plain` est
+    explicitement wipé, mais `utf8.decode(plain)` puis `jsonDecode(...)`
+    créent des `String` Dart intermédiaires non-wipables qui contiennent
+    les mots de passe jusqu'au GC. Le wipe de `plain` réduit la surface
+    sans la fermer.
+  - **TOTP `DateTime.now()`** : `TotpService` utilise le wall-clock
+    (RFC 6238 oblige le sync horloge avec le serveur). Un attaquant
+    root capable de modifier l'horloge système (`adb shell date -s`)
+    peut rejouer un code TOTP expiré dans la fenêtre ±30 s tolérée.
+    Mitigations partielles : pas de stockage TOTP en clair (le secret
+    Base32 est dans le vault chiffré), wall-clock pas utilisable pour
+    déverrouiller le vault lui-même (les chemins lockout passent par
+    `MonotonicClock`).
+  Mitigation globale : auto-lock court + FLAG_SECURE + Keystore
+  hardware-backed quand disponible.
 - **Wipe Keystore = perte du coffre** : factory reset, restauration usine,
   certaines opérations Samsung Auto Blocker invalident la KEK. Sans la
   KEK, le coffre est mathématiquement irrécupérable même avec le master
@@ -395,6 +410,14 @@ Le modèle de menace cible trois scénarios :
 - **Mode panique non-instantané sur certains OEM** : le camouflage d'icône
   via alias d'activité peut prendre 1–3 s sur Samsung One UI à cause du
   cache du launcher.
+- **Biométrie post-réenrôlement empreinte** (M-6) : `biometric_storage`
+  v5.0.x n'expose pas `setInvalidatedByBiometricEnrollment(true)` dans
+  son API publique. Si un attaquant ayant accès physique au device et
+  au PIN Android ajoute sa propre empreinte, il pourrait théoriquement
+  déverrouiller la biométrie sans connaître le master password.
+  Mitigation v2.5.0 : note UI dans Réglages → désactiver/réactiver la
+  biométrie après chaque modification d'empreinte/visage Android. Fix
+  définitif (KeystoreBridge custom) en backlog ROADMAP_HARDENING.
 
 ### Migration v3 → v4
 

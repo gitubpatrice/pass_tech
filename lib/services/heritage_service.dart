@@ -201,12 +201,47 @@ class HeritageService {
     // les snapshots historiques (pas de break compat).
     final salt = SecretBytes.randomBytes(32);
     final key = await KdfService.argon2id(password: heirPassword, salt: salt);
+    // v2.5.0 (F6) : ordre revu — fichier AVANT salt + rollback explicite si
+    // l'écriture du salt échoue. Ancien ordre (salt → fichier) créait une
+    // fenêtre de désync sur les updates : si l'écriture du fichier échouait
+    // après l'écriture du nouveau salt, l'ancien fichier devenait illisible
+    // pour l'héritier (chiffré avec l'ancien salt mais le nouveau salt est
+    // déjà persisté). Nouveau flow : tmp+rename atomique du fichier, puis
+    // salt, puis enabled. Si salt/enabled fail, restauration des anciennes
+    // valeurs depuis le snapshot RAM.
+    final oldSalt = await _storage.read(key: _saltKey);
+    final oldEnabled = await _storage.read(key: _enabledKey);
     try {
-      // Ordre critique : salt AVANT le fichier. Si crash après salt et
-      // avant fichier, le prochain setup réécrasera salt sans état corrompu.
-      await _storage.write(key: _saltKey, value: base64Encode(salt));
+      // 1) Fichier nouveau (atomic tmp+rename dans _writeSnapshotV2). Si
+      //    échec ici, ancien fichier + ancien salt intacts.
       await _writeSnapshotV2(entries, key, salt);
-      await _storage.write(key: _enabledKey, value: '1');
+      try {
+        // 2) Salt cohérent avec le nouveau fichier.
+        await _storage.write(key: _saltKey, value: base64Encode(salt));
+        // 3) Activation.
+        await _storage.write(key: _enabledKey, value: '1');
+      } catch (e) {
+        // Rollback : si l'écriture du salt ou de enabled échoue, restaurer
+        // les anciennes valeurs pour rester cohérent avec l'ancien fichier
+        // (qui a été remplacé — perte des anciennes données héritage, mais
+        // l'état storage reste cohérent et un nouveau setup réparera).
+        try {
+          if (oldSalt != null) {
+            await _storage.write(key: _saltKey, value: oldSalt);
+          } else {
+            await _storage.delete(key: _saltKey);
+          }
+          if (oldEnabled != null) {
+            await _storage.write(key: _enabledKey, value: oldEnabled);
+          } else {
+            await _storage.delete(key: _enabledKey);
+          }
+        } catch (_) {
+          // Best-effort rollback — si même ça échoue, le storage est
+          // probablement HS, l'exception originale remonte.
+        }
+        rethrow;
+      }
     } finally {
       SecretBytes.wipe(key);
     }

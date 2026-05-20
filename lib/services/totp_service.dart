@@ -2,6 +2,17 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 /// RFC 6238 TOTP-SHA1 / 30-second period / 6 digits.
+///
+/// v2.5.0 (F5) — `DateTime.now()` est utilisé INTENTIONNELLEMENT pour le
+/// compteur TOTP et le countdown UI. RFC 6238 impose le wall-clock (UNIX
+/// epoch), car le serveur qui valide le code l'utilise aussi. Un attaquant
+/// root peut décaler le wall-clock (`adb shell date -s`) pour rejouer un
+/// code expiré dans la fenêtre ±30 s tolérée — limitation acceptée et
+/// documentée en SECURITY.md item M-4. Utiliser `MonotonicClock` ici
+/// CASSERAIT la fonctionnalité (le serveur ne verrait pas le même counter).
+/// Toutes les décisions de sécurité internes (lockout, TTL biométrique,
+/// inactivité héritage) passent par `MonotonicClock`. Seul ce service
+/// reste sur le wall-clock par design.
 class TotpService {
   static const _stepSeconds = 30;
   static const _digits = 6;
@@ -11,6 +22,7 @@ class TotpService {
     try {
       final key = _decodeBase32(secret);
       if (key.isEmpty) return '------';
+      // wall-clock RFC 6238 — voir doc de classe.
       final time = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       final counter = time ~/ _stepSeconds;
       final cb = Uint8List(8);

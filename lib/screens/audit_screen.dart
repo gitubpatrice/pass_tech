@@ -116,11 +116,22 @@ class _AuditScreenState extends State<AuditScreen> {
     _score = s.clamp(0, 100);
   }
 
+  /// v2.5.0 (F4a + F14) — couleurs sémantiques alignées Material 3.
+  /// Mapping :
+  ///   - score >= 90 → `cs.tertiary` (succès, adapté light/dark).
+  ///   - score >= 70 → `Colors.amber.shade700` (warning ; Material 3 n'a pas
+  ///     de token "warning" natif, amber.shade700 garantit contraste ≥ 4.5:1
+  ///     en light ET en dark sur le fond Pass Tech `#161B22`).
+  ///   - score >= 50 → `Colors.deepOrange` (warning fort).
+  ///   - score < 50 → `cs.error` (danger).
+  /// Ancien gradient `0xFFFDD835` (jaune vif) sur fond clair créait un
+  /// contraste limite < WCAG AA pour le texte blanc — corrigé.
   Color _scoreColor(BuildContext ctx) {
-    if (_score >= 90) return const Color(0xFF43A047);
-    if (_score >= 70) return const Color(0xFFFDD835);
-    if (_score >= 50) return const Color(0xFFFF7043);
-    return const Color(0xFFE53935);
+    final cs = Theme.of(ctx).colorScheme;
+    if (_score >= 90) return cs.tertiary;
+    if (_score >= 70) return Colors.amber.shade700;
+    if (_score >= 50) return Colors.deepOrange;
+    return cs.error;
   }
 
   String _scoreLabel(AppLocalizations t) {
@@ -344,11 +355,16 @@ class _AuditScreenState extends State<AuditScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Issues
+          // Issues — v2.5.0 (F4a) : couleurs sémantiques Material 3.
+          // weak → cs.error (danger critique)
+          // duplicates → Colors.deepOrange (warning fort, pas de token M3
+          //   "warning" natif, deepOrange contraste OK light+dark)
+          // missing 2FA → cs.primary (info, pas un défaut grave en soi)
+          // old → Colors.amber.shade700 (warning doux temporel)
           _IssueSection(
             title: t.auditIssueWeakTitle,
             description: t.auditIssueWeakDesc,
-            color: const Color(0xFFE53935),
+            color: Theme.of(context).colorScheme.error,
             icon: Icons.warning_amber_outlined,
             entries: _weak,
             onTap: _refreshFromDetail,
@@ -357,7 +373,7 @@ class _AuditScreenState extends State<AuditScreen> {
           _IssueSection(
             title: t.auditIssueDuplicateTitle,
             description: t.auditIssueDuplicateDesc,
-            color: const Color(0xFFFF7043),
+            color: Colors.deepOrange,
             icon: Icons.content_copy_outlined,
             entries: _duplicates,
             onTap: _refreshFromDetail,
@@ -366,7 +382,7 @@ class _AuditScreenState extends State<AuditScreen> {
           _IssueSection(
             title: t.auditIssueNo2faTitle,
             description: t.auditIssueNo2faDesc,
-            color: const Color(0xFF1976D2),
+            color: Theme.of(context).colorScheme.primary,
             icon: Icons.shield_outlined,
             entries: _missing2fa,
             onTap: _refreshFromDetail,
@@ -375,7 +391,7 @@ class _AuditScreenState extends State<AuditScreen> {
           _IssueSection(
             title: t.auditIssueOldTitle,
             description: t.auditIssueOldDesc,
-            color: const Color(0xFFFDD835),
+            color: Colors.amber.shade700,
             icon: Icons.schedule_outlined,
             entries: _old,
             onTap: _refreshFromDetail,
@@ -464,15 +480,18 @@ class _BreachCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
-    final purple = const Color(0xFF7B1FA2);
+    // v2.5.0 (F4a) — couleurs sémantiques Material 3 :
+    //   - clean (HIBP : zéro breach) → cs.tertiary (succès)
+    //   - breach détecté → cs.error (danger)
+    //   - pas encore vérifié (état neutre, non sollicité) → cs.outline
     final hasResult = breached != null;
     final isClean = hasResult && breached!.isEmpty;
     final hasBreach = hasResult && breached!.isNotEmpty;
     final color = isClean
-        ? const Color(0xFF43A047)
+        ? cs.tertiary
         : hasBreach
-        ? const Color(0xFFE53935)
-        : purple;
+        ? cs.error
+        : cs.outline;
 
     return Card(
       child: Padding(
@@ -542,7 +561,9 @@ class _BreachCard extends StatelessWidget {
                         value: total == 0 ? 0 : progress / total,
                         minHeight: 6,
                         backgroundColor: cs.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation(purple),
+                        // v2.5.0 (F4a) : progress neutre = cs.outline (cf.
+                        // état "pas encore vérifié" plus haut).
+                        valueColor: AlwaysStoppedAnimation(cs.outline),
                         semanticsLabel: t.auditBreachTitle,
                         semanticsValue: '$progress / $total',
                       ),
@@ -705,13 +726,14 @@ class _IssueSection extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: (isEmpty ? const Color(0xFF43A047) : color)
-                        .withValues(alpha: 0.15),
+                    color: (isEmpty ? cs.tertiary : color).withValues(
+                      alpha: 0.15,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     isEmpty ? Icons.check_circle_outline : icon,
-                    color: isEmpty ? const Color(0xFF43A047) : color,
+                    color: isEmpty ? cs.tertiary : color,
                     size: 18,
                   ),
                 ),
@@ -743,8 +765,9 @@ class _IssueSection extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: (isEmpty ? const Color(0xFF43A047) : color)
-                        .withValues(alpha: 0.12),
+                    color: (isEmpty ? cs.tertiary : color).withValues(
+                      alpha: 0.12,
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -752,7 +775,7 @@ class _IssueSection extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: isEmpty ? const Color(0xFF43A047) : color,
+                      color: isEmpty ? cs.tertiary : color,
                     ),
                   ),
                 ),

@@ -1,7 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <!-- v2.5.0 (F12) : USE_FINGERPRINT retiré. Obsolète depuis API 28
+         (Android 9, septembre 2018). USE_BIOMETRIC le remplace et couvre
+         l'ensemble des modalités biométriques (empreinte, visage, iris).
+         Garder USE_FINGERPRINT = signal inutile + permission de plus dans
+         la liste vue par le user/store. minSdk = 26 sur Pass Tech (cf.
+         android/app/build.gradle.kts), donc l'écart API 26→28 ne touche
+         pratiquement aucun device en circulation en 2026. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

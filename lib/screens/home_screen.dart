@@ -146,19 +146,37 @@ class _HomeScreenState extends State<HomeScreen> {
   /// AuditScreen via callback parallèle), `_refresh()` invalide aussi le
   /// cache et trigger un rebuild.
   List<Entry>? _cachedFiltered;
-  int? _cachedEntriesLength;
+  int? _cachedEntriesSignature;
 
   void _invalidateFiltered() {
     _cachedFiltered = null;
-    _cachedEntriesLength = null;
+    _cachedEntriesSignature = null;
+  }
+
+  /// v2.5.0 (F3) : signature basée sur (length × 31) XOR max(updatedAt).
+  /// Ancien cache invalidait seulement sur changement de longueur — un
+  /// update d'entry (titre, password) sans add/delete laissait le cache
+  /// stale si `_refresh()` n'était pas appelé par tous les paths de retour
+  /// (cas confirmé : édition depuis AuditScreen via callback parallèle).
+  /// Le `updatedAt.millisecondsSinceEpoch` est touché par chaque
+  /// `VaultService.save()` → mutation visible dans la signature.
+  int _entriesSignature(List<Entry> entries) {
+    if (entries.isEmpty) return 0;
+    var maxUpdated = 0;
+    for (final e in entries) {
+      final ms = e.updatedAt.millisecondsSinceEpoch;
+      if (ms > maxUpdated) maxUpdated = ms;
+    }
+    return entries.length * 31 ^ maxUpdated;
   }
 
   List<Entry> get _filtered {
     final entries = VaultService().entries;
-    // Garde de sûreté : si la longueur a changé hors `_refresh` (cas
-    // théorique), recalcule. Évite un cache stale après une mutation
-    // qu'on aurait oublié de notifier.
-    if (_cachedFiltered != null && _cachedEntriesLength == entries.length) {
+    final sig = _entriesSignature(entries);
+    // Garde robuste : la signature change sur add/delete (length) ET sur
+    // update d'une entry (updatedAt). Évite tout cache stale même si une
+    // mutation indirecte oublie d'appeler `_refresh()`.
+    if (_cachedFiltered != null && _cachedEntriesSignature == sig) {
       return _cachedFiltered!;
     }
     var list = entries.toList();
@@ -200,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
         list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     }
     _cachedFiltered = list;
-    _cachedEntriesLength = entries.length;
+    _cachedEntriesSignature = sig;
     return list;
   }
 

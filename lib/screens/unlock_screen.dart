@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:biometric_storage/biometric_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
@@ -35,18 +36,40 @@ class _UnlockScreenState extends State<UnlockScreen> {
     _loadHeirFailCount();
   }
 
-  /// P3-3 (v2.2.0) : restaure le compteur d'échecs heir depuis les prefs.
+  /// P3-3 (v2.2.0) : restaure le compteur d'échecs heir depuis le stockage sécurisé.
   /// Avant v2.2.0 le compteur était RAM-only — un attaquant pouvait force-close
-  /// l'app pour annuler le délai progressif. Désormais persisté.
+  /// l'app pour annuler le délai progressif.
+  /// v2.5.0 (F1) : migration SharedPreferences → FlutterSecureStorage. L'ancien
+  /// stockage était lisible/modifiable en clair par un process root (reset du
+  /// compteur possible). FSS persiste désormais via les ciphers internes de
+  /// flutter_secure_storage v10 (plus EncryptedSharedPreferences). Lit l'ancienne
+  /// clé `heir_fail_count` une dernière fois pour migrer puis la purge.
   Future<void> _loadHeirFailCount() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final n = prefs.getInt(_heirFailCountKey) ?? 0;
+      final stored = await _secureStorage.read(key: _heirFailCountKey);
+      var n = int.tryParse(stored ?? '') ?? 0;
+      // Migration one-shot depuis l'ancienne clé SharedPreferences (< v2.5.0).
+      if (n == 0) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final legacy = prefs.getInt('heir_fail_count');
+          if (legacy != null && legacy > 0) {
+            n = legacy;
+            await _secureStorage.write(
+              key: _heirFailCountKey,
+              value: n.toString(),
+            );
+          }
+          // Purge l'ancienne clé qu'elle ait existé ou non (pas d'erreur si absente).
+          await prefs.remove('heir_fail_count');
+        } catch (_) {}
+      }
       if (mounted) setState(() => _heirFailCount = n);
     } catch (_) {}
   }
 
-  static const _heirFailCountKey = 'heir_fail_count';
+  static const _heirFailCountKey = 'pt_heir_fail_count';
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
   /// Vérifie root / émulateur / debugger. Avertit l'utilisateur une seule
   /// fois par session si un problème est détecté. L'app fonctionne malgré
@@ -115,16 +138,20 @@ class _UnlockScreenState extends State<UnlockScreen> {
             ),
           ),
           actions: [
+            // v2.5.0 (F11) : hiérarchie inversée. "Continuer quand même" est
+            // l'action risquée — elle doit être visuellement moins dominante
+            // que "Quitter" (action sûre). Ancien layout (TextButton Quitter +
+            // FilledButton.error Continuer) attirait l'œil sur l'action
+            // dangereuse → risque de clic réflexe.
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(t.actionQuit),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error,
-              ),
+              style: TextButton.styleFrom(foregroundColor: cs.error),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(t.integrityContinueAtRisk),
+            ),
+            FilledButton(
+              autofocus: true,
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(t.actionQuit),
             ),
           ],
         );
@@ -302,9 +329,12 @@ class _UnlockScreenState extends State<UnlockScreen> {
       _heirFailCount++;
       // P3-3 : persiste pour résister à un force-close (sinon l'attaquant
       // peut reset le délai progressif en relançant l'app).
+      // v2.5.0 (F1) : FlutterSecureStorage au lieu de SharedPreferences clair.
       try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(_heirFailCountKey, _heirFailCount);
+        await _secureStorage.write(
+          key: _heirFailCountKey,
+          value: _heirFailCount.toString(),
+        );
       } catch (_) {}
       if (!mounted) return;
       final t = AppLocalizations.of(context);
@@ -316,8 +346,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
     _heirFailCount = 0;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_heirFailCountKey);
+      await _secureStorage.delete(key: _heirFailCountKey);
     } catch (_) {}
     if (!mounted) return;
     Navigator.of(context).pushReplacement(

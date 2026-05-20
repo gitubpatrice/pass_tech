@@ -137,6 +137,16 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   int? _pausedAtMonoMs;
   static final Stopwatch _stopwatch = Stopwatch()..start();
 
+  /// v2.5.0 (F9) — guard cache session sur `_checkForUpdate`.
+  /// `PassTechApp` est recréé à chaque transition lock→unlock (auto-lock 5s).
+  /// Sans ce flag, `_checkForUpdate` re-déclenchait une requête HTTP
+  /// vers l'API GitHub Releases à chaque rebuild → consommation réseau
+  /// inutile + pattern de timing observable côté serveur (fingerprinting
+  /// IP×fréquence). Le flag est `static` pour persister à travers les
+  /// recréations du widget root mais pas à travers un kill OS — comportement
+  /// voulu (refresh check au démarrage de l'app, pas à chaque unlock).
+  static bool _updateCheckedThisSession = false;
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +161,8 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   }
 
   Future<void> _checkForUpdate() async {
+    if (_updateCheckedThisSession) return;
+    _updateCheckedThisSession = true;
     await appUpdateService.checkForUpdate();
   }
 

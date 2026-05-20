@@ -453,6 +453,8 @@
   "settingsBiometricDisabled": "Déverrouillage biométrique désactivé.",
   "settingsBiometricEnableCanceled": "Activation biométrique annulée.",
   "settingsBiometricEnableFailed": "Activation biométrique échouée.",
+  "settingsBiometricNewEnrollmentWarning": "Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.",
+  "@settingsBiometricNewEnrollmentWarning": { "description": "Avertissement subtil affiche sous le toggle biometrique : invalidation cle Android Keystore si nouvelle enrollment ajoutee (ROADMAP_HARDENING M-6)." },
   "settingsChangeMasterTitle": "Changer le mot de passe maître",
   "settingsAutoLockTitle": "Verrouillage automatique",
   "settingsAutoLockDialogTitle": "Verrouiller l'app après",

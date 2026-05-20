@@ -1,0 +1,14 @@
+v2.5.0 — Audit expert : 13 corrections
+
+Sécurité : compteur heir → FlutterSecureStorage,
+héritage rollback atomique, retrait USE_FINGERPRINT,
+note bio post-réenrôlement, SECURITY.md étendu.
+
+UI Material 3 : dialog intégrité "Quitter" primary
+(anti-clic réflexe), audit tokens M3 + WCAG AA,
+30 snacks Réglages migrés vers SnackUtils floating.
+
+Perf : cache HomeScreen invalidé par updatedAt,
+vérif update 1× par session.
+
+flutter analyze 0, 72/72 tests verts.

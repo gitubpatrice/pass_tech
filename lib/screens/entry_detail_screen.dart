@@ -921,6 +921,12 @@ class _CardVisual extends StatelessWidget {
     return Container(
       height: 180,
       decoration: BoxDecoration(
+        // v2.5.0 (F4b) — gradient hardcodé volontairement conservé : c'est
+        // le rendu visuel d'une carte bancaire physique (bleu → violet),
+        // pas un statut sémantique. Mapper sur cs.primary/cs.tertiary
+        // dénaturerait l'effet "carte de crédit" attendu par l'utilisateur
+        // (en light mode notamment, les tokens M3 produiraient un dégradé
+        // bleu pâle → orange pâle, perte d'identité visuelle).
         gradient: const LinearGradient(
           colors: [Color(0xFF1F6FEB), Color(0xFF7B1FA2)],
           begin: Alignment.topLeft,

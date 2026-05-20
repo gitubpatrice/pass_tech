@@ -470,6 +470,8 @@
   "settingsBiometricDisabled": "Biometric unlock disabled.",
   "settingsBiometricEnableCanceled": "Biometric activation canceled.",
   "settingsBiometricEnableFailed": "Biometric activation failed.",
+  "settingsBiometricNewEnrollmentWarning": "If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.",
+  "@settingsBiometricNewEnrollmentWarning": { "description": "Subtle warning shown below the biometric toggle: Android Keystore key invalidation if a new biometric enrollment is added (ROADMAP_HARDENING M-6)." },
   "settingsChangeMasterTitle": "Change master password",
   "settingsAutoLockTitle": "Auto-lock",
   "settingsAutoLockDialogTitle": "Lock the app after",

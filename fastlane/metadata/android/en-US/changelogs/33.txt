@@ -1,0 +1,14 @@
+v2.5.0 — Expert audit: 13 fixes
+
+Security: heir fail count → FlutterSecureStorage,
+heritage atomic rollback, USE_FINGERPRINT removed,
+biometric re-enrollment note, SECURITY.md extended.
+
+Material 3 UI: integrity dialog "Quit" primary
+(anti-reflex click), audit M3 tokens + WCAG AA,
+30 Settings snacks migrated to floating SnackUtils.
+
+Perf: HomeScreen cache invalidated by updatedAt,
+update check 1× per session.
+
+flutter analyze 0, 72/72 tests passing.

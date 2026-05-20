@@ -110,8 +110,18 @@ extension VaultCrypto on VaultService {
         _isOpen = true;
         return true;
       } finally {
-        SecretBytes.wipe(macKey);
-        SecretBytes.wipe(encKeyBytes);
+        // v2.5.0 (F15) : best-effort. Si sublist() retourne une Uint8List
+        // non-modifiable (cas FFI ou view, cf. feedback_secretbytes_wipe_
+        // unmodifiable.md), fillRange() throw silencieusement. Le wipe
+        // reste tenté — si exception, la copie reste en RAM jusqu'au GC
+        // (chemin v3 legacy, donc rare et migrable). Pattern aligné sur
+        // les autres sites de wipe best-effort dans Pass Tech.
+        try {
+          SecretBytes.wipe(macKey);
+        } catch (_) {}
+        try {
+          SecretBytes.wipe(encKeyBytes);
+        } catch (_) {}
       }
     } catch (_) {
       return false;
