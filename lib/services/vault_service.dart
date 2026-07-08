@@ -119,8 +119,11 @@ enum UnlockResult {
 }
 
 /// Identifie quel slot du vault est en cours d'utilisation.
-/// - primary : coffre historique (file pt_vault.enc, salt pt_salt)
-/// - decoy   : coffre leurre (file pt_vault_decoy.enc, salt pt_salt_decoy)
+/// - primary : coffre historique (file `pt_vault_a.enc`, salt pt_salt)
+/// - decoy   : coffre leurre (file `pt_vault_b.enc`, salt pt_salt_decoy) —
+///   TOUJOURS présent depuis H1 (leurre factice si pas de vrai decoy).
+/// Noms de fichiers neutres (ex-`pt_vault.enc` / `pt_vault_decoy.enc`) migrés
+/// par `ensureVaultLayout`. Voir aussi le flag `pt_decoy_configured`.
 ///
 /// Le code ne fait JAMAIS de différence fonctionnelle entre primary et decoy.
 /// Les deux ont les mêmes capacités (CRUD entries, biométrique optionnelle…).
@@ -160,6 +163,14 @@ class VaultService {
   static const _biometricFlagKey = 'pt_biometric_enabled';
   static const _failCountKey = 'pt_fail_count';
   static const _lockoutKey = 'pt_lockout_until';
+
+  // v2.5.x (H1) — flag « un VRAI coffre leurre est configuré ». Stocké chiffré
+  // (EncryptedSharedPreferences, clé TEE non-extractible → illisible au
+  // forensic) et TOUJOURS présent (défaut 'false') pour un profil de storage
+  // constant. Remplace l'ancien signal « le fichier decoy existe » — lequel,
+  // combiné au nom `_decoy`, révélait au repos l'existence du 2ᵉ coffre. Voir
+  // `ensureVaultLayout` (leurre factice toujours présent + noms neutres).
+  static const _decoyConfiguredKey = 'pt_decoy_configured';
 
   /// Slot du vault actuellement ouvert (pour les écritures ultérieures).
   /// null si aucun vault ouvert.
@@ -249,8 +260,12 @@ class VaultService {
   Future<bool> get vaultExists async =>
       (await _vaultFileFor(_Slot.primary)).existsSync();
 
+  /// v2.5.x (H1) — « un VRAI coffre leurre est-il configuré ? ». Lit le flag
+  /// chiffré (secure storage), PAS l'existence du fichier `_b` : depuis H1 ce
+  /// fichier existe TOUJOURS (leurre factice si pas de vrai decoy), donc son
+  /// existence ne dit plus rien. Le flag est illisible au repos (clé TEE).
   Future<bool> get hasDecoyVault async =>
-      (await _vaultFileFor(_Slot.decoy)).existsSync();
+      (await _storage.read(key: _decoyConfiguredKey)) == 'true';
 
   /// True si le slot actuellement déverrouillé est le coffre leurre.
   /// L'app peut s'en servir pour adapter discrètement l'UX, mais ne doit
@@ -261,6 +276,17 @@ class VaultService {
 
   Future<void> createVault(String masterPassword) async {
     await _createSlot(_Slot.primary, masterPassword);
+    // v2.5.x (H1) — leurre factice créé DÈS la création du coffre (profil de
+    // fichiers constant : tout install a `_a` + `_b`). Flag 'false' = pas de
+    // VRAI decoy. `setupDecoyVault` écrasera ce factice si l'utilisateur en
+    // configure un. Best-effort : un échec ici ne doit pas bloquer la création
+    // du coffre principal (déjà écrit + déverrouillé).
+    try {
+      await _createDummyDecoy();
+      await _storage.write(key: _decoyConfiguredKey, value: 'false');
+    } catch (_) {
+      /* le leurre sera re-tenté au prochain boot par ensureVaultLayout */
+    }
   }
 
   /// Crée le coffre LEURRE (decoy). Appelé depuis Settings quand l'utilisateur
@@ -272,7 +298,11 @@ class VaultService {
   /// et l'unlock retournerait toujours le même (le primary qui est testé
   /// avant). L'appelant doit valider en amont que le 2 mots de passe diffèrent.
   Future<void> setupDecoyVault(String decoyPassword) async {
+    // `_createSlot(decoy)` écrase le fichier `_b` (leurre factice) par un VRAI
+    // coffre leurre (contenu + mot de passe choisis par l'utilisateur).
     await _createSlot(_Slot.decoy, decoyPassword);
+    // v2.5.x (H1) — marque qu'un VRAI decoy existe désormais (pour l'UI).
+    await _storage.write(key: _decoyConfiguredKey, value: 'true');
   }
 
   String _aliasFor(_Slot slot) =>
@@ -520,15 +550,25 @@ class VaultService {
 
   Future<void> deleteVault() async {
     lock();
-    // Supprime les 2 slots : reset complet de l'app.
-    for (final slot in _Slot.values) {
-      final file = await _vaultFileFor(slot);
+    final dir = await getApplicationDocumentsDirectory();
+    // Supprime les 2 slots — NOUVEAUX (H1) ET anciens noms (pré-H1) + leurs
+    // `.bak` v3 — pour un reset complet quel que soit l'état de migration.
+    for (final name in const [
+      'pt_vault_a.enc',
+      'pt_vault_b.enc',
+      'pt_vault.enc',
+      'pt_vault_decoy.enc',
+    ]) {
+      final file = File('${dir.path}/$name');
       if (file.existsSync()) file.deleteSync();
-      // v3 backup, créé pendant la migration v3→v4 — on l'efface aussi.
       final bak = File('${file.path}_v3.enc.bak');
       if (bak.existsSync()) bak.deleteSync();
+    }
+    for (final slot in _Slot.values) {
       await _storage.delete(key: _saltKeyFor(slot));
     }
+    // v2.5.x (H1) — efface le flag decoy (repart à zéro).
+    await _storage.delete(key: _decoyConfiguredKey);
     await deleteBiometricKey();
     // v4 : détruit aussi les 2 KEK keystore (decision #4).
     try {
@@ -540,20 +580,47 @@ class VaultService {
     await _storage.delete(key: _lockoutKey);
   }
 
-  /// Supprime UNIQUEMENT le coffre leurre, sans toucher au primary.
-  /// Utilisé depuis Settings si l'utilisateur veut désactiver le décoy.
+  /// Désactive le VRAI coffre leurre sans toucher au primary. Utilisé depuis
+  /// Settings.
+  ///
+  /// v2.5.x (H1) — ne SUPPRIME PLUS le fichier `_b` (le profil de fichiers doit
+  /// rester constant : sinon la disparition du 2ᵉ fichier prouverait au repos
+  /// qu'un decoy réel a existé puis été retiré). On l'ÉCRASE par un leurre
+  /// factice non-déverrouillable et on remet le flag à 'false'. Après ça, un
+  /// attaquant forensic voit toujours 2 fichiers indistinguables et ne peut
+  /// pas prouver qu'un decoy réel a existé.
   Future<void> deleteDecoyVault() async {
-    final file = await _vaultFileFor(_Slot.decoy);
-    if (file.existsSync()) file.deleteSync();
-    await _storage.delete(key: _saltKeyFor(_Slot.decoy));
+    await _createDummyDecoy();
+    await _storage.write(key: _decoyConfiguredKey, value: 'false');
   }
 
   // ── Internal helpers (paths) ────────────────────────────────────────────────
 
   Future<File> _vaultFileFor(_Slot slot) async {
     final dir = await getApplicationDocumentsDirectory();
-    final name = slot == _Slot.primary ? 'pt_vault.enc' : 'pt_vault_decoy.enc';
-    return File('${dir.path}/$name');
+    // v2.5.x (H1) — noms neutres indistinguables. Avant : `pt_vault.enc` /
+    // `pt_vault_decoy.enc` — le suffixe `_decoy` désignait au forensic quel
+    // fichier était le vrai coffre (déni plausible cassé au repos). `_a`
+    // (ex-primary) / `_b` (ex-decoy) sont indistinguables ; combinés au leurre
+    // factice toujours présent (`ensureVaultLayout`), un attaquant ne peut plus
+    // prouver l'existence d'un second coffre réel à partir des fichiers.
+    final newFile = File(
+      '${dir.path}/${slot == _Slot.primary ? 'pt_vault_a.enc' : 'pt_vault_b.enc'}',
+    );
+    // FALLBACK rétro-compat — filet de sécurité « sans rien casser » : si la
+    // migration de noms (`ensureVaultLayout`) n'a pas encore tourné OU a échoué
+    // (IO/Keystore), l'ancien fichier peut être le SEUL présent. On retombe
+    // dessus tant que le nouveau n'existe pas → on ne perd JAMAIS l'accès au
+    // coffre (et donc jamais de fausse détection « pas de coffre » qui
+    // conduirait à un écrasement au setup). La migration renommera au prochain
+    // boot réussi.
+    if (!newFile.existsSync()) {
+      final oldFile = File(
+        '${dir.path}/${slot == _Slot.primary ? 'pt_vault.enc' : 'pt_vault_decoy.enc'}',
+      );
+      if (oldFile.existsSync()) return oldFile;
+    }
+    return newFile;
   }
 
   String _saltKeyFor(_Slot slot) =>

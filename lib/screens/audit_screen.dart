@@ -5,6 +5,7 @@ import '../models/entry.dart';
 import '../services/breach_service.dart';
 import '../services/password_strength_service.dart';
 import '../services/vault_service.dart';
+import '../utils/snack_utils.dart';
 import 'entry_detail_screen.dart';
 
 class AuditScreen extends StatefulWidget {
@@ -448,7 +449,7 @@ class _AuditScreenState extends State<AuditScreen> {
         _checkingBreach = false;
         _breachError = t.auditBreachNetworkError;
       });
-      messenger.showSnackBar(SnackBar(content: Text(t.auditBreachSnackError)));
+      SnackUtils.showError(context, messenger, t.auditBreachSnackError);
       return;
     }
     setState(() {

@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../services/clipboard_service.dart';
 import '../services/diceware_fr.dart';
 import '../services/password_strength_service.dart';
+import '../utils/snack_utils.dart';
 
 class GeneratorScreen extends StatefulWidget {
   final bool returnPassword;
@@ -57,13 +58,14 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     if (_lower) buf.write(_lowers);
     if (_digits) buf.write(_nums);
     if (_symbols) buf.write(_syms);
-    if (buf.isEmpty) {
-      buf.write(_lowers);
-      setState(() => _lower = true);
-    }
+    // Toutes les classes décochées : on réactive minuscules (pool non vide
+    // requis). Fusionné dans l'unique setState ci-dessous (avant : 2 setState).
+    final forceLower = buf.isEmpty;
+    if (forceLower) buf.write(_lowers);
     final pool = buf.toString();
     final rng = Random.secure();
     setState(() {
+      if (forceLower) _lower = true;
       _password = List.generate(
         _length.round(),
         (_) => pool[rng.nextInt(pool.length)],
@@ -203,11 +205,10 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                       final messenger = ScaffoldMessenger.of(context);
                       final dir = Directionality.of(context);
                       await ClipboardService.copyWithAutoClear(_password);
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(t.generatorCopiedSnack),
-                          duration: const Duration(seconds: 2),
-                        ),
+                      SnackUtils.showInfo(
+                        messenger,
+                        t.generatorCopiedSnack,
+                        duration: const Duration(seconds: 2),
                       );
                       // ignore: deprecated_member_use — sendAnnouncement requires FlutterView API non-stable.
                       SemanticsService.announce(t.snackbarCopied, dir);

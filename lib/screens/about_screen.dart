@@ -3,6 +3,7 @@ import 'package:files_tech_core/files_tech_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_update.dart';
+import '../utils/snack_utils.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -166,9 +167,7 @@ class _AboutScreenState extends State<AboutScreen> {
     if (!mounted) return;
     setState(() => _checkingUpdate = false);
     if (info == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(t.aboutAlreadyLatest)));
+      SnackUtils.showInfo(ScaffoldMessenger.of(context), t.aboutAlreadyLatest);
       return;
     }
     showDialog(

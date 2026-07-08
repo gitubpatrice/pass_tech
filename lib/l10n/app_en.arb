@@ -2,7 +2,6 @@
   "@@locale": "en",
 
   "appTitle": "Pass Tech",
-  "appTagline": "100% local password manager",
 
   "categoryWeb": "Web",
   "categoryEmail": "Email",
@@ -570,13 +569,6 @@
   "passphraseErrorMismatch": "Passphrases do not match",
   "passphraseEncryptCta": "Encrypt",
   "passphraseDecryptCta": "Decrypt",
-  "noteActionPaste": "Paste",
-  "noteActionCopyAll": "Copy all",
-  "noteActionSelectAll": "Select all",
-  "noteActionClipboardEmpty": "Clipboard is empty",
-  "noteActionPasted": "Pasted",
-  "noteActionCopied": "Note copied",
-  "noteActionAllSelected": "All text selected",
   "settingsScreenshotProtectionTitle": "Block screenshots",
   "settingsScreenshotProtectionSubtitle": "Enabled by default (recommended). Blocks screenshots, screen recording, Recent Apps thumbnail and external display projection. Disable ONLY if you need to paste text from another app on Samsung — Knox blocks the cross-app clipboard when protection is active.",
   "settingsScreenshotProtectionRestart": "Restart Pass Tech to fully apply the change.",

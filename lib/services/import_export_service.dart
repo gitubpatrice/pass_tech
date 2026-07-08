@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/entry.dart';
 import 'aead_service.dart';
@@ -56,8 +57,19 @@ class ImportExportService {
       if (json is List) {
         final entries = <Entry>[];
         for (final item in json) {
+          if (item is! Map) continue;
+          // Import tolérant : un JSON édité à la main / exporté par un autre
+          // outil peut ne pas avoir id/createdAt/updatedAt, requis par
+          // `Entry.fromJson` (volontairement strict pour le chemin coffre).
+          // On injecte des défauts pour l'IMPORT uniquement, sans relâcher le
+          // modèle du coffre chiffré (source unique de vérité).
+          final map = Map<String, dynamic>.from(item);
+          final now = DateTime.now().toIso8601String();
+          map['id'] ??= const Uuid().v4();
+          map['createdAt'] ??= now;
+          map['updatedAt'] ??= now;
           try {
-            entries.add(Entry.fromJson(item as Map<String, dynamic>));
+            entries.add(Entry.fromJson(map));
           } catch (_) {}
         }
         return ImportResult(entries: entries, format: 'pass_tech');

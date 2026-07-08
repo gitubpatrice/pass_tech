@@ -64,12 +64,4 @@ class ClipboardService {
     await _clearNative();
     cb?.call();
   }
-
-  static void cancel() {
-    _timer?.cancel();
-    _timer = null;
-    final cb = _pendingOnCleared;
-    _pendingOnCleared = null;
-    cb?.call();
-  }
 }

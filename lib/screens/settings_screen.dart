@@ -986,11 +986,22 @@ class _SettingsScreenState extends State<SettingsScreen>
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
-    await VaultService().changeMasterPassword(result);
-    if (mounted) {
+    // v2.5.x — try/catch : `changeMasterPassword` peut throw (wrap KEK, IO du
+    // save, deleteBiometricKey). Sans ça, le spinner `barrierDismissible:false`
+    // restait affiché indéfiniment → app gelée, et si le throw survenait APRÈS
+    // le save réussi, le mot de passe était changé mais l'UI le croyait échoué.
+    // Aligné sur les autres opérations Réglages (export/héritage) déjà en
+    // try/catch avec pop du progress en cas d'erreur.
+    try {
+      await VaultService().changeMasterPassword(result);
+      if (!mounted) return;
       nav.pop(); // close progress dialog
       SnackUtils.showInfo(messenger, t.changePasswordDoneSnack);
       setState(() => _biometricEnabled = false);
+    } catch (e) {
+      if (!mounted) return;
+      nav.pop(); // close progress dialog
+      SnackUtils.showError(context, messenger, t.genericError('$e'));
     }
   }
 
@@ -1051,6 +1062,117 @@ class _SettingsScreenState extends State<SettingsScreen>
       appBar: AppBar(title: Text(t.settingsTitle)),
       body: ListView(
         children: [
+          _section(t.settingsSectionAppearance),
+          ListTile(
+            leading: const Icon(Icons.brightness_6_outlined),
+            title: Text(t.settingsThemeTitle),
+            subtitle: Text(_themeLabelOf(t)),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () async {
+              final m = await showDialog<ThemeMode>(
+                context: context,
+                builder: (_) => SimpleDialog(
+                  title: Text(t.settingsThemeChooseTitle),
+                  children:
+                      [
+                        (
+                          t.settingsThemeSystem,
+                          ThemeMode.system,
+                          Icons.settings_brightness,
+                        ),
+                        (
+                          t.settingsThemeLight,
+                          ThemeMode.light,
+                          Icons.light_mode_outlined,
+                        ),
+                        (
+                          t.settingsThemeDark,
+                          ThemeMode.dark,
+                          Icons.dark_mode_outlined,
+                        ),
+                      ].map((opt) {
+                        return ListTile(
+                          leading: Icon(opt.$3, size: 20),
+                          title: Text(opt.$1),
+                          trailing: _themeMode == opt.$2
+                              ? const Icon(Icons.check)
+                              : null,
+                          onTap: () => Navigator.pop(context, opt.$2),
+                        );
+                      }).toList(),
+                ),
+              );
+              if (m != null) _setTheme(m);
+            },
+          ),
+          Builder(
+            builder: (ctx) {
+              final t = AppLocalizations.of(ctx);
+              return ListTile(
+                leading: const Icon(Icons.language),
+                title: Text(t.settingsLanguage),
+                subtitle: Text(_localeLabel(t)),
+                trailing: const Icon(Icons.chevron_right, size: 18),
+                onTap: () async {
+                  // Use a sentinel string so we can distinguish a barrier
+                  // dismiss (null) from an explicit "System" choice.
+                  final choice = await showDialog<String>(
+                    context: ctx,
+                    builder: (_) => SimpleDialog(
+                      title: Text(t.settingsLanguage),
+                      children:
+                          <(String, String)>[
+                            (t.settingsLanguageSystem, 'system'),
+                            (t.settingsLanguageFrench, 'fr'),
+                            (t.settingsLanguageEnglish, 'en'),
+                          ].map((opt) {
+                            final selected =
+                                (_locale?.languageCode ?? 'system') == opt.$2;
+                            return ListTile(
+                              title: Text(opt.$1),
+                              trailing: selected
+                                  ? const Icon(Icons.check)
+                                  : null,
+                              onTap: () => Navigator.pop(ctx, opt.$2),
+                            );
+                          }).toList(),
+                    ),
+                  );
+                  if (choice == null) return; // barrier dismiss
+                  await _setLocale(parseLocale(choice));
+                },
+              );
+            },
+          ),
+
+          _section(t.settingsSectionClipboard),
+          ListTile(
+            leading: const Icon(Icons.content_paste_off_outlined),
+            title: Text(t.settingsClipboardTitle),
+            subtitle: Text(_clipLabelOf(t)),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () async {
+              final v = await showDialog<int>(
+                context: context,
+                builder: (_) => SimpleDialog(
+                  title: Text(t.settingsClipboardDialogTitle),
+                  children: _clipOptions(t)
+                      .map(
+                        (o) => ListTile(
+                          title: Text(o.label),
+                          trailing: _clipboardClear == o.value
+                              ? const Icon(Icons.check)
+                              : null,
+                          onTap: () => Navigator.pop(context, o.value),
+                        ),
+                      )
+                      .toList(),
+                ),
+              );
+              if (v != null) _setClipboard(v);
+            },
+          ),
+
           _section(t.settingsSectionSecurity),
           // v2.3.11 — toggle FLAG_SECURE. Activé par défaut. L'utilisateur
           // peut désactiver pour permettre le paste cross-app sur Samsung
@@ -1287,117 +1409,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ),
                 ],
               );
-            },
-          ),
-
-          _section(t.settingsSectionAppearance),
-          ListTile(
-            leading: const Icon(Icons.brightness_6_outlined),
-            title: Text(t.settingsThemeTitle),
-            subtitle: Text(_themeLabelOf(t)),
-            trailing: const Icon(Icons.chevron_right, size: 18),
-            onTap: () async {
-              final m = await showDialog<ThemeMode>(
-                context: context,
-                builder: (_) => SimpleDialog(
-                  title: Text(t.settingsThemeChooseTitle),
-                  children:
-                      [
-                        (
-                          t.settingsThemeSystem,
-                          ThemeMode.system,
-                          Icons.settings_brightness,
-                        ),
-                        (
-                          t.settingsThemeLight,
-                          ThemeMode.light,
-                          Icons.light_mode_outlined,
-                        ),
-                        (
-                          t.settingsThemeDark,
-                          ThemeMode.dark,
-                          Icons.dark_mode_outlined,
-                        ),
-                      ].map((opt) {
-                        return ListTile(
-                          leading: Icon(opt.$3, size: 20),
-                          title: Text(opt.$1),
-                          trailing: _themeMode == opt.$2
-                              ? const Icon(Icons.check)
-                              : null,
-                          onTap: () => Navigator.pop(context, opt.$2),
-                        );
-                      }).toList(),
-                ),
-              );
-              if (m != null) _setTheme(m);
-            },
-          ),
-          Builder(
-            builder: (ctx) {
-              final t = AppLocalizations.of(ctx);
-              return ListTile(
-                leading: const Icon(Icons.language),
-                title: Text(t.settingsLanguage),
-                subtitle: Text(_localeLabel(t)),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: () async {
-                  // Use a sentinel string so we can distinguish a barrier
-                  // dismiss (null) from an explicit "System" choice.
-                  final choice = await showDialog<String>(
-                    context: ctx,
-                    builder: (_) => SimpleDialog(
-                      title: Text(t.settingsLanguage),
-                      children:
-                          <(String, String)>[
-                            (t.settingsLanguageSystem, 'system'),
-                            (t.settingsLanguageFrench, 'fr'),
-                            (t.settingsLanguageEnglish, 'en'),
-                          ].map((opt) {
-                            final selected =
-                                (_locale?.languageCode ?? 'system') == opt.$2;
-                            return ListTile(
-                              title: Text(opt.$1),
-                              trailing: selected
-                                  ? const Icon(Icons.check)
-                                  : null,
-                              onTap: () => Navigator.pop(ctx, opt.$2),
-                            );
-                          }).toList(),
-                    ),
-                  );
-                  if (choice == null) return; // barrier dismiss
-                  await _setLocale(parseLocale(choice));
-                },
-              );
-            },
-          ),
-
-          _section(t.settingsSectionClipboard),
-          ListTile(
-            leading: const Icon(Icons.content_paste_off_outlined),
-            title: Text(t.settingsClipboardTitle),
-            subtitle: Text(_clipLabelOf(t)),
-            trailing: const Icon(Icons.chevron_right, size: 18),
-            onTap: () async {
-              final v = await showDialog<int>(
-                context: context,
-                builder: (_) => SimpleDialog(
-                  title: Text(t.settingsClipboardDialogTitle),
-                  children: _clipOptions(t)
-                      .map(
-                        (o) => ListTile(
-                          title: Text(o.label),
-                          trailing: _clipboardClear == o.value
-                              ? const Icon(Icons.check)
-                              : null,
-                          onTap: () => Navigator.pop(context, o.value),
-                        ),
-                      )
-                      .toList(),
-                ),
-              );
-              if (v != null) _setClipboard(v);
             },
           ),
 

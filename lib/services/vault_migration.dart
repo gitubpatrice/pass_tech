@@ -63,19 +63,41 @@ extension VaultMigration on VaultService {
       _wipeKey();
       _key = Uint8List.fromList(finalKey);
 
-      // Persist the new salt under the existing _saltKeyFor() entry. The
-      // legacy v3 PBKDF2 salt is overwritten — v3 is no longer readable.
-      await VaultService._storage.write(
-        key: _saltKeyFor(slot),
-        value: base64Encode(newSalt),
-      );
-
       await _saveVaultV4(
         slot: slot,
         salt: newSalt,
         wrappedDek: wrap.ciphertext,
         wrapNonce: wrap.nonce,
       );
+
+      // V1 v2.4.0 — salt en storage écrit APRÈS le save vault réussi (aligné
+      // sur `_createSlot` / `changeMasterPassword`). Avant : écrit AVANT le
+      // save ; si `_saveVaultV4` throwait (IO), le fichier restait en v3 mais
+      // le salt storage passait en v4 → au prochain unlock le path v3 relisait
+      // un salt divergent → `wrongPassword` définitif + perte de données (le
+      // `.bak` avait lui aussi son salt écrasé). Le path v4 lit son salt depuis
+      // le FICHIER (`kdf.salt`, cf. `_v4Unlock`), pas depuis storage : ce write
+      // ne sert qu'à rendre obsolète l'ancien salt v3.
+      await VaultService._storage.write(
+        key: _saltKeyFor(slot),
+        value: base64Encode(newSalt),
+      );
+
+      // H2 v2.5.x — purge le `.bak` v3 dès la migration réussie. Avant : il ne
+      // partait qu'au prochain `changeMasterPassword` / `deleteVault`, laissant
+      // une copie complète du coffre chiffrée en PBKDF2+AES-CBC dérivée du SEUL
+      // master password (aucune liaison KEK/TEE, KDF plus faible qu'Argon2id) —
+      // brute-forçable offline, annulant les deux durcissements majeurs de v4.
+      // Le rename atomique de `_saveVaultV4` garantit déjà la durabilité, le
+      // `.bak` n'est plus un filet nécessaire une fois le v4 écrit.
+      try {
+        final src = await _vaultFileFor(slot);
+        final bak = File('${src.path}_v3.enc.bak');
+        if (await bak.exists()) await bak.delete();
+      } catch (_) {
+        /* best-effort : purgé sinon au prochain changeMasterPassword */
+      }
+
       return true;
     } catch (_) {
       return false;

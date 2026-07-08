@@ -195,7 +195,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final hasKey = await VaultService().hasBiometricKey;
     final enabled = canAuth == CanAuthenticateResponse.success && hasKey;
     if (mounted) setState(() => _hasBiometric = enabled);
-    if (enabled && _lockoutRemaining == null) _tryBiometric();
+    // `mounted` requis : `_tryBiometric` démarre par un setState inconditionnel.
+    // Si l'écran est disposé pendant les await de _checkBiometric, l'appel
+    // provoquerait « setState after dispose ».
+    if (enabled && _lockoutRemaining == null && mounted) _tryBiometric();
   }
 
   Future<void> _tryBiometric() async {

@@ -1,0 +1,13 @@
+v2.5.1 — Audit expert + déni plausible
+
+Sécurité : coffre leurre indistinguable au repos
+(noms neutres + leurre factice toujours présent) ;
+correctif perte de données migration v3→v4 ; purge
+du .bak brute-forçable ; mot de passe héritier min 12.
+
+UI : logo damier dans le titre ; Réglages réorganisés
+(Apparence puis Presse-papier en tête) ; 6 derniers
+snacks migrés ; gel UI (changement mot de passe)
+corrigé.
+
+flutter analyze 0, 74 tests verts.

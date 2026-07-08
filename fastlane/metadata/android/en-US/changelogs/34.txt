@@ -1,0 +1,12 @@
+v2.5.1 — Expert audit + plausible deniability
+
+Security: decoy vault indistinguishable at rest
+(neutral file names + always-present dummy decoy);
+fixed v3→v4 migration data-loss path; purged the
+brute-forceable .bak; heir password min 12.
+
+UI: checkerboard logo in title; Settings reordered
+(Appearance then Clipboard on top); last 6 snackbars
+migrated; fixed UI freeze on password change.
+
+flutter analyze 0, 74 tests passing.

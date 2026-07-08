@@ -11,6 +11,7 @@ import '../services/anti_phishing_service.dart';
 import '../services/clipboard_service.dart';
 import '../services/totp_service.dart';
 import '../services/vault_service.dart';
+import '../utils/snack_utils.dart';
 import 'entry_edit_screen.dart';
 
 class EntryDetailScreen extends StatefulWidget {
@@ -64,27 +65,23 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         // périmé > 60s). On copie mais on prévient — pour éviter le faux
         // sentiment de sécurité.
         if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(t.entryDetailAntiPhishingInactive),
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: t.entryDetailAntiPhishingSettings,
-              onPressed: () => svc.openAccessibilitySettings(),
-            ),
+        SnackUtils.showInfo(
+          messenger,
+          t.entryDetailAntiPhishingInactive,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: t.entryDetailAntiPhishingSettings,
+            onPressed: () => svc.openAccessibilitySettings(),
           ),
         );
       }
     }
 
     await ClipboardService.copyWithAutoClear(text);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          t.entryDetailCopiedSnack(label, ClipboardService.clearAfterSeconds),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
+    SnackUtils.showInfo(
+      messenger,
+      t.entryDetailCopiedSnack(label, ClipboardService.clearAfterSeconds),
+      duration: const Duration(seconds: 3),
     );
     if (mounted) {
       // ignore: deprecated_member_use — sendAnnouncement requires FlutterView API non-stable.
@@ -244,18 +241,21 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     }
   }
 
-  // P2.2 v2.4.3 — DateFormat hissé static : entry_detail rebuild fréquent
+  // P2.2 v2.4.3 — DateFormat mémoïsé : entry_detail rebuild fréquent
   // (TOTPCard force `setState` 1× / s pour la barre de progression OTP).
   // Recréer un DateFormat ICU à chaque build = allocation+lookup l10n
-  // gaspillée.
-  static final _dfDMYHm = DateFormat('dd/MM/yyyy HH:mm');
+  // gaspillée. v2.5.x — cache PAR LOCALE (au lieu d'un format `dd/MM/yyyy`
+  // figé FR/EU) : `yMd().add_Hm()` respecte la locale active (EN = MM/dd/yyyy).
+  static final Map<String, DateFormat> _dfCache = {};
+  static DateFormat _dfFor(String locale) =>
+      _dfCache.putIfAbsent(locale, () => DateFormat.yMd(locale).add_Hm());
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final catColor = categoryColor(_entry.category);
-    final fmt = _dfDMYHm;
+    final fmt = _dfFor(Localizations.localeOf(context).toString());
 
     return Scaffold(
       appBar: AppBar(

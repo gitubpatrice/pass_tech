@@ -189,8 +189,13 @@ class HeritageService {
   /// [heirPassword] doit différer du password primary (vérifié à l'appel
   /// via VaultService.passwordMatchesPrimary par l'UI).
   Future<void> setupOrUpdateSnapshot({required String heirPassword}) async {
-    if (heirPassword.length < 8) {
-      throw ArgumentError('Heir password : 8 caractères minimum');
+    // v2.5.x — min 12 (aligné sur master password, export .ptbak et l'UI
+    // `_PassphraseDialog confirm:true`). Le snapshot héritier est une copie
+    // COMPLÈTE du coffre dérivée du SEUL heir_password (pas de liaison TEE,
+    // l'héritier déchiffre ailleurs) : un mot de passe faible = brute-force
+    // offline du `pt_heir.enc` depuis une simple copie de fichier.
+    if (heirPassword.length < 12) {
+      throw ArgumentError('Heir password : 12 caractères minimum');
     }
     final entries = VaultService().entries;
     if (entries.isEmpty) {

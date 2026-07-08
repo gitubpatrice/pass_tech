@@ -8,12 +8,57 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 | Version       | Supportée  |
 | ------------- | ---------- |
-| 2.4.x         | ✅          |
-| 2.3.x         | ⚠️ legacy (mettre à jour) |
-| 2.0.x – 2.2.x | ⚠️ migration uniquement |
+| 2.5.x         | ✅          |
+| 2.4.x         | ⚠️ legacy (mettre à jour) |
+| 2.0.x – 2.3.x | ⚠️ migration uniquement |
 | < 2.0.0       | ❌          |
 
 ### Historique des correctifs récents
+
+- **v2.5.1** (2026-07-08) — Audit expert 4-axes post-v2.5.0
+  (sécurité / perf-qualité / câblage / cohérence-i18n). Socle crypto jugé
+  exceptionnel (Argon2id, AES-256-GCM+AAD, KEK scellée TEE/StrongBox
+  non-exportable, nonce frais par save). Corrections :
+  - **Perte de données (migration v3→v4)** — `_migrateV3ToV4` écrivait le
+    nouveau salt en storage AVANT `_saveVaultV4`. Un échec du save laissait le
+    fichier en v3 mais le salt storage en v4 → le path v3 relisait un salt
+    divergent au prochain unlock → `wrongPassword` définitif + `.bak` inutile
+    (son salt aussi écrasé). Corrigé : salt écrit APRÈS le save (aligné sur
+    `_createSlot` / `changeMasterPassword` v2.4.0 ; le path v4 lit son salt du
+    FICHIER, pas du storage — sûr au crash-between).
+  - **`.bak` v3 brute-forçable (H2)** — le `*_v3.enc.bak` (copie complète du
+    coffre en PBKDF2+AES-CBC dérivée du seul master password, sans liaison
+    TEE) persistait après migration jusqu'au prochain `changeMasterPassword`.
+    Désormais purgé **dès la migration réussie** — plus de fenêtre de
+    brute-force offline annulant les durcissements v4.
+  - **Déni plausible au repos (H1)** — le coffre leurre n'était créé qu'à la
+    configuration, sous un nom (`pt_vault_decoy.enc`) qui révélait au forensic
+    quel fichier était le vrai coffre. Refonte : (1) noms **neutres
+    indistinguables** `pt_vault_a.enc` / `pt_vault_b.enc` ; (2) leurre
+    **factice toujours présent** — liste d'entrées vide chiffrée AES-GCM sous
+    un mot de passe aléatoire **jamais stocké** (coffre v4 valide mais jamais
+    déverrouillable) → profil de fichiers **constant** que le decoy soit
+    configuré ou non ; (3) flag `pt_decoy_configured` en secure storage
+    (chiffré TEE) au lieu de « le fichier decoy existe » pour l'UI. Migration
+    `ensureVaultLayout` **crash-safe** (rename ancien→neutre + backfill leurre
+    factice, fallback lecture des anciens noms). Validé device (unlock
+    empreinte + création/suppression leurre).
+  - **Mot de passe héritier min 12** (était 8, service) — aligné sur le master
+    password et l'export `.ptbak`. Le snapshot héritier n'a pas de liaison TEE.
+  - **Gel UI** — `_changePassword` wrappé en try/catch (le spinner
+    `barrierDismissible:false` restait affiché indéfiniment si l'opération
+    throwait ; risque de désync « mot de passe changé mais UI en échec »).
+  - Garde `mounted` sur `_tryBiometric` ; migration des 6 derniers `SnackBar`
+    bruts vers `SnackUtils` (contraste/floating) ; date `entry_detail`
+    localisée ; purge de 8 clés l10n orphelines ; import JSON tolérant
+    (id/timestamps optionnels) ; nettoyage code mort. `flutter analyze` 0
+    issue, 74 tests verts.
+
+  **Points ouverts (documentés, non régressifs)** :
+  - **Biométrie non invalidée par nouvel enrôlement d'empreinte** (TODO M-6) —
+    nécessite un MethodChannel natif (`setInvalidatedByBiometricEnrollment`).
+
+- **v2.4.4** (2026-05-14) — Audit expert post-v2.4.3 (3 agents parallèles
 
 - **v2.4.4** (2026-05-14) — Audit expert post-v2.4.3 (3 agents parallèles
   sécurité / performance / UX) : 22 corrections F2-F12+F15 sécu /

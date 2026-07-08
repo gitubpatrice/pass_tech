@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show SystemNavigator;
 import '../l10n/app_localizations.dart';
 import '../models/entry.dart';
 import '../services/clipboard_service.dart';
+import '../utils/snack_utils.dart';
 
 /// Vue lecture seule du coffre destinée à l'héritier après que le dead man's
 /// switch s'est déclenché. Affiche les entries du snapshot, permet de copier
@@ -76,11 +77,10 @@ class _EntryTile extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     final t = AppLocalizations.of(context);
     await ClipboardService.copyWithAutoClear(value);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(t.heirViewCopiedSnack(label)),
-        duration: const Duration(seconds: 2),
-      ),
+    SnackUtils.showInfo(
+      messenger,
+      t.heirViewCopiedSnack(label),
+      duration: const Duration(seconds: 2),
     );
   }
 

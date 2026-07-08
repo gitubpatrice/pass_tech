@@ -129,4 +129,161 @@ extension VaultSetup on VaultService {
       // Best-effort : le bak n'existe peut-être plus (jamais migré v3).
     }
   }
+
+  /// v2.5.x (H1) — migration du schéma de fichiers vers des noms neutres
+  /// indistinguables + leurre factice toujours présent (déni plausible au
+  /// repos). À appeler au démarrage AVANT tout accès au vault (`vaultExists`,
+  /// `unlock`).
+  ///
+  /// Idempotent + crash-safe : le rename est atomique (même FS) et n'est tenté
+  /// que si la cible est absente ; aucun coffre RÉEL n'est jamais
+  /// supprimé/écrasé de façon destructive — on ne fait que renommer, puis
+  /// éventuellement CRÉER un leurre factice là où il manque.
+  Future<void> ensureVaultLayout() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final oldPrimary = File('${dir.path}/pt_vault.enc');
+    final oldDecoy = File('${dir.path}/pt_vault_decoy.enc');
+    final newPrimary = File('${dir.path}/pt_vault_a.enc');
+    final newDecoy = File('${dir.path}/pt_vault_b.enc');
+
+    // 1. Rename atomique ancien → nouveau (seulement si cible absente ET source
+    //    présente). Le rename POSIX same-FS est atomique : un crash laisse soit
+    //    l'ancien, soit le nouveau, jamais rien.
+    if (!newPrimary.existsSync() && oldPrimary.existsSync()) {
+      await oldPrimary.rename(newPrimary.path);
+    }
+    if (!newDecoy.existsSync() && oldDecoy.existsSync()) {
+      // Un VRAI decoy existait (ancien schéma) → on le porte + marque le flag.
+      await oldDecoy.rename(newDecoy.path);
+      await VaultService._storage.write(
+        key: VaultService._decoyConfiguredKey,
+        value: 'true',
+      );
+    }
+
+    // 2. Pas de coffre principal (fresh install pré-createVault) : rien à faire,
+    //    createVault posera `_a` + le leurre `_b`.
+    if (!newPrimary.existsSync()) return;
+
+    // 3. Coffre principal présent mais `_b` absent (utilisateur sans decoy,
+    //    ancien schéma 1 fichier) → créer un leurre factice pour rendre le
+    //    profil constant. Best-effort : re-tenté au prochain boot si KEK/IO KO.
+    if (!newDecoy.existsSync()) {
+      try {
+        await _createDummyDecoy();
+      } catch (_) {
+        return;
+      }
+    }
+
+    // 4. Le flag a toujours une valeur explicite (profil de storage constant).
+    //    Ne l'écrase PAS s'il vaut déjà 'true'.
+    final cur = await VaultService._storage.read(
+      key: VaultService._decoyConfiguredKey,
+    );
+    if (cur == null) {
+      await VaultService._storage.write(
+        key: VaultService._decoyConfiguredKey,
+        value: 'false',
+      );
+    }
+
+    // 5. Nettoyage défensif : aucun ancien fichier au nom révélateur ne doit
+    //    subsister (un `pt_vault_decoy.enc` résiduel trahirait le decoy au
+    //    repos). Après un rename atomique réussi ces chemins sont déjà vides ;
+    //    ce garde-fou couvre un FS non-atomique / une copie partielle.
+    if (newPrimary.existsSync() && oldPrimary.existsSync()) {
+      try {
+        await oldPrimary.delete();
+      } catch (_) {}
+    }
+    if (newDecoy.existsSync() && oldDecoy.existsSync()) {
+      try {
+        await oldDecoy.delete();
+      } catch (_) {}
+    }
+  }
+
+  /// v2.5.x (H1) — écrit un coffre LEURRE FACTICE (0 entrée) sous un mot de
+  /// passe aléatoire JAMAIS persisté (donc jamais déverrouillable). Sert
+  /// uniquement à rendre le profil de fichiers constant (déni plausible au
+  /// repos) : personne ne peut l'ouvrir, son contenu (vide) n'est jamais montré.
+  ///
+  /// N'altère PAS l'état courant (`_key` / `_entries` / `_activeSlot` /
+  /// `_cached*`) — contrairement à `_createSlot` / `_saveVaultV4`. Réutilise les
+  /// primitives crypto (Argon2id, KEK wrap, HKDF, AES-GCM) mais duplique
+  /// volontairement l'assemblage d'enveloppe pour NE PAS toucher au chemin de
+  /// sauvegarde audité.
+  Future<void> _createDummyDecoy() async {
+    await _keystore.ensureBothKeksExist();
+    final salt = SecretBytes.randomBytes(32);
+    // Mot de passe aléatoire 32 octets — JAMAIS écrit nulle part.
+    final randomPw = base64Encode(SecretBytes.randomBytes(32));
+    final pwHash = await KdfService.argon2id(password: randomPw, salt: salt);
+    final hwSecret = SecretBytes.randomBytes(32);
+    Uint8List? finalKey;
+    Uint8List? ptBytes;
+    try {
+      final alias = _aliasFor(_Slot.decoy);
+      final wrap = await _keystore.wrap(alias, hwSecret);
+      finalKey = await _hkdfFinalKey(
+        salt: salt,
+        pwHash: pwHash,
+        hwSecret: hwSecret,
+      );
+
+      // Liste d'entrées VIDE chiffrée en AES-GCM, AAD identique au format v4.
+      ptBytes = Uint8List.fromList(utf8.encode(jsonEncode(const <dynamic>[])));
+      final aead = await AeadService.encryptGcm(
+        key: finalKey,
+        plaintext: ptBytes,
+        aad: _aadV4(alias),
+      );
+
+      final out = <String, dynamic>{
+        'magic': VaultService._vaultMagic,
+        'version': VaultService._currentVersion,
+        'kdf': <String, dynamic>{
+          'algo': 'argon2id',
+          'm': VaultService._argon2M,
+          't': VaultService._argon2T,
+          'p': VaultService._argon2P,
+          'salt': base64Encode(salt),
+        },
+        'kek': <String, dynamic>{
+          'algo': 'AES-GCM-256',
+          'alias': alias,
+          'wrappedDek': base64Encode(wrap.ciphertext),
+          'wrapNonce': base64Encode(wrap.nonce),
+        },
+        'cipher': <String, dynamic>{
+          'algo': 'AES-GCM-256',
+          'nonce': base64Encode(aead.nonce),
+          'data': base64Encode(aead.cipherAndTag),
+        },
+      };
+
+      // Cible EXPLICITE au nouveau nom canonique `pt_vault_b.enc` — jamais via
+      // `_vaultFileFor` (dont le fallback rétro-compat pourrait viser l'ancien
+      // nom `pt_vault_decoy.enc` et RAVIVER la fuite H1).
+      final dir = await getApplicationDocumentsDirectory();
+      final target = File('${dir.path}/pt_vault_b.enc');
+      final tmp = File('${target.path}.tmp');
+      await tmp.writeAsString(jsonEncode(out), flush: true);
+      await tmp.rename(target.path); // atomique
+      await VaultService._storage.write(
+        key: _saltKeyFor(_Slot.decoy),
+        value: base64Encode(salt),
+      );
+    } finally {
+      SecretBytes.wipe(pwHash);
+      SecretBytes.wipe(hwSecret);
+      if (finalKey != null) SecretBytes.wipe(finalKey);
+      if (ptBytes != null) {
+        try {
+          ptBytes.fillRange(0, ptBytes.length, 0);
+        } catch (_) {}
+      }
+    }
+  }
 }

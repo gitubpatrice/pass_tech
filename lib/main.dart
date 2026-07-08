@@ -100,6 +100,17 @@ void main() async {
   );
   localeNotifier.value = parseLocale(prefs.getString(prefKeyLocale));
 
+  // v2.5.x (H1) — migration du schéma de fichiers (noms neutres) + leurre
+  // factice toujours présent, AVANT toute lecture du vault. Idempotent,
+  // crash-safe, non destructif. Best-effort : un échec (IO/Keystore) ne doit
+  // pas empêcher le boot — l'app fonctionnera sur les anciens noms via le
+  // fallback et re-tentera au prochain lancement.
+  try {
+    await VaultService().ensureVaultLayout();
+  } catch (_) {
+    /* re-tenté au prochain boot */
+  }
+
   final vaultExists = await VaultService().vaultExists;
   final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
   // v2.4.5 — splash de presentation Files Tech au tout premier lancement

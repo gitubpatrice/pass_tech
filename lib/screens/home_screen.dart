@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/vault_service.dart';
+import '../utils/snack_utils.dart';
 import 'entry_detail_screen.dart';
 import 'entry_edit_screen.dart';
 import 'generator_screen.dart';
@@ -356,7 +357,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               )
-            : Text(t.homeTitle),
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/logo_damier.png',
+                    width: 28,
+                    height: 28,
+                    filterQuality: FilterQuality.high,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(t.homeTitle),
+                ],
+              ),
         actions: [
           IconButton(
             // U3 v2.4.3 — tooltip explicite pour TalkBack + survol pointeur.
@@ -679,11 +692,10 @@ class _EntryCard extends StatelessWidget {
               if (confirm != true) return;
               await VaultService().deleteEntry(entry.id);
               onChanged();
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(t.homeDeletedSnack(entry.title)),
-                  duration: const Duration(seconds: 2),
-                ),
+              SnackUtils.showInfo(
+                messenger,
+                t.homeDeletedSnack(entry.title),
+                duration: const Duration(seconds: 2),
               );
             },
             backgroundColor: cs.error,

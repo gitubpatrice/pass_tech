@@ -515,8 +515,6 @@ class DicewareFr {
     'ile',
   ];
 
-  static int get wordCount => _uniqueWords.length;
-
   /// Bits d'entropie pour [count] mots tirés au sort.
   static double entropy(int count) {
     return count * (log(_uniqueWords.length) / ln2);
