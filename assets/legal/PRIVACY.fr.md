@@ -1,6 +1,6 @@
 # Politique de confidentialité — Pass Tech
 
-**Version du document** : 11 mai 2026 (Pass Tech v2.4.0)
+**Version du document** : 15 juillet 2026 (Pass Tech v2.5.1)
 **App** : Pass Tech
 **Site officiel** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -35,18 +35,21 @@ La présente Politique de confidentialité explique comment l'application **Pass
 
 | Type de donnée                       | Utilisation                                              | Lieu de traitement                                |
 | ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------- |
-| Mots de passe, secrets TOTP, cartes bancaires, notes sécurisées | Entrées du coffre créées par l'utilisateur | Chiffré au repos sur l'appareil (`pt_vault.enc`)  |
-| Mot de passe maître                  | Dérive la clé de chiffrement (PBKDF2-SHA256 600 000 itérations) | Jamais persisté ; effacé de la RAM au verrouillage |
+| Mots de passe, secrets TOTP, cartes bancaires, notes sécurisées | Entrées du coffre créées par l'utilisateur | Chiffré au repos sur l'appareil (`pt_vault_a.enc`) |
+| Second emplacement de coffre (`pt_vault_b.enc`) | Déni plausible — **toujours présent**, que vous ayez configuré un leurre ou non | Chiffré sur l'appareil avec sa propre clé Keystore |
+| Mot de passe maître                  | Dérive la clé de chiffrement (Argon2id, référence OWASP 2024) | Jamais persisté ; effacé de la RAM au verrouillage |
 | Clé biométrique                      | Déverrouillage optionnel par empreinte / face            | Android Keystore (lié au matériel), `setUserAuthenticationRequired(true)` |
 | Sauvegardes chiffrées (`.ptbak`)     | Export optionnel déclenché par l'utilisateur             | Emplacement choisi par l'utilisateur              |
 | Préférences locales                  | Thème, durée auto-lock, timeout presse-papier            | Stockage local sur l'appareil                     |
 
 ## 5. Chiffrement & dérivation de clé
 
-- **AES-256-CBC + HMAC-SHA256** (encrypt-then-MAC), comparaison MAC en temps constant avant déchiffrement.
-- **PBKDF2-HMAC-SHA256, 600 000 itérations** pour le coffre et les `.ptbak` (recommandation OWASP 2023).
-- **HMAC sur les métadonnées** (version, itérations, sel) empêche les attaques par downgrade du fichier.
+- **AES-256-GCM** (AEAD), avec AAD liée pour résister au downgrade du fichier.
+- **Argon2id** (m = 19 MiB, t = 2, p = 1, référence OWASP 2024) pour dériver la clé maître du coffre.
+- **KEK liée au matériel** dans l'Android Keystore (StrongBox si disponible), qui enveloppe un secret matériel propre au coffre : celui qui exfiltre le seul fichier ne peut pas le brute-forcer sans votre appareil.
+- **Sauvegardes `.ptbak`** — même pack Argon2id + AES-GCM, avec une passphrase que vous choisissez (sans liaison Keystore, pour rester portables d'un appareil à l'autre).
 - **Clé biométrique liée au matériel** via Android Keystore ; non extractible sans authentification biométrique.
+- **Déni plausible** — personne, en inspectant l'appareil, ne peut savoir si vous gardez un second coffre caché. Les deux emplacements portent des noms neutres et indistinguables (`pt_vault_a.enc` / `pt_vault_b.enc`) et **les deux existent toujours** : sans leurre configuré, l'app en écrit quand même un factice — une liste vide, chiffrée sous un mot de passe aléatoire stocké nulle part, donc jamais ouvrable, ni par vous ni par nous. Alias Keystore, sels et temps de déverrouillage sont alignés entre les deux chemins.
 
 ## 6. Réseau
 
@@ -68,6 +71,7 @@ L'application ne transmet aucune donnée à un serveur opéré par le développe
 - Les données du coffre sont stockées localement et restent sous le contrôle de l'utilisateur.
 - La désinstallation de l'app efface toutes les données (le fichier coffre est dans le répertoire privé de l'app, exclu du backup cloud via `dataExtractionRules`).
 - L'utilisateur peut aussi supprimer le coffre depuis l'app (`Réglages → Supprimer le coffre`).
+- **Aucune copie résiduelle d'un ancien coffre** — la migration d'un coffre v3 laissait auparavant une copie `.bak`, chiffrée avec l'ancien schéma plus faible et attaquable hors ligne. Depuis la v2.5.1, elle est supprimée dès que la migration réussit.
 
 ## 9. Sécurité
 

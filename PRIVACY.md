@@ -1,6 +1,6 @@
 # Privacy Policy — Pass Tech
 
-**Document version** : 11 May 2026 (Pass Tech v2.4.0)
+**Document version** : 15 July 2026 (Pass Tech v2.5.1) · 🇫🇷 [Version française](PRIVACY.fr.md)
 **App** : Pass Tech
 **Website** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -35,11 +35,11 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 
 | Data type                            | Use                                                      | Processing location                              |
 | ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------ |
-| Passwords, TOTP secrets, payment cards, secure notes | Vault entries created by the user                | Encrypted at rest on the device (`pt_vault.enc`) |
+| Passwords, TOTP secrets, payment cards, secure notes | Vault entries created by the user                | Encrypted at rest on the device (`pt_vault_a.enc`) |
 | Master password                       | Derives the vault encryption key (Argon2id m=19 MiB, t=2) | Never persisted; wiped from RAM on lock      |
 | Biometric-bound key                   | Optional unlock via fingerprint/face                      | Android Keystore (hardware-bound), `setUserAuthenticationRequired(true)` |
 | Hardware-bound KEK                    | AES-256-GCM key wrapping the vault secret                 | Android Keystore alias `pt_vault_kek_v1` (StrongBox/TEE) — never extractable |
-| Decoy vault (optional)                | Plausible-deniability secondary vault                     | Encrypted with a separate KEK alias (`pt_vault_kek_decoy_v1`) on device |
+| Second vault slot (`pt_vault_b.enc`)  | Plausible deniability — **always present**, whether or not you configured a decoy | Encrypted on device with its own KEK alias (`pt_vault_kek_decoy_v1`) |
 | Encrypted backups (`.ptbak`)          | Optional user-triggered export                            | User-chosen storage location                     |
 | Local preferences                     | Theme, auto-lock duration, clipboard timeout              | Local storage on the device                      |
 
@@ -49,7 +49,11 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 - **Argon2id** (RFC 9106) — m = 19 MiB, t = 2, p = 1, L = 32 bytes (OWASP 2024 recommendation for mobile password managers). Replaces PBKDF2 used in legacy v3 vaults.
 - **Hardware-bound KEK** — a 32-byte `hwSecret` is wrapped by an AES-256-GCM KEK held in the Android Keystore (alias `pt_vault_kek_v1`, StrongBox-backed when available, TEE software fallback). The KEK never leaves the secure element.
 - **Final key derivation** — `finalKey = HKDF-SHA256(salt, pwHash || hwSecret, "pt:v4", 32)`. An attacker who exfiltrates the vault file alone cannot brute-force it without the device-bound KEK.
-- **Plausible deniability** — two KEK aliases (`pt_vault_kek_v1` + `pt_vault_kek_decoy_v1`) are created at first install regardless of decoy use; a 32-byte dummy salt is generated and timing of decoy verification is aligned with the real path so Keystore inspection and side-channel timing do not reveal whether a decoy is configured.
+- **Plausible deniability** — the app is built so that nobody inspecting the device can tell whether you keep a second, hidden vault.
+  - *At rest (since v2.5.1)* — the two vault slots carry **neutral, indistinguishable file names** (`pt_vault_a.enc` / `pt_vault_b.enc`), and **both always exist**: if you never configured a decoy, the app still writes a dummy one (an empty entry list, encrypted under a random password that is never stored anywhere, and therefore never openable — not by you, not by us). Someone who copies your device sees two vault files either way.
+  - *In the Keystore* — two KEK aliases (`pt_vault_kek_v1` + `pt_vault_kek_decoy_v1`) are created at first install regardless of decoy use, and a 32-byte dummy salt is generated.
+  - *In timing* — verification of the decoy path is aligned with the real one, so measuring how long an unlock attempt takes reveals nothing.
+  - The code makes **no functional distinction** between the two slots: both have the same capabilities. The active slot is simply the one your master password decrypted.
 - **`.ptbak` backups** — encrypted with a user-chosen passphrase using the same Argon2id + AES-GCM pack (no Keystore binding so the backup is portable across devices).
 - **Biometric unlock** — optional; biometric-bound key in Android Keystore, not extractable without biometric authentication.
 
@@ -73,6 +77,11 @@ The application does not transmit user data to any server operated by the develo
 - Vault data is stored locally and remains under user control.
 - Uninstalling the app erases all data (the vault file is in the app's private directory, excluded from cloud backup via `dataExtractionRules`).
 - The user can also delete the vault from within the app (`Settings → Delete vault`).
+- **No leftover copy of an older vault.** Upgrading a legacy v3 vault to v4 used to leave a `.bak`
+  copy behind until the next master-password change. That copy was encrypted with the older, weaker
+  scheme (PBKDF2 + AES-CBC) derived from the master password **alone**, with no hardware binding —
+  so it could be attacked offline, undoing the two protections v4 exists to provide. Since v2.5.1 it
+  is deleted as soon as the upgrade succeeds.
 
 ## 9. Security
 

@@ -1,6 +1,6 @@
 # Privacy Policy — Pass Tech
 
-**Document version**: May 11, 2026 (Pass Tech v2.4.0)
+**Document version**: July 15, 2026 (Pass Tech v2.5.1)
 **App**: Pass Tech
 **Official website**: https://www.files-tech.com
 **Contact**: contact@files-tech.com
@@ -35,7 +35,8 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 
 | Data type                              | Use                                                          | Processing location                              |
 | -------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
-| Passwords, TOTP secrets, bank cards, secure notes | Vault entries created by the user            | Encrypted at rest on device (`pt_vault.enc`)     |
+| Passwords, TOTP secrets, bank cards, secure notes | Vault entries created by the user            | Encrypted at rest on device (`pt_vault_a.enc`)   |
+| Second vault slot (`pt_vault_b.enc`)   | Plausible deniability — **always present**, whether or not you configured a decoy | Encrypted on device with its own Keystore key |
 | Master password                        | Derives the encryption key (Argon2id, OWASP 2024 baseline)   | Never persisted; wiped from RAM on lock          |
 | Biometric key                          | Optional fingerprint / face unlock                           | Android Keystore (hardware-bound), `setUserAuthenticationRequired(true)` |
 | Encrypted backups (`.ptbak`)           | Optional export triggered by the user                        | User-chosen location                             |
@@ -47,6 +48,7 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 - **Argon2id** (m = 19 MiB, t = 2, p = 1, OWASP 2024 baseline) for the vault master key derivation.
 - **Hardware-bound KEK** in Android Keystore (StrongBox best-effort) wraps a per-vault hardware secret.
 - **Biometric key tied to hardware** via Android Keystore; non-extractible without biometric authentication.
+- **Plausible deniability** — nobody inspecting the device can tell whether you keep a second, hidden vault. Both vault slots carry neutral, indistinguishable names (`pt_vault_a.enc` / `pt_vault_b.enc`) and **both always exist**: with no decoy configured, the app still writes a dummy one — an empty list, encrypted under a random password stored nowhere, so it can never be opened, by you or by us. Keystore aliases, salts and unlock timing are aligned between the two paths.
 
 ## 6. Network
 
@@ -68,6 +70,7 @@ The application does not transmit any data to a server operated by the developer
 - Vault data is stored locally and remains under user control.
 - Uninstalling the app deletes all data (the vault file is in the app's private directory, excluded from cloud backup via `dataExtractionRules`).
 - The user can also delete the vault from within the app (`Settings → Delete vault`).
+- **No leftover copy of an older vault** — upgrading a legacy v3 vault used to leave a `.bak` copy behind, encrypted with the older, weaker scheme and attackable offline. Since v2.5.1 it is deleted as soon as the upgrade succeeds.
 
 ## 9. Security
 
