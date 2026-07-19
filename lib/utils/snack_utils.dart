@@ -25,6 +25,10 @@ abstract final class SnackUtils {
         content: Text(text),
         behavior: SnackBarBehavior.floating,
         duration: duration,
+        // `SnackBar.persist` vaut par défaut `action != null` : sans ce flag,
+        // passer une [action] rendrait le bandeau permanent et [duration]
+        // inopérante (cf. snack_bar.dart / scaffold.dart).
+        persist: false,
         action: action,
       ),
     );
