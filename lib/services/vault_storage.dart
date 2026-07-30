@@ -85,7 +85,17 @@ extension VaultStorage on VaultService {
     final plainText = utf8.encode(
       jsonEncode(_entries.map((e) => e.toJson()).toList()),
     );
-    final ptBytes = Uint8List.fromList(plainText);
+    // SEC F6 v2.5.2 — rembourrage par paliers AVANT chiffrement. AES-GCM
+    // préserve la longueur : sans ça, la taille du chiffré révèle la taille du
+    // coffre, et un leurre factice (qui chiffre `[]`, soit 24 caractères
+    // base64) se distinguait d'un vrai coffre de façon déterministe. Le déni
+    // plausible que le nommage neutre `_a`/`_b` existe pour offrir tombait sur
+    // un simple `ls -l`.
+    // `utf8.encode` rend déjà un Uint8List : on le passe TEL QUEL. Un
+    // `Uint8List.fromList(plainText)` intermédiaire créerait une troisième
+    // copie du JSON en clair — contenant tous les mots de passe — que le wipe
+    // ci-dessous ne couvrirait pas.
+    final ptBytes = VaultService._padToBucket(plainText);
 
     final aead = await AeadService.encryptGcm(
       key: _key!,

@@ -549,6 +549,45 @@ class VaultService {
     '  ',
   ).convert(_entries.map((e) => e.toJson()).toList());
 
+  /// SEC F6 v2.5.2 — granularité du rembourrage du clair avant chiffrement.
+  /// 4 Kio : assez large pour qu'un coffre naissant et un leurre factice
+  /// tombent dans le même palier, assez fin pour que le surcoût de stockage
+  /// reste négligeable.
+  static const int _paddingBucketBytes = 4096;
+
+  /// Rembourre [plain] par des espaces jusqu'au palier supérieur de
+  /// [_paddingBucketBytes], avec un plancher de [minBuckets] paliers.
+  ///
+  /// Le remplissage utilise l'espace (0x20) et non des octets nuls : `jsonDecode`
+  /// ignore les espaces de fin, donc le clair rembourré se relit avec le
+  /// décodeur EXISTANT. Aucun bump de version de format, aucune migration, et
+  /// les coffres déjà écrits sans rembourrage continuent de s'ouvrir —
+  /// vérifié empiriquement avant implémentation.
+  ///
+  /// ⚠️ Limite résiduelle : ceci supprime le tell « 24 octets = manifestement
+  /// vide », mais ne rend PAS un gros coffre réel indistinguable d'un petit
+  /// leurre. Deux fichiers de paliers différents restent différents. Rendre les
+  /// deux emplacements strictement équivalents demanderait de les rembourrer au
+  /// MÊME palier, donc de faire croître le leurre avec le vrai coffre.
+  static Uint8List _padToBucket(Uint8List plain, {int minBuckets = 1}) {
+    final needed = (plain.length / _paddingBucketBytes).ceil();
+    final buckets = needed < minBuckets ? minBuckets : needed;
+    final target = (buckets < 1 ? 1 : buckets) * _paddingBucketBytes;
+    final out = Uint8List(target)..fillRange(0, target, 0x20);
+    out.setRange(0, plain.length, plain);
+    return out;
+  }
+
+  /// Entrée de test pour [_padToBucket] et [_paddingBucketBytes], qui sont
+  /// privés à la bibliothèque. Le rembourrage conditionne le déni plausible :
+  /// il doit être couvert par des tests, pas seulement par relecture.
+  @visibleForTesting
+  static Uint8List padToBucketForTest(Uint8List plain, {int minBuckets = 1}) =>
+      _padToBucket(plain, minBuckets: minBuckets);
+
+  @visibleForTesting
+  static int get paddingBucketBytesForTest => _paddingBucketBytes;
+
   /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
   /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.
   /// Best-effort : sur un système de fichiers à copie sur écriture (F2FS,
