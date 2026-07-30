@@ -1,0 +1,6 @@
+Smoother writing in notes.
+
+• Text selection now stops at the last character instead of running to the screen edge.
+• Drag-selection no longer stutters: the field grows with the text instead of scrolling on its own.
+
+Display fixes only — no security or vault format change since 2.5.2.

@@ -1,0 +1,6 @@
+Confort d'écriture dans les notes.
+
+• La sélection de texte s'arrête au dernier caractère au lieu de filer jusqu'au bord de l'écran.
+• Le glissement de sélection ne saccade plus : le champ grandit avec le texte au lieu de défiler dans son coin.
+
+Corrections d'affichage uniquement — aucun changement de sécurité ni de format de coffre depuis la 2.5.2.
