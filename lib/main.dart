@@ -190,7 +190,20 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
       // B2 — horodatage monotonique (Stopwatch) immune au clock-skew.
+      //
+      // DOIT rester la toute première instruction, et SYNCHRONE. Une version
+      // intermédiaire de SEC F3 plaçait l'appel FLAG_SECURE (un aller-retour
+      // de canal de plateforme) avant cette ligne : l'horodatage était alors
+      // capturé APRÈS l'attente, donc plus tard que la mise en arrière-plan
+      // réelle. Le verrouillage automatique en déduisait un temps écoulé plus
+      // court et verrouillait plus tard — affaiblissement silencieux introduit
+      // par un correctif de sécurité.
       _pausedAtMonoMs ??= _stopwatch.elapsedMilliseconds;
+      // SEC F3 v2.5.2 — réarme FLAG_SECURE avant toute autre opération
+      // asynchrone : Android prend son instantané de fenêtre au moment du
+      // passage en arrière-plan, donc chaque `await` qui précède est une
+      // fenêtre de capture.
+      await SecureWindow.suspendRelaxForBackground();
       // Wipe clipboard immediately on background : don't risk leaving secrets
       // in the clipboard if the OS kills the process before the timer fires.
       await ClipboardService.cancelAndClear();
@@ -199,6 +212,8 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // Immediate lock: wipe key now, navigate on resume
       if (lockSec == 0 && VaultService().isOpen) VaultService().lock();
     } else if (state == AppLifecycleState.resumed) {
+      // SEC F3 v2.5.2 — rétablit la relaxation si un écran la demande encore.
+      await SecureWindow.resumeRelaxAfterBackground();
       final pausedMs = _pausedAtMonoMs;
       _pausedAtMonoMs = null;
 

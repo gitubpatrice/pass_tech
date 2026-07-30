@@ -1,0 +1,9 @@
+Version de sécurité — 17 failles corrigées après un audit externe.
+
+• Coffre leurre : sa taille ne trahit plus qu'il est factice.
+• Verrouillage : avancer l'horloge ne l'efface plus.
+• Mode panique : désactive aussi la biométrie.
+• « Tout supprimer » n'oublie plus la sauvegarde héritier.
+• Audit : les mots de passe faibles sont enfin détectés.
+• Changer le mot de passe maître exige l'actuel.
+• Notes : plus de fuite dans les applis récentes.

@@ -120,6 +120,52 @@ class SecureWindow {
     }
   }
 
+  /// SEC F3 v2.5.2 — vrai quand le cycle de vie a réarmé FLAG_SECURE alors
+  /// qu'une relaxation était active. Distinct de `_relaxCount`, qu'on ne
+  /// touche JAMAIS ici : le refcount doit rester le reflet exact du nombre
+  /// d'écrans qui demandent la relaxation, sinon le `restore()` du `dispose`
+  /// se désynchronise.
+  static bool _suspendedByLifecycle = false;
+
+  /// Réarme FLAG_SECURE lors du passage en arrière-plan, quelle que soit la
+  /// relaxation en cours.
+  ///
+  /// Sans ça, l'éditeur de note sécurisée (seul appelant de `relax()`)
+  /// laissait la fenêtre NON protégée pendant toute sa durée de vie — c'est sa
+  /// conception, pour permettre le collage depuis une autre app. Or Android
+  /// capture l'instantané de la fenêtre au moment où l'app passe en
+  /// arrière-plan, et le persiste pour le sélecteur d'applications récentes.
+  /// Le contenu d'une note (codes de récupération, IBAN, phrases de
+  /// récupération — ce que les chaînes de l'app annoncent elles-mêmes) restait
+  /// donc lisible dans la vignette, et cette vignette SURVIT au verrouillage
+  /// automatique du coffre : quiconque récupérait le téléphone déverrouillé
+  /// ouvrait les récentes et lisait les codes sans toucher au mot de passe
+  /// maître.
+  static Future<void> suspendRelaxForBackground() async {
+    if (_userDisabled) return;
+    if (_relaxCount <= 0 || _suspendedByLifecycle) return;
+    _suspendedByLifecycle = true;
+    try {
+      await _channel.invokeMethod('setSecure', {'enabled': true});
+    } catch (_) {
+      /* silent — non bloquant */
+    }
+  }
+
+  /// Rétablit la relaxation au retour au premier plan, si et seulement si
+  /// elle était encore demandée par un écran vivant.
+  static Future<void> resumeRelaxAfterBackground() async {
+    if (_userDisabled) return;
+    if (!_suspendedByLifecycle) return;
+    _suspendedByLifecycle = false;
+    if (_relaxCount <= 0) return;
+    try {
+      await _channel.invokeMethod('setSecure', {'enabled': false});
+    } catch (_) {
+      /* silent — non bloquant */
+    }
+  }
+
   /// Restaure FLAG_SECURE quand le dernier écran qui demandait sa
   /// désactivation se ferme. À appeler dans `dispose`.
   static Future<void> restore() async {

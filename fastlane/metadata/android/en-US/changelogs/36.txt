@@ -1,0 +1,9 @@
+Security release — 17 issues fixed after an external audit.
+
+• Decoy vault: its size no longer reveals it is a dummy.
+• Lockout: moving the clock forward no longer clears it.
+• Panic mode: now also disables biometrics.
+• "Delete everything" no longer skips the heir backup.
+• Audit: weak passwords are finally detected.
+• Changing the master password requires the current one.
+• Notes: no more leak into the recent apps view.

@@ -68,7 +68,55 @@ extension VaultSetup on VaultService {
   /// et re-wrappé. La biométrique liée au PRIMARY est invalidée si on change
   /// le password du PRIMARY ; conserver la bio sur PRIMARY après changement
   /// du DECOY trahirait son existence.
-  Future<void> changeMasterPassword(String newPassword) async {
+  /// SEC F10 v2.5.2 — [currentPassword] est désormais OBLIGATOIRE et vérifié.
+  ///
+  /// Avant, la fonction ne prenait que `newPassword` : elle générait un sel et
+  /// un `hwSecret` neufs, réenveloppait, dérivait un nouveau `finalKey` et
+  /// réécrivait le coffre — sans jamais vérifier le mot de passe courant ni
+  /// consulter le verrouillage. Le dialogue appelant ne comportait que deux
+  /// champs (« nouveau » / « confirmer »).
+  ///
+  /// Quiconque disposait d'un accès momentané à une session déverrouillée
+  /// pouvait donc pivoter le secret et verrouiller DÉFINITIVEMENT le
+  /// propriétaire hors de son coffre : la rotation invalide en prime
+  /// l'enveloppe biométrique, et `allowBackup="false"` élimine toute
+  /// restauration système. Le verrouillage automatique par défaut est à 300 s
+  /// et n'est évalué qu'au retour au premier plan, donc une app laissée
+  /// ouverte au premier plan ne se reverrouille jamais.
+  ///
+  /// Lève [StateError] avec [VaultService.wrongCurrentPassword] si la
+  /// vérification échoue.
+  Future<void> changeMasterPassword(
+    String newPassword, {
+    required String currentPassword,
+  }) async {
+    // SEC-R1 v2.5.2 — le mutex est tenu sur TOUTE l'opération, vérification
+    // ET rotation. Avant, `verifyCurrentPassword` le relâchait en sortant et
+    // la rotation lisait `_activeSlot` sans protection : un `unlock()`
+    // concurrent pouvait s'intercaler et faire pivoter la clé du MAUVAIS
+    // emplacement.
+    if (_unlockGate != null) {
+      throw StateError(VaultService.vaultBusy);
+    }
+    final gate = _unlockGate = Completer<void>();
+    try {
+      await _changeMasterPasswordLocked(
+        newPassword,
+        currentPassword: currentPassword,
+      );
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  Future<void> _changeMasterPasswordLocked(
+    String newPassword, {
+    required String currentPassword,
+  }) async {
+    if (!await verifyCurrentPasswordLocked(currentPassword)) {
+      throw StateError(VaultService.wrongCurrentPassword);
+    }
     // v4 : Argon2id + re-wrap fresh hwSecret. Le slot opposé n'est pas affecté.
     final slot = _activeSlot ?? _Slot.primary;
     final salt = SecretBytes.randomBytes(32);
@@ -233,7 +281,23 @@ extension VaultSetup on VaultService {
       );
 
       // Liste d'entrées VIDE chiffrée en AES-GCM, AAD identique au format v4.
-      ptBytes = Uint8List.fromList(utf8.encode(jsonEncode(const <dynamic>[])));
+      //
+      // SEC F6 v2.5.2 — le clair est rembourré sur le MÊME barreau que l'autre
+      // emplacement. Avant, `jsonEncode([])` produisait 2 octets, donc 18
+      // octets de sortie GCM et 24 caractères base64 dans `cipher.data`, alors
+      // qu'un coffre réel produit un chiffré proportionnel au nombre d'entrées.
+      // AES-GCM préservant la longueur et aucun rembourrage n'étant appliqué,
+      // la longueur du chiffré était le SEUL discriminant entre les deux
+      // emplacements — et il était décisif. Le code étant public sous
+      // Apache 2.0, la taille exacte du leurre était même calculable à l'avance.
+      //
+      // L'appariement sur l'autre emplacement (et non un tirage aléatoire)
+      // donne l'équivalence STRICTE recherchée : le leurre factice fait
+      // exactement la taille du vrai coffre.
+      ptBytes = VaultService._padToLadder(
+        utf8.encode(jsonEncode(const <dynamic>[])),
+        minPlainBytes: await _otherSlotPlainLength(_Slot.decoy),
+      );
       final aead = await AeadService.encryptGcm(
         key: finalKey,
         plaintext: ptBytes,

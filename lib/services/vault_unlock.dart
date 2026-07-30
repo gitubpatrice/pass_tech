@@ -25,6 +25,29 @@ extension VaultUnlock on VaultService {
   /// via deeplinks / Back rapide) pouvait corrompre `_key`/`_entries`
   /// pendant le snapshot/restore du path v3.
   Future<bool> passwordMatchesPrimary(String password) async {
+    // SEC F7 v2.5.2 — Cette fonction est un oracle oui/non sur le mot de passe
+    // maître RÉEL. Avant, elle était atteignable depuis une session LEURRE
+    // (`_manageHeritage` → « Mettre à jour », sans garde de slot) et ne
+    // consultait NI le lockout NI le compteur d'échecs : un adversaire à qui
+    // l'on avait remis le mot de passe leurre — la situation exacte pour
+    // laquelle le leurre existe — disposait d'un oracle illimité sur le
+    // secret principal. La frontière de déni plausible était franchie.
+    //
+    // Garde 1 : interdire l'appel hors du slot principal. C'est ce qui tue
+    // l'oracle : depuis un leurre, on ne peut plus rien apprendre du primary.
+    if (_activeSlot != _Slot.primary) return false;
+
+    // Garde 2 : respecter le verrouillage anti-force-brute, comme `unlock()`.
+    if (await getLockoutRemaining() != null) return false;
+
+    // NB : on n'incrémente délibérément PAS `_onUnlockFail()` sur non-
+    // correspondance, contrairement à ce que suggérait l'audit. Le principal
+    // appelant est la création du coffre leurre, qui vérifie que le mot de
+    // passe leurre DIFFÈRE du principal : la non-correspondance y est le
+    // résultat ATTENDU et souhaitable. Compter ces essais verrouillerait un
+    // utilisateur légitime en train de configurer son leurre. La garde de slot
+    // ci-dessus supprime déjà la valeur d'oracle ; le comptage n'apporterait
+    // qu'un faux positif.
     if (_unlockGate != null) return false;
     final gate = _unlockGate = Completer<void>();
     try {
@@ -35,9 +58,58 @@ extension VaultUnlock on VaultService {
     }
   }
 
-  Future<bool> _passwordMatchesPrimaryInternal(String password) async {
+  /// SEC F10 v2.5.2 — vérifie [password] contre l'emplacement ACTIF.
+  ///
+  /// Destiné à la réauthentification avant une opération sensible
+  /// (changement de mot de passe maître). Contrairement à
+  /// [passwordMatchesPrimary], le comptage d'échecs est ici LÉGITIME : une
+  /// non-correspondance est un vrai échec d'authentification, pas un résultat
+  /// attendu.
+  ///
+  /// Retourne `false` si le coffre est verrouillé, si aucun coffre n'est
+  /// ouvert, ou si un déverrouillage est déjà en cours.
+  Future<bool> verifyCurrentPassword(String password) async {
+    if (_unlockGate != null) return false;
+    final gate = _unlockGate = Completer<void>();
     try {
-      final file = await _vaultFileFor(_Slot.primary);
+      return await verifyCurrentPasswordLocked(password);
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  /// Corps de [verifyCurrentPassword] SANS acquisition du mutex.
+  ///
+  /// SEC-R1 v2.5.2 — `changeMasterPassword` doit tenir `_unlockGate` sur TOUTE
+  /// sa durée, vérification comprise. Avant, il appelait
+  /// [verifyCurrentPassword], qui relâchait le mutex en sortant, puis lisait
+  /// `_activeSlot` et faisait pivoter salt / hwSecret / finalKey SANS le
+  /// reprendre. Un `unlock()` concurrent — atteignable par double-appui rapide,
+  /// deeplink ou Retour rapide, le même scénario que la garde F4 v2.4.4
+  /// documente déjà — pouvait s'intercaler dans cette fenêtre et réassigner
+  /// `_activeSlot` / `_key`. La rotation portait alors sur le MAUVAIS
+  /// emplacement, sans que rien ne le signale : perte d'accès définitive au
+  /// coffre visé.
+  ///
+  /// L'appelant DOIT détenir `_unlockGate`.
+  Future<bool> verifyCurrentPasswordLocked(String password) async {
+    if (!_isOpen || _activeSlot == null) return false;
+    if (await getLockoutRemaining() != null) return false;
+    final ok = await _passwordMatchesPrimaryInternal(
+      password,
+      slot: _activeSlot!,
+    );
+    if (!ok) await _onUnlockFail();
+    return ok;
+  }
+
+  Future<bool> _passwordMatchesPrimaryInternal(
+    String password, {
+    _Slot slot = _Slot.primary,
+  }) async {
+    try {
+      final file = await _vaultFileFor(slot);
       if (!await file.exists()) return false;
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
@@ -53,11 +125,7 @@ extension VaultUnlock on VaultService {
       final savedSlot = _activeSlot;
       try {
         if (version >= VaultService._currentVersion) {
-          final r = await _v4Unlock(
-            slot: _Slot.primary,
-            password: password,
-            raw: raw,
-          );
+          final r = await _v4Unlock(slot: slot, password: password, raw: raw);
           if (r == null) return false;
           // F3 v2.4.4 — `_v4Unlock` est désormais pur. On wipe tous les
           // buffers retournés ; `r.entries` est juste une `List<Entry>`
@@ -70,7 +138,7 @@ extension VaultUnlock on VaultService {
         }
         // v3 path — derive PBKDF2 then attempt MAC check.
         final saltB64 = await VaultService._storage.read(
-          key: _saltKeyFor(_Slot.primary),
+          key: _saltKeyFor(slot),
         );
         if (saltB64 == null) return false;
         final salt = base64Decode(saltB64);

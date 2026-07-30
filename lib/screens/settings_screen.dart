@@ -541,7 +541,25 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (action != 'delete' || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    await VaultService().deleteDecoyVault();
+    // SEC-R3 v2.5.2 — depuis une session leurre, le service refuse et lève.
+    //
+    // On garde volontairement la section « Coffre leurre » VISIBLE et on
+    // affiche un refus neutre, plutôt que de masquer l'entrée. Masquer
+    // révélerait l'emplacement actif : le code étant public sous Apache 2.0,
+    // un adversaire sait qu'une section absente signifie « vous êtes dans le
+    // leurre ». Même raisonnement que pour « Tout supprimer » (F12).
+    try {
+      await VaultService().deleteDecoyVault();
+    } on StateError {
+      if (mounted) {
+        SnackUtils.showError(
+          context,
+          messenger,
+          t.settingsDeleteAllUnavailable,
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() {});
     SnackUtils.showInfo(messenger, t.decoyDeletedSnack);
@@ -748,17 +766,43 @@ class _SettingsScreenState extends State<SettingsScreen>
       // F20 v2.3.7 — overwrite plaintext avec random bytes AVANT delete
       // (best-effort — F2FS/SSD wear-leveling ne garantit pas l'effacement
       // physique, mais empêche la récupération via lecture brute fichier).
-      try {
-        if (file.existsSync()) {
-          final len = file.lengthSync();
-          if (len > 0) {
-            final rand = SecretBytes.randomBytes(len);
-            file.writeAsBytesSync(rand, flush: true);
-          }
-          file.deleteSync();
-        }
-      } catch (_) {}
+      _shredFile(file);
+      // SEC F8 v2.5.2 — `Share.shareXFiles` ne PARTAGE PAS notre fichier : il
+      // le RECOPIE dans `<cache>/share_plus/` (share_plus `copyToShareCacheFolder`)
+      // et n'y fait le ménage qu'au DÉBUT du prochain appel à `shareFiles`.
+      // On écrasait donc soigneusement notre propre fichier temporaire pendant
+      // qu'un vidage JSON en clair de TOUTES les entrées survivait
+      // indéfiniment à côté — sans mot de passe, sans Keystore, sans Argon2id
+      // pour le protéger. Le plugin accorde en outre une permission de lecture
+      // sur cette copie à toute activité résolvant le sélecteur.
+      _shredShareCache(dir);
     }
+  }
+
+  /// Écrase un fichier par des octets aléatoires puis le supprime.
+  static void _shredFile(File file) {
+    try {
+      if (!file.existsSync()) return;
+      final len = file.lengthSync();
+      if (len > 0) {
+        file.writeAsBytesSync(SecretBytes.randomBytes(len), flush: true);
+      }
+      file.deleteSync();
+    } catch (_) {}
+  }
+
+  /// Purge le répertoire de cache de `share_plus`, où le plugin recopie tout
+  /// fichier partagé. Appelé après chaque partage et au verrouillage, pour
+  /// couvrir aussi le cas où le processus est tué pendant l'affichage du
+  /// sélecteur (le `finally` ne s'exécute alors jamais).
+  static void _shredShareCache(Directory cacheDir) {
+    try {
+      final shareDir = Directory('${cacheDir.path}/share_plus');
+      if (!shareDir.existsSync()) return;
+      for (final ent in shareDir.listSync(followLinks: false)) {
+        if (ent is File) _shredFile(ent);
+      }
+    } catch (_) {}
   }
 
   Future<void> _exportEncrypted() async {
@@ -976,7 +1020,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     final nav = Navigator.of(context);
     final t = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final result = await showDialog<String>(
+    // SEC F10 v2.5.2 — le dialogue rend désormais le couple
+    // (mot de passe actuel, nouveau mot de passe).
+    final result = await showDialog<({String current, String fresh})>(
       context: context,
       builder: (_) => const _ChangePasswordDialog(),
     );
@@ -993,11 +1039,25 @@ class _SettingsScreenState extends State<SettingsScreen>
     // Aligné sur les autres opérations Réglages (export/héritage) déjà en
     // try/catch avec pop du progress en cas d'erreur.
     try {
-      await VaultService().changeMasterPassword(result);
+      await VaultService().changeMasterPassword(
+        result.fresh,
+        currentPassword: result.current,
+      );
       if (!mounted) return;
       nav.pop(); // close progress dialog
       SnackUtils.showInfo(messenger, t.changePasswordDoneSnack);
       setState(() => _biometricEnabled = false);
+    } on StateError catch (e) {
+      // SEC F10 v2.5.2 — mot de passe actuel incorrect : message dédié plutôt
+      // qu'une erreur générique exposant le sentinel interne.
+      if (!mounted) return;
+      nav.pop();
+      SnackUtils.showError(context, messenger, switch (e.message) {
+        VaultService.wrongCurrentPassword => t.changePasswordErrorWrongCurrent,
+        // SEC-R1 v2.5.2 — opération concurrente : rien n'a été muté.
+        VaultService.vaultBusy => t.vaultBusyRetry,
+        _ => t.genericError('$e'),
+      });
     } catch (e) {
       if (!mounted) return;
       nav.pop(); // close progress dialog
@@ -1009,6 +1069,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final nav = Navigator.of(context);
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -1037,7 +1098,22 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (ok != true) return;
     // U9 v2.4.4 — feedback haptique sur action destructive ultime.
     await HapticFeedback.heavyImpact();
-    await VaultService().deleteVault();
+    // SEC F12 v2.5.2 — depuis une session leurre, `deleteVault()` refuse et
+    // lève. On affiche un refus NEUTRE : révéler « vous n'êtes pas sur le
+    // coffre principal » prouverait à l'adversaire qu'un coffre principal
+    // existe, ce qui annulerait le déni plausible.
+    try {
+      await VaultService().deleteVault();
+    } on StateError {
+      if (mounted) {
+        SnackUtils.showError(
+          context,
+          messenger,
+          t.settingsDeleteAllUnavailable,
+        );
+      }
+      return;
+    }
     if (mounted) {
       nav.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const SetupScreen()),
@@ -1568,6 +1644,10 @@ class _ChangePasswordDialog extends StatefulWidget {
 }
 
 class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  /// SEC F10 v2.5.2 — champ « mot de passe actuel ». Son absence permettait à
+  /// quiconque disposait d'un accès momentané à une session déverrouillée de
+  /// pivoter le secret et de verrouiller définitivement le propriétaire.
+  final _ctrlCurrent = TextEditingController();
   final _ctrl1 = TextEditingController();
   final _ctrl2 = TextEditingController();
   String? _error;
@@ -1575,8 +1655,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   @override
   void dispose() {
     // B9 v2.3.8 — clear master password ctrls avant dispose.
+    _ctrlCurrent.clear();
     _ctrl1.clear();
     _ctrl2.clear();
+    _ctrlCurrent.dispose();
     _ctrl1.dispose();
     _ctrl2.dispose();
     super.dispose();
@@ -1592,6 +1674,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          PasswordTextField(
+            controller: _ctrlCurrent,
+            labelText: t.changePasswordCurrentLabel,
+            showPrefixIcon: false,
+          ),
+          const SizedBox(height: 12),
           PasswordTextField(
             controller: _ctrl1,
             labelText: t.changePasswordNewLabel,
@@ -1613,6 +1701,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         TextButton(onPressed: () => nav.pop(), child: Text(t.actionCancel)),
         FilledButton(
           onPressed: () {
+            if (_ctrlCurrent.text.isEmpty) {
+              setState(() => _error = t.changePasswordErrorCurrentRequired);
+              return;
+            }
             if (_ctrl1.text.length < 12) {
               setState(() => _error = t.changePasswordErrorMin);
               return;
@@ -1621,7 +1713,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               setState(() => _error = t.changePasswordErrorMismatch);
               return;
             }
-            nav.pop(_ctrl1.text);
+            nav.pop((current: _ctrlCurrent.text, fresh: _ctrl1.text));
           },
           child: Text(t.changePasswordCta),
         ),

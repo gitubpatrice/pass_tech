@@ -43,6 +43,28 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
     `ensureVaultLayout` **crash-safe** (rename ancien→neutre + backfill leurre
     factice, fallback lecture des anciens noms). Validé device (unlock
     empreinte + création/suppression leurre).
+
+    > **Correction v2.5.2 (SEC F6).** « Profil de fichiers constant » était
+    > FAUX jusqu'à la v2.5.1 : les noms et les enveloppes JSON étaient bien
+    > identiques champ pour champ, mais AES-GCM **préserve la longueur** et
+    > aucun rembourrage n'était appliqué. Le leurre factice chiffrait `[]`,
+    > soit 24 caractères base64 dans `cipher.data`, contre plusieurs kilo-
+    > octets pour un vrai coffre : la TAILLE était un discriminant
+    > déterministe, et le code étant public, la taille exacte du leurre était
+    > calculable à l'avance. Un `ls -l` suffisait.
+    >
+    > Depuis v2.5.2, le clair est rembourré par espaces sur une échelle de
+    > barreaux (64 Kio, puis ×4) **avant** chiffrement, sur les deux chemins
+    > d'écriture, et chaque emplacement s'aligne sur le barreau couvrant aussi
+    > la longueur de clair de l'autre — lisible sans sa clé, puisque
+    > `longueurClair = base64Decode(cipher.data).length - 16`. Un coffre de
+    > plusieurs centaines d'entrées tient sous le premier barreau : en
+    > pratique les deux fichiers font exactement 64 Kio.
+    >
+    > **Limite subsistante** : deux coffres qui tomberaient sur des barreaux
+    > différents (l'un dépassant 64 Kio, l'autre non) redeviendraient
+    > distinguables jusqu'à la prochaine écriture du plus petit, qui le
+    > réaligne.
   - **Mot de passe héritier min 12** (était 8, service) — aligné sur le master
     password et l'export `.ptbak`. Le snapshot héritier n'a pas de liaison TEE.
   - **Gel UI** — `_changePassword` wrappé en try/catch (le spinner
@@ -443,8 +465,18 @@ Le modèle de menace cible trois scénarios :
     peut rejouer un code TOTP expiré dans la fenêtre ±30 s tolérée.
     Mitigations partielles : pas de stockage TOTP en clair (le secret
     Base32 est dans le vault chiffré), wall-clock pas utilisable pour
-    déverrouiller le vault lui-même (les chemins lockout passent par
-    `MonotonicClock`).
+    déverrouiller le vault lui-même — depuis v2.5.2 le lockout est ancré
+    sur `SystemClock.elapsedRealtime()`, insensible aux Réglages Date et
+    heure comme à NTP.
+
+    > **Correction v2.5.2 (SEC F5/F17).** Cette affirmation était FAUSSE
+    > jusqu'à la v2.5.1. `MonotonicClock.nowMs()` rend
+    > `max(DateTime.now(), maxSeen)` : la monotonie ne jouait que contre
+    > les RECULS d'horloge, alors que l'AVANCE est la direction
+    > attaquante. Avancer la date d'un jour dans les Réglages Android
+    > effaçait le verrouillage anti-force-brute, sans root ni ADB. Le
+    > verrouillage persiste désormais une durée restante plus une ancre
+    > `elapsedRealtime`, et décompte le temps réellement écoulé.
   Mitigation globale : auto-lock court + FLAG_SECURE + Keystore
   hardware-backed quand disponible.
 - **Wipe Keystore = perte du coffre** : factory reset, restauration usine,

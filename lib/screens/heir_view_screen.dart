@@ -115,6 +115,9 @@ class _EntryTile extends StatelessWidget {
             subtitle: SelectableText(
               entry.username,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              // UI v2.5.2 — la sélection s'arrête au dernier caractère au lieu
+              // de déborder jusqu'au bord du ListTile.
+              textWidthBasis: TextWidthBasis.longestLine,
             ),
             // U5 v2.4.4 — tooltip explicite (l'héritier n'est par
             // définition pas familier de l'app — c'est son SEUL usage).
@@ -136,6 +139,7 @@ class _EntryTile extends StatelessWidget {
             subtitle: SelectableText(
               entry.password,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              textWidthBasis: TextWidthBasis.longestLine,
             ),
             trailing: IconButton(
               icon: const Icon(Icons.copy, size: 18),
@@ -155,6 +159,7 @@ class _EntryTile extends StatelessWidget {
             subtitle: SelectableText(
               entry.url,
               style: const TextStyle(fontSize: 12),
+              textWidthBasis: TextWidthBasis.longestLine,
             ),
           ),
         if (entry.notes.isNotEmpty)
@@ -173,6 +178,7 @@ class _EntryTile extends StatelessWidget {
                 SelectableText(
                   entry.notes,
                   style: const TextStyle(fontSize: 12),
+                  textWidthBasis: TextWidthBasis.longestLine,
                 ),
               ],
             ),

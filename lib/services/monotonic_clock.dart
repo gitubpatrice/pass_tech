@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// A6/A7 v2.3.8 — horloge monotone résistante au clock-skew.
@@ -56,6 +57,32 @@ class MonotonicClock {
   static Future<int> _continueAfter(int previous) async {
     final realNow = DateTime.now().millisecondsSinceEpoch;
     return realNow > previous ? realNow : previous;
+  }
+
+  /// SEC F5/F17 v2.5.2 — horloge monotone au niveau SYSTÈME.
+  ///
+  /// `SystemClock.elapsedRealtime()` compte les millisecondes écoulées depuis
+  /// le démarrage, sommeil profond inclus. Contrairement à [nowMs], elle n'est
+  /// pas seulement résistante aux RECULS : elle est insensible aux AVANCES.
+  /// Ni les Réglages Date et heure, ni une resynchronisation NTP ne la
+  /// déplacent — c'est ce qui la rend utilisable comme ancre du verrouillage
+  /// anti-force-brute, là où [nowMs] échouait en ouverture.
+  ///
+  /// Retourne `null` si la plateforme ne répond pas (hors Android, canal
+  /// indisponible en test) : l'appelant doit alors se rabattir sur [nowMs] et
+  /// accepter la limite documentée.
+  ///
+  /// ⚠️ Se remet à ZÉRO au redémarrage de l'appareil. Un appelant qui persiste
+  /// une valeur doit détecter le recul et le traiter de façon conservatrice.
+  static const _rasp = MethodChannel('com.passtech.pass_tech/rasp');
+
+  static Future<int?> elapsedRealtimeMs() async {
+    try {
+      final v = await _rasp.invokeMethod<int>('elapsedRealtime');
+      return (v != null && v >= 0) ? v : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<int> _nowMsInternal() async {

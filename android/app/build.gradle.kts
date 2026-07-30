@@ -75,7 +75,38 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (rootProject.file("key.properties").exists()) {
+            // SEC F15 v2.5.2 — Avant : repli SILENCIEUX sur le keystore de
+            // debug quand `key.properties` manque. Alias `androiddebugkey` /
+            // mot de passe `android` sont publiquement documentés : n'importe
+            // qui pouvait alors reconstruire un Pass Tech troyanisé, le signer
+            // avec sa propre copie de `~/.android/debug.keystore` et le faire
+            // installer PAR-DESSUS l'app légitime — héritant du répertoire de
+            // données, de `pt_vault_a.enc` et des alias KEK Keystore.
+            // `key.properties` étant gitignoré, c'était l'état par défaut de
+            // tout clone frais.
+            // Désormais : on n'échoue que si un build RELEASE est réellement
+            // demandé, pour ne pas casser les builds debug/profile sur une
+            // machine sans keystore.
+            // SEC-R2 v2.5.2 — on cible les tâches d'ASSEMBLAGE, pas tout ce qui
+            // contient « release ». Un `contains("elease")` matchait aussi
+            // `testReleaseUnitTest`, `lintRelease` ou `compileReleaseKotlin`,
+            // qui n'impliquent aucune signature : un futur job CI exécutant
+            // l'une d'elles sans keystore aurait échoué sur un message
+            // trompeur parlant de refus de signature.
+            val keyPropsFile = rootProject.file("key.properties")
+            if (!keyPropsFile.exists() &&
+                gradle.startParameter.taskNames.any {
+                    it.contains("assembleRelease") || it.contains("bundleRelease")
+                }
+            ) {
+                throw GradleException(
+                    "key.properties introuvable : refus de signer un build " +
+                        "release avec la clé de DEBUG. Restaure " +
+                        "${keyPropsFile.absolutePath} avant de couper une " +
+                        "release. Voir SECURITY.md (signature de release)."
+                )
+            }
+            signingConfig = if (keyPropsFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")

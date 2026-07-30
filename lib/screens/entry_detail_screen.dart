@@ -433,6 +433,11 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
               SelectableText(
                 _entry.notes.isEmpty ? t.entryDetailNoteEmpty : _entry.notes,
                 style: const TextStyle(fontSize: 14, height: 1.4),
+                // UI v2.5.2 — sans ça, `textWidthBasis` vaut `parent` : la
+                // boîte de texte occupe toute la largeur disponible et le
+                // rectangle de sélection déborde jusqu'au bord du conteneur au
+                // lieu de s'arrêter au dernier caractère de la ligne.
+                textWidthBasis: TextWidthBasis.longestLine,
               ),
             ],
           ),
@@ -585,7 +590,13 @@ class _Field extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  SelectableText(value, style: const TextStyle(fontSize: 14)),
+                  SelectableText(
+                    value,
+                    style: const TextStyle(fontSize: 14),
+                    // UI v2.5.2 — cf. note sur le champ Notes : évite que la
+                    // sélection déborde au-delà du dernier caractère.
+                    textWidthBasis: TextWidthBasis.longestLine,
+                  ),
                 ],
               ),
             ),

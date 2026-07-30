@@ -147,10 +147,24 @@ class AntiPhishingService {
     }
 
     // Sous-domaine légitime : example.com couvre login.example.com etc.
-    // On compare le domaine racine (eTLD+1 simplifié — on prend les 2 derniers
-    // segments après split sur '.'). Pas parfait pour .co.uk etc. mais OK
-    // pour les cas courants.
-    if (_sameRootDomain(activeDomain, expectedDomain)) {
+    //
+    // SEC F11 v2.5.2 — Avant : `_sameRootDomain`, qui comparait un eTLD+1
+    // « simplifié » (2 derniers labels, plus une liste figée de 8 labels de
+    // second niveau). Sans Public Suffix List, tout suffixe public hors de
+    // cette liste était traité comme un domaine ENREGISTRABLE :
+    // `attacker.github.io` et `victim.github.io` réduisaient tous deux à
+    // `github.io`, donc verdict `ok` — sans même atteindre la détection de
+    // typosquattage. Idem pour *.pages.dev, *.netlify.app, *.web.app,
+    // *.firebaseapp.com, *.blogspot.com, *.herokuapp.com, *.myshopify.com.
+    //
+    // Désormais : véritable relation de sous-domaine. `a.endsWith('.' + b)`
+    // ne franchit JAMAIS une frontière d'enregistrement, et ne dépend
+    // d'aucune liste à maintenir. Le cas d'égalité exacte est déjà traité
+    // au-dessus. Conséquence assumée : un domaine racine différent mais
+    // apparenté (ex. `example.co.uk` vs `www.example.co.uk`) reste couvert,
+    // alors qu'une entrée notée `login.example.com` ne couvrira plus
+    // `example.com` — restriction volontaire, dans le sens sûr.
+    if (activeDomain.endsWith('.$expectedDomain')) {
       return PhishingCheck(
         verdict: PhishingVerdict.ok,
         activeDomain: activeDomain,
@@ -199,46 +213,11 @@ class AntiPhishingService {
     }
   }
 
-  /// True si [a] et [b] partagent le même domaine racine (eTLD+1).
-  /// Permet à `login.example.com` de matcher `example.com`.
-  /// Gère les TLDs composés courants (.co.uk, .com.au, etc.) sans dépendre
-  /// d'une PSL externe.
-  static bool _sameRootDomain(String a, String b) {
-    final rootA = _eTldPlusOne(a);
-    final rootB = _eTldPlusOne(b);
-    return rootA != null && rootA == rootB;
-  }
-
-  /// Second-level generics combinés à un country-code 2 chars pour former
-  /// un TLD composé (ex. `co.uk`, `com.au`, `gov.uk`, `org.uk`, `ac.uk`,
-  /// `com.br`, `co.jp`, `co.za`, `co.in`, `net.au`, etc.).
-  static const _composedSecondLevels = {
-    'co',
-    'com',
-    'gov',
-    'org',
-    'net',
-    'ac',
-    'edu',
-    'mil',
-  };
-
-  /// Extrait l'eTLD+1 d'un host. Retourne null si le host est trop court.
-  /// Heuristique : si l'avant-dernier segment est un second-level générique
-  /// (co/com/gov/...) ET que le TLD fait 2 caractères (country-code), on
-  /// considère que le TLD est composé et on prend les 3 derniers segments.
-  static String? _eTldPlusOne(String host) {
-    final parts = host.split('.');
-    if (parts.length < 2) return null;
-    if (parts.length >= 3) {
-      final secondLevel = parts[parts.length - 2];
-      final tld = parts.last;
-      if (tld.length == 2 && _composedSecondLevels.contains(secondLevel)) {
-        return '${parts[parts.length - 3]}.$secondLevel.$tld';
-      }
-    }
-    return '${parts[parts.length - 2]}.${parts.last}';
-  }
+  // SEC F11 v2.5.2 — `_sameRootDomain` et `_eTldPlusOne` retirés : leur
+  // heuristique d'eTLD+1 sans Public Suffix List traitait les suffixes publics
+  // (github.io, pages.dev, netlify.app…) comme des domaines enregistrables et
+  // faisait passer `attacker.pages.dev` pour `victim.pages.dev`. Remplacés
+  // par une relation de sous-domaine stricte dans `check()`.
 
   /// Distance d'édition de Levenshtein entre 2 chaînes (insertion / suppression
   /// / substitution coûtent 1). Implémentation standard O(m*n).

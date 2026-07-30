@@ -22,6 +22,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:biometric_storage/biometric_storage.dart';
@@ -162,7 +163,17 @@ class VaultService {
   static const _biometricStorageName = 'pt_biometric_key_v2';
   static const _biometricFlagKey = 'pt_biometric_enabled';
   static const _failCountKey = 'pt_fail_count';
+
+  /// Ancien format du verrouillage : horodatage ABSOLU sur horloge murale.
+  /// Conservé en lecture seule pour les installations verrouillées au moment
+  /// de la mise à jour — plus jamais écrit (cf. SEC F5/F17).
   static const _lockoutKey = 'pt_lockout_until';
+
+  /// SEC F5/F17 v2.5.2 — nouveau format : durée restante en millisecondes,
+  /// plus l'ancre `SystemClock.elapsedRealtime()` à laquelle elle a été
+  /// écrite. Insensible aux manipulations de l'horloge murale.
+  static const _lockoutRemainingKey = 'pt_lockout_remaining_ms';
+  static const _lockoutAnchorKey = 'pt_lockout_anchor_ms';
 
   // v2.5.x (H1) — flag « un VRAI coffre leurre est configuré ». Stocké chiffré
   // (EncryptedSharedPreferences, clé TEE non-extractible → illisible au
@@ -548,27 +559,242 @@ class VaultService {
     '  ',
   ).convert(_entries.map((e) => e.toJson()).toList());
 
+  /// SEC F6 v2.5.2 — premier barreau de l'échelle de rembourrage : 64 Kio.
+  ///
+  /// Volontairement GÉNÉREUX. Le déni plausible exige que les deux
+  /// emplacements aient la MÊME taille ; le moyen le plus robuste d'y parvenir
+  /// est que tous les coffres réalistes tiennent sur le même barreau. 64 Kio
+  /// de JSON représentent plusieurs centaines d'entrées : en pratique un
+  /// coffre réel, un coffre leurre réel et un leurre factice sont tous les
+  /// trois à 64 Kio, donc rigoureusement indistinguables par la taille.
+  /// Le surcoût de stockage est négligeable et le coût AES-GCM sur 64 Kio est
+  /// sous la milliseconde.
+  static const int _paddingBaseRungBytes = 65536;
+
+  /// Barreau de l'échelle couvrant [bytes]. Progression ×4 : 64 Kio, 256 Kio,
+  /// 1 Mio, 4 Mio… Les barreaux sont rares et très espacés, pour que franchir
+  /// l'un d'eux reste un événement exceptionnel.
+  static int _ladderRungFor(int bytes) {
+    var rung = _paddingBaseRungBytes;
+    while (rung < bytes) {
+      rung *= 4;
+    }
+    return rung;
+  }
+
+  /// Rembourre [plain] par des espaces jusqu'au barreau couvrant à la fois sa
+  /// propre longueur et [minPlainBytes] — la longueur de clair de l'AUTRE
+  /// emplacement, pour que les deux fichiers coïncident.
+  ///
+  /// Le remplissage utilise l'espace (0x20) et non des octets nuls :
+  /// `jsonDecode` ignore les espaces de fin, donc le clair rembourré se relit
+  /// avec le décodeur EXISTANT. Aucun bump de version de format, aucune
+  /// migration, et les coffres déjà écrits sans rembourrage continuent de
+  /// s'ouvrir — vérifié empiriquement avant implémentation.
+  static Uint8List _padToLadder(Uint8List plain, {int minPlainBytes = 0}) {
+    final need = plain.length > minPlainBytes ? plain.length : minPlainBytes;
+    final target = _ladderRungFor(need);
+    final out = Uint8List(target)..fillRange(0, target, 0x20);
+    out.setRange(0, plain.length, plain);
+    return out;
+  }
+
+  /// Longueur du CLAIR de l'emplacement opposé à [slot], sans posséder sa clé.
+  ///
+  /// AES-GCM préserve la longueur et `cipher.data` vaut `ciphertext || tag`,
+  /// donc `longueurClair = base64Decode(data).length - tagBytes`. C'est ce qui
+  /// rend l'appariement possible depuis une session leurre, qui ne détient pas
+  /// la clé du principal — et c'est aussi, par construction, exactement
+  /// l'information dont disposait l'examinateur pour distinguer les deux
+  /// fichiers. On s'en sert ici pour la neutraliser.
+  ///
+  /// Retourne 0 (aucune contrainte) si le fichier est absent, illisible, ou au
+  /// format v3 hérité qui n'a pas de champ `cipher`.
+  Future<int> _otherSlotPlainLength(_Slot slot) async {
+    final other = slot == _Slot.primary ? _Slot.decoy : _Slot.primary;
+    try {
+      final f = await _vaultFileFor(other);
+      if (!f.existsSync()) return 0;
+      final raw = jsonDecode(await f.readAsString());
+      if (raw is! Map<String, dynamic>) return 0;
+      final cipher = raw['cipher'];
+      if (cipher is! Map) return 0;
+      final data = cipher['data'];
+      if (data is! String) return 0;
+      // On calcule la longueur décodée SANS décoder : `_saveVaultV4` appelle
+      // cette méthode à chaque écriture du coffre (ajout, édition, suppression
+      // d'entrée), et décoder allouerait puis jetterait 64 Kio à chaque fois.
+      // base64 : 4 caractères ⇒ 3 octets, moins le bourrage `=`.
+      final b64 = data.length;
+      if (b64 < 4 || b64 % 4 != 0) return 0;
+      var padding = 0;
+      if (data.endsWith('==')) {
+        padding = 2;
+      } else if (data.endsWith('=')) {
+        padding = 1;
+      }
+      final len = (b64 ~/ 4) * 3 - padding - AeadService.tagBytes;
+      return len > 0 ? len : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Entrées de test pour le rembourrage, privé à la bibliothèque. Le
+  /// rembourrage conditionne le déni plausible : il doit être couvert par des
+  /// tests, pas seulement par relecture.
+  @visibleForTesting
+  static Uint8List padToLadderForTest(
+    Uint8List plain, {
+    int minPlainBytes = 0,
+  }) => _padToLadder(plain, minPlainBytes: minPlainBytes);
+
+  @visibleForTesting
+  static int get paddingBaseRungForTest => _paddingBaseRungBytes;
+
+  /// Entrée de test pour le calcul de longueur base64 sans décodage.
+  @visibleForTesting
+  static int decodedLenFromBase64ForTest(String b64) {
+    final n = b64.length;
+    if (n < 4 || n % 4 != 0) return 0;
+    var padding = 0;
+    if (b64.endsWith('==')) {
+      padding = 2;
+    } else if (b64.endsWith('=')) {
+      padding = 1;
+    }
+    return (n ~/ 4) * 3 - padding;
+  }
+
+  /// SEC F16 v2.5.2 — purge tout résidu `*_v3.enc.bak`.
+  ///
+  /// `_migrateV3ToV4` copie le fichier v3 en `.bak` SANS condition, mais ne le
+  /// purge qu'à la toute fin de son `try`. Or `_saveVaultV4` termine son
+  /// renommage atomique AVANT l'écriture du stockage sécurisé qui suit : une
+  /// exception dans cette fenêtre laisse le fichier en v4 pour toujours, donc
+  /// `_migrateV3ToV4` n'est plus jamais atteignable — les chemins de
+  /// déverrouillage prennent la branche v4 — et le `.bak` ne peut plus être
+  /// purgé par le flux normal.
+  ///
+  /// Ce résidu est une copie COMPLÈTE du coffre chiffrée en PBKDF2 + AES-CBC
+  /// à partir du seul mot de passe maître, sans liaison Keystore : attaquable
+  /// hors ligne à la vitesse GPU, là où le fichier v4 voisin résiste grâce à
+  /// Argon2id et au `hwSecret` lié au TEE.
+  ///
+  /// Appelé à CHAQUE déverrouillage réussi, pour qu'aucun résidu ne survive à
+  /// un échec quelconque — plutôt que de dépendre du seul chemin nominal.
+  Future<void> _purgeLegacyV3Backups() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      for (final ent in dir.listSync(followLinks: false)) {
+        if (ent is File && ent.path.endsWith('_v3.enc.bak')) _shredSync(ent);
+      }
+    } catch (_) {
+      /* best-effort : ne doit jamais faire échouer un déverrouillage */
+    }
+  }
+
+  /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
+  /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.
+  /// Best-effort : sur un système de fichiers à copie sur écriture (F2FS,
+  /// couche flash) l'écrasement ne garantit pas la destruction physique.
+  static void _shredSync(File file) {
+    try {
+      if (!file.existsSync()) return;
+      final len = file.lengthSync();
+      if (len > 0) {
+        final rnd = Random.secure();
+        file.writeAsBytesSync(
+          Uint8List.fromList(List<int>.generate(len, (_) => rnd.nextInt(256))),
+          flush: true,
+        );
+      }
+      file.deleteSync();
+    } catch (_) {
+      // Best-effort : on tente quand même l'unlink si l'écrasement a échoué.
+      try {
+        if (file.existsSync()) file.deleteSync();
+      } catch (_) {}
+    }
+  }
+
+  /// Levée par [deleteVault] quand l'appel vient d'une session leurre.
+  /// L'appelant doit présenter ce refus à l'utilisateur sans révéler qu'un
+  /// coffre principal existe — le message d'erreur ne doit RIEN dire de plus
+  /// que « opération indisponible ».
+  static const decoySessionDeleteRefused = 'pt_delete_refused_decoy_session';
+
+  /// SEC F10 v2.5.2 — sentinelle levée par `changeMasterPassword` quand le mot
+  /// de passe actuel fourni ne correspond pas. L'appelant doit la traduire en
+  /// message dédié plutôt que d'exposer la sentinelle brute.
+  static const wrongCurrentPassword = 'pt_change_pwd_wrong_current';
+
+  /// SEC-R1 v2.5.2 — une opération concurrente détient déjà `_unlockGate`.
+  /// L'appelant doit inviter l'utilisateur à réessayer, sans rien muter.
+  static const vaultBusy = 'pt_vault_busy';
+
   Future<void> deleteVault() async {
+    // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI
+    // aucune réauthentification, et son unique appelant l'exposait derrière un
+    // simple dialogue de confirmation, sans garde `isDecoyActive`. Une session
+    // ouverte avec le mot de passe LEURRE pouvait donc anéantir le coffre
+    // principal : `_keystore.deleteAll()` détruit les DEUX KEK liées au TEE,
+    // rendant même une copie antérieure de `pt_vault_a.enc` définitivement
+    // indéchiffrable. C'est l'inverse exact de l'objet du leurre — la victime
+    // livre le mot de passe leurre en comptant sur le fait que le vrai coffre
+    // reste sûr ET caché.
+    if (_activeSlot != _Slot.primary) {
+      throw StateError(decoySessionDeleteRefused);
+    }
     lock();
     final dir = await getApplicationDocumentsDirectory();
-    // Supprime les 2 slots — NOUVEAUX (H1) ET anciens noms (pré-H1) + leurs
-    // `.bak` v3 — pour un reset complet quel que soit l'état de migration.
+    // SEC F1 v2.5.2 — Avant : liste de noms CODÉE EN DUR, qui oubliait
+    // `pt_heir.enc` (l'instantané Héritage). Après « Tout supprimer », une
+    // copie déchiffrable de CHAQUE entrée survivait donc dans le stockage
+    // privé — et contrairement au coffre principal, cet instantané est dérivé
+    // du seul mot de passe héritier SANS liaison hwSecret/TEE : il est
+    // attaquable hors ligne depuis une simple copie de fichier. Le dialogue
+    // promettait pourtant une suppression définitive.
+    // Désormais : on ÉNUMÈRE les artefacts `pt_*` du répertoire documents,
+    // pour que tout artefact futur soit couvert par défaut au lieu d'attendre
+    // qu'on pense à l'ajouter ici.
+    try {
+      for (final ent in dir.listSync(followLinks: false)) {
+        if (ent is! File) continue;
+        final name = ent.uri.pathSegments.last;
+        if (name.startsWith('pt_')) _shredSync(ent);
+      }
+    } catch (_) {
+      /* Répertoire illisible : on retombe sur la liste explicite ci-dessous. */
+    }
+    // Filet de sécurité si l'énumération a échoué (et couvre les `.bak` v3).
     for (final name in const [
       'pt_vault_a.enc',
       'pt_vault_b.enc',
       'pt_vault.enc',
       'pt_vault_decoy.enc',
+      'pt_heir.enc',
     ]) {
-      final file = File('${dir.path}/$name');
-      if (file.existsSync()) file.deleteSync();
-      final bak = File('${file.path}_v3.enc.bak');
-      if (bak.existsSync()) bak.deleteSync();
+      _shredSync(File('${dir.path}/$name'));
+      _shredSync(File('${dir.path}/${name}_v3.enc.bak'));
     }
     for (final slot in _Slot.values) {
       await _storage.delete(key: _saltKeyFor(slot));
     }
     // v2.5.x (H1) — efface le flag decoy (repart à zéro).
     await _storage.delete(key: _decoyConfiguredKey);
+    // SEC F1 v2.5.2 — état Héritage : sans ça, `pt_heir_enabled` restait à '1'
+    // et le bouton « Accès héritier » réapparaissait sur l'écran de
+    // déverrouillage après le délai de grâce, servant l'ancien coffre.
+    for (final k in const [
+      'pt_heir_salt',
+      'pt_heir_enabled',
+      'pt_heir_threshold_days',
+      'pt_heir_grace_start_ts',
+      'pt_last_active_ts',
+    ]) {
+      await _storage.delete(key: k);
+    }
     await deleteBiometricKey();
     // v4 : détruit aussi les 2 KEK keystore (decision #4).
     try {
@@ -578,6 +804,16 @@ class VaultService {
     }
     await _storage.delete(key: _failCountKey);
     await _storage.delete(key: _lockoutKey);
+    // SEC F5/F17 v2.5.2 — le nouveau format doit être purgé ici aussi, sinon
+    // un verrouillage survivait à la suppression complète du coffre.
+    await _storage.delete(key: _lockoutRemainingKey);
+    await _storage.delete(key: _lockoutAnchorKey);
+    // SEC F17 v2.5.2 — `pt_max_seen_ms` est un plancher persisté qui ne
+    // décroît JAMAIS. Une valeur très future observée une fois (horloge réglée
+    // à 2099 puis corrigée) restait le « maintenant » de l'app indéfiniment.
+    // Ne pas l'effacer ici laissait un coffre fraîchement recréé hériter de ce
+    // plancher empoisonné.
+    await _storage.delete(key: 'pt_max_seen_ms');
   }
 
   /// Désactive le VRAI coffre leurre sans toucher au primary. Utilisé depuis
@@ -590,6 +826,21 @@ class VaultService {
   /// attaquant forensic voit toujours 2 fichiers indistinguables et ne peut
   /// pas prouver qu'un decoy réel a existé.
   Future<void> deleteDecoyVault() async {
+    // SEC-R3 v2.5.2 — garde analogue à celle de `deleteVault` (F12), qui
+    // manquait ici. Cette fonction écrase `pt_vault_b.enc` par un leurre
+    // factice dont le mot de passe aléatoire n'est JAMAIS persisté : le
+    // fichier devient définitivement non déverrouillable.
+    //
+    // Or la section « Coffre leurre » des Réglages s'affiche selon
+    // `hasDecoyVault`, un drapeau GLOBAL, et non selon l'emplacement actif.
+    // Un utilisateur se trouvant dans sa propre session leurre pouvait donc
+    // écraser le coffre qu'il avait justement ouvert. Les buffers en RAM
+    // réparent la situation au prochain CRUD, mais verrouiller ou fermer
+    // l'app avant toute autre écriture perdait le vrai contenu — sans
+    // recours, y compris pour le propriétaire légitime.
+    if (_activeSlot == _Slot.decoy) {
+      throw StateError(decoySessionDeleteRefused);
+    }
     await _createDummyDecoy();
     await _storage.write(key: _decoyConfiguredKey, value: 'false');
   }

@@ -221,6 +221,10 @@ class _AboutScreenState extends State<AboutScreen> {
                             fontSize: 12,
                             letterSpacing: 0.3,
                           ),
+                          // UI v2.5.2 — un SHA-256 sur 64 caractères se replie
+                          // sur plusieurs lignes : sans ça, la sélection de
+                          // chaque ligne débordait jusqu'au bord de la carte.
+                          textWidthBasis: TextWidthBasis.longestLine,
                         ),
                         const SizedBox(height: 6),
                         Text(
