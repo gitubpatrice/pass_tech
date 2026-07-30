@@ -105,6 +105,19 @@ class MainActivity : FlutterFragmentActivity() {
                     "checkIntegrity" -> {
                         result.success(checkIntegrity())
                     }
+                    // SEC F5/F17 v2.5.2 — horloge monotone au niveau SYSTEME.
+                    // `SystemClock.elapsedRealtime()` compte les millisecondes
+                    // depuis le demarrage, temps de sommeil profond inclus, et
+                    // n'est PAS modifiable par l'utilisateur : ni les Reglages
+                    // Date et heure, ni une resynchronisation NTP ne l'affectent.
+                    // C'est la seule source sur laquelle ancrer le verrouillage
+                    // anti-force-brute — `DateTime.now()` etant avancable a
+                    // volonte par quiconque tient l'appareil.
+                    // Se remet a zero au redemarrage : le Dart detecte le recul
+                    // et traite ce cas de facon conservatrice.
+                    "elapsedRealtime" -> {
+                        result.success(android.os.SystemClock.elapsedRealtime())
+                    }
                     else -> result.notImplemented()
                 }
             }

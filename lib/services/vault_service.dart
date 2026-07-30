@@ -163,7 +163,17 @@ class VaultService {
   static const _biometricStorageName = 'pt_biometric_key_v2';
   static const _biometricFlagKey = 'pt_biometric_enabled';
   static const _failCountKey = 'pt_fail_count';
+
+  /// Ancien format du verrouillage : horodatage ABSOLU sur horloge murale.
+  /// Conservé en lecture seule pour les installations verrouillées au moment
+  /// de la mise à jour — plus jamais écrit (cf. SEC F5/F17).
   static const _lockoutKey = 'pt_lockout_until';
+
+  /// SEC F5/F17 v2.5.2 — nouveau format : durée restante en millisecondes,
+  /// plus l'ancre `SystemClock.elapsedRealtime()` à laquelle elle a été
+  /// écrite. Insensible aux manipulations de l'horloge murale.
+  static const _lockoutRemainingKey = 'pt_lockout_remaining_ms';
+  static const _lockoutAnchorKey = 'pt_lockout_anchor_ms';
 
   // v2.5.x (H1) — flag « un VRAI coffre leurre est configuré ». Stocké chiffré
   // (EncryptedSharedPreferences, clé TEE non-extractible → illisible au
@@ -731,6 +741,10 @@ class VaultService {
     }
     await _storage.delete(key: _failCountKey);
     await _storage.delete(key: _lockoutKey);
+    // SEC F5/F17 v2.5.2 — le nouveau format doit être purgé ici aussi, sinon
+    // un verrouillage survivait à la suppression complète du coffre.
+    await _storage.delete(key: _lockoutRemainingKey);
+    await _storage.delete(key: _lockoutAnchorKey);
   }
 
   /// Désactive le VRAI coffre leurre sans toucher au primary. Utilisé depuis

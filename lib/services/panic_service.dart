@@ -31,6 +31,12 @@ class PanicService {
   /// (même `FlutterSecureStorage` par défaut côté Android).
   static const _failCountKey = 'pt_fail_count';
   static const _lockoutKey = 'pt_lockout_until';
+  // SEC F5/F17 v2.5.2 — nouveau format du verrouillage (durée + ancre
+  // monotone). Doit être purgé ici AUSSI : sinon l'état post-panique gardait
+  // un verrouillage actif, signal indirect qu'une urgence vient d'avoir lieu —
+  // exactement ce que le nettoyage ci-dessous existe pour effacer.
+  static const _lockoutRemainingKey = 'pt_lockout_remaining_ms';
+  static const _lockoutAnchorKey = 'pt_lockout_anchor_ms';
   static const _storage = FlutterSecureStorage();
 
   static Future<void> panic({bool disguise = true}) async {
@@ -58,6 +64,8 @@ class PanicService {
     try {
       await _storage.delete(key: _failCountKey);
       await _storage.delete(key: _lockoutKey);
+      await _storage.delete(key: _lockoutRemainingKey);
+      await _storage.delete(key: _lockoutAnchorKey);
     } catch (_) {}
     // 5. SEC F4 v2.5.2 — désarme le déverrouillage biométrique.
     // Avant : `lock()` ne remettait que `_bioFile` à null ; le drapeau
