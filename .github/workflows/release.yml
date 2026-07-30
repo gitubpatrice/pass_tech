@@ -1,11 +1,31 @@
-name: Release
+name: Release (manuel)
 
-# Se déclenche au push d'un tag `v*` (ex : `git tag v1.12.2 && git push origin v1.12.2`).
-# Build l'APK signé via les secrets GitHub, calcule SHA256, crée la release.
+# ⚠️ DÉSACTIVÉ SUR TAG depuis le 2026-07-30 (v2.5.2 / v2.5.3).
+#
+# Ce workflow créait la release LUI-MÊME au push d'un tag `v*`. Comme les
+# releases Files Tech sont préparées à la main (4 APK : 3 splits ABI + 1
+# universel, notes bilingues FR/EN détaillées), il entrait en conflit :
+#
+#   1. Il ÉCRASAIT les notes de release manuelles par un bloc minimal généré.
+#   2. Il ajoutait un 5ᵉ asset `pass_tech-v<version>.apk` — un SECOND APK
+#      universel construit indépendamment, donc au SHA-256 DIFFÉRENT de celui
+#      publié dans les notes. Un utilisateur téléchargeant ce fichier et
+#      vérifiant l'empreinte concluait à une falsification : exactement le
+#      signal que la vérification d'intégrité de l'app existe pour éviter.
+#      (Le certificat de signature, lui, était bien identique.)
+#   3. Il étiquetait son APK « APK arm64-v8a » alors que c'est l'universel.
+#
+# Il ne produit qu'UN seul APK universel là où une release Files Tech en
+# publie 4. Passé en déclenchement MANUEL : conservé pour référence et
+# utilisable au besoin via l'onglet Actions, mais il ne part plus tout seul.
+#
+# Les workflows `ci.yml` et `security.yml` restent actifs sur push/PR.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag à publier (ex : v2.5.4). La release doit déjà exister."
+        required: true
 
 jobs:
   build-and-release:
@@ -20,6 +40,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: pass_tech
+          # En déclenchement manuel, le défaut serait la branche par défaut et
+          # non le tag : on construirait autre chose que la version demandée.
+          ref: ${{ inputs.tag }}
 
       - name: Checkout files_tech_core (path dependency)
         uses: actions/checkout@v4
@@ -41,7 +64,12 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        # Le workflow ne se déclenche plus sur push de tag : `GITHUB_REF`
+        # pointerait sur la branche, pas sur `refs/tags/vX.Y.Z`. On lit donc
+        # le tag depuis l'entrée `workflow_dispatch`, en retirant le `v`.
+        run: echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+        env:
+          TAG: ${{ inputs.tag }}
 
       - name: Decode keystore
         env:
@@ -86,13 +114,17 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          # `github.ref_name` vaudrait la BRANCHE en déclenchement manuel.
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
           generate_release_notes: true
           body: |
             ## Vérification d'intégrité
 
-            **APK arm64-v8a** : `${{ steps.sha.outputs.APK_PATH }}`
+            ⚠️ Ce corps ÉCRASE des notes de release existantes. Ne lancer ce
+            workflow que sur une release qui n'en a pas encore.
+
+            **APK universel** (toutes architectures) : `${{ steps.sha.outputs.APK_PATH }}`
 
             **SHA-256** :
             ```
