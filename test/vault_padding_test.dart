@@ -91,6 +91,36 @@ void main() {
     });
   });
 
+  group('longueur base64 sans decodage', () {
+    // `_otherSlotPlainLength` est appelee a CHAQUE ecriture du coffre. Decoder
+    // pour ne lire qu'une longueur allouerait puis jetterait 64 Kio a chaque
+    // ajout / edition / suppression d'entree. Le calcul doit donc etre exact
+    // sur toutes les longueurs, y compris les trois cas de bourrage.
+    test('coincide avec base64Decode sur toutes les longueurs', () {
+      for (var n = 0; n <= 200; n++) {
+        final src = Uint8List.fromList(List<int>.generate(n, (i) => i % 256));
+        final b64 = base64Encode(src);
+        expect(
+          VaultService.decodedLenFromBase64ForTest(b64),
+          n < 4 ? (n == 0 ? 0 : base64Decode(b64).length) : n,
+          reason: 'longueur $n (base64 "$b64")',
+        );
+      }
+    });
+
+    test('coincide sur une taille realiste de coffre rembourre', () {
+      final src = Uint8List(65536 + 16); // clair rembourre + tag GCM
+      final b64 = base64Encode(src);
+      expect(VaultService.decodedLenFromBase64ForTest(b64), src.length);
+    });
+
+    test('entree malformee rend 0 au lieu de lever', () {
+      for (final bad in ['', 'a', 'ab', 'abc', 'abcde']) {
+        expect(VaultService.decodedLenFromBase64ForTest(bad), 0, reason: bad);
+      }
+    });
+  });
+
   group('retro-compatibilite de lecture', () {
     // Point CRITIQUE : le rembourrage utilise l'espace (0x20), que `jsonDecode`
     // ignore en fin de chaine. Le clair rembourre se relit donc avec le

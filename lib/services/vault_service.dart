@@ -621,7 +621,19 @@ class VaultService {
       if (cipher is! Map) return 0;
       final data = cipher['data'];
       if (data is! String) return 0;
-      final len = base64Decode(data).length - AeadService.tagBytes;
+      // On calcule la longueur décodée SANS décoder : `_saveVaultV4` appelle
+      // cette méthode à chaque écriture du coffre (ajout, édition, suppression
+      // d'entrée), et décoder allouerait puis jetterait 64 Kio à chaque fois.
+      // base64 : 4 caractères ⇒ 3 octets, moins le bourrage `=`.
+      final b64 = data.length;
+      if (b64 < 4 || b64 % 4 != 0) return 0;
+      var padding = 0;
+      if (data.endsWith('==')) {
+        padding = 2;
+      } else if (data.endsWith('=')) {
+        padding = 1;
+      }
+      final len = (b64 ~/ 4) * 3 - padding - AeadService.tagBytes;
       return len > 0 ? len : 0;
     } catch (_) {
       return 0;
@@ -639,6 +651,20 @@ class VaultService {
 
   @visibleForTesting
   static int get paddingBaseRungForTest => _paddingBaseRungBytes;
+
+  /// Entrée de test pour le calcul de longueur base64 sans décodage.
+  @visibleForTesting
+  static int decodedLenFromBase64ForTest(String b64) {
+    final n = b64.length;
+    if (n < 4 || n % 4 != 0) return 0;
+    var padding = 0;
+    if (b64.endsWith('==')) {
+      padding = 2;
+    } else if (b64.endsWith('=')) {
+      padding = 1;
+    }
+    return (n ~/ 4) * 3 - padding;
+  }
 
   /// SEC F16 v2.5.2 — purge tout résidu `*_v3.enc.bak`.
   ///
