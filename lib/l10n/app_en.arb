@@ -402,13 +402,13 @@
   "snackbarCopied": "Copied",
 
   "panicDialogTitle": "Panic mode?",
-  "panicDialogBody": "This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disguises the icon as \"Calculator\" on the launcher\n\nYou can restore the icon from Settings once you are safe.",
+  "panicDialogBody": "This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Renames the app to \"Calculator\" on the launcher\n\n⚠ THE ICON DOES NOT CHANGE: only the displayed name is altered. The Pass Tech logo stays visible on the launcher.\n\nYou will need your master password to re-enable biometrics. The name can be restored from Settings once you are safe.",
   "panicDialogActivate": "Activate",
   "panicSection": "Panic mode",
   "panicTriggerTitle": "Activate panic mode",
-  "panicTriggerSubtitle": "Locks immediately, clears the clipboard and disguises the icon as \"Calculator\"",
-  "panicRevealTitle": "Restore the Pass Tech icon",
-  "panicRevealSubtitle": "The app is currently disguised as \"Calculator\"",
+  "panicTriggerSubtitle": "Locks, clears the clipboard, disables biometrics and renames the app to \"Calculator\" (icon unchanged)",
+  "panicRevealTitle": "Restore the Pass Tech name",
+  "panicRevealSubtitle": "The app is currently renamed \"Calculator\" (icon unchanged)",
   "panicRevealSnack": "Pass Tech icon restored — relaunch the launcher if it does not appear",
 
   "decoyDialogTitle": "Decoy vault",
@@ -556,6 +556,18 @@
   "importFormatEncryptedBackup": "Encrypted backup",
 
   "changePasswordDialogTitle": "New password",
+  "changePasswordCurrentLabel": "Current password",
+  "@changePasswordCurrentLabel": {
+    "description": "Re-authentication field before master password rotation (SEC F10)."
+  },
+  "changePasswordErrorCurrentRequired": "Enter your current password.",
+  "@changePasswordErrorCurrentRequired": {
+    "description": "Error shown when the current password field is empty."
+  },
+  "changePasswordErrorWrongCurrent": "Current password is incorrect.",
+  "@changePasswordErrorWrongCurrent": {
+    "description": "Error shown when current password verification fails."
+  },
   "changePasswordNewLabel": "New password (min. 12)",
   "changePasswordConfirmLabel": "Confirm",
   "changePasswordErrorMin": "Minimum 12 characters",

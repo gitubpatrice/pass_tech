@@ -1002,7 +1002,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     final nav = Navigator.of(context);
     final t = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final result = await showDialog<String>(
+    // SEC F10 v2.5.2 — le dialogue rend désormais le couple
+    // (mot de passe actuel, nouveau mot de passe).
+    final result = await showDialog<({String current, String fresh})>(
       context: context,
       builder: (_) => const _ChangePasswordDialog(),
     );
@@ -1019,11 +1021,26 @@ class _SettingsScreenState extends State<SettingsScreen>
     // Aligné sur les autres opérations Réglages (export/héritage) déjà en
     // try/catch avec pop du progress en cas d'erreur.
     try {
-      await VaultService().changeMasterPassword(result);
+      await VaultService().changeMasterPassword(
+        result.fresh,
+        currentPassword: result.current,
+      );
       if (!mounted) return;
       nav.pop(); // close progress dialog
       SnackUtils.showInfo(messenger, t.changePasswordDoneSnack);
       setState(() => _biometricEnabled = false);
+    } on StateError catch (e) {
+      // SEC F10 v2.5.2 — mot de passe actuel incorrect : message dédié plutôt
+      // qu'une erreur générique exposant le sentinel interne.
+      if (!mounted) return;
+      nav.pop();
+      SnackUtils.showError(
+        context,
+        messenger,
+        e.message == VaultService.wrongCurrentPassword
+            ? t.changePasswordErrorWrongCurrent
+            : t.genericError('$e'),
+      );
     } catch (e) {
       if (!mounted) return;
       nav.pop(); // close progress dialog
@@ -1610,6 +1627,10 @@ class _ChangePasswordDialog extends StatefulWidget {
 }
 
 class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  /// SEC F10 v2.5.2 — champ « mot de passe actuel ». Son absence permettait à
+  /// quiconque disposait d'un accès momentané à une session déverrouillée de
+  /// pivoter le secret et de verrouiller définitivement le propriétaire.
+  final _ctrlCurrent = TextEditingController();
   final _ctrl1 = TextEditingController();
   final _ctrl2 = TextEditingController();
   String? _error;
@@ -1617,8 +1638,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   @override
   void dispose() {
     // B9 v2.3.8 — clear master password ctrls avant dispose.
+    _ctrlCurrent.clear();
     _ctrl1.clear();
     _ctrl2.clear();
+    _ctrlCurrent.dispose();
     _ctrl1.dispose();
     _ctrl2.dispose();
     super.dispose();
@@ -1634,6 +1657,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          PasswordTextField(
+            controller: _ctrlCurrent,
+            labelText: t.changePasswordCurrentLabel,
+            showPrefixIcon: false,
+          ),
+          const SizedBox(height: 12),
           PasswordTextField(
             controller: _ctrl1,
             labelText: t.changePasswordNewLabel,
@@ -1655,6 +1684,10 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         TextButton(onPressed: () => nav.pop(), child: Text(t.actionCancel)),
         FilledButton(
           onPressed: () {
+            if (_ctrlCurrent.text.isEmpty) {
+              setState(() => _error = t.changePasswordErrorCurrentRequired);
+              return;
+            }
             if (_ctrl1.text.length < 12) {
               setState(() => _error = t.changePasswordErrorMin);
               return;
@@ -1663,7 +1696,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               setState(() => _error = t.changePasswordErrorMismatch);
               return;
             }
-            nav.pop(_ctrl1.text);
+            nav.pop((current: _ctrlCurrent.text, fresh: _ctrl1.text));
           },
           child: Text(t.changePasswordCta),
         ),

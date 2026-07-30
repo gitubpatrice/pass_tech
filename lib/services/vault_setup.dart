@@ -68,7 +68,31 @@ extension VaultSetup on VaultService {
   /// et re-wrappé. La biométrique liée au PRIMARY est invalidée si on change
   /// le password du PRIMARY ; conserver la bio sur PRIMARY après changement
   /// du DECOY trahirait son existence.
-  Future<void> changeMasterPassword(String newPassword) async {
+  /// SEC F10 v2.5.2 — [currentPassword] est désormais OBLIGATOIRE et vérifié.
+  ///
+  /// Avant, la fonction ne prenait que `newPassword` : elle générait un sel et
+  /// un `hwSecret` neufs, réenveloppait, dérivait un nouveau `finalKey` et
+  /// réécrivait le coffre — sans jamais vérifier le mot de passe courant ni
+  /// consulter le verrouillage. Le dialogue appelant ne comportait que deux
+  /// champs (« nouveau » / « confirmer »).
+  ///
+  /// Quiconque disposait d'un accès momentané à une session déverrouillée
+  /// pouvait donc pivoter le secret et verrouiller DÉFINITIVEMENT le
+  /// propriétaire hors de son coffre : la rotation invalide en prime
+  /// l'enveloppe biométrique, et `allowBackup="false"` élimine toute
+  /// restauration système. Le verrouillage automatique par défaut est à 300 s
+  /// et n'est évalué qu'au retour au premier plan, donc une app laissée
+  /// ouverte au premier plan ne se reverrouille jamais.
+  ///
+  /// Lève [StateError] avec [VaultService.wrongCurrentPassword] si la
+  /// vérification échoue.
+  Future<void> changeMasterPassword(
+    String newPassword, {
+    required String currentPassword,
+  }) async {
+    if (!await verifyCurrentPassword(currentPassword)) {
+      throw StateError(VaultService.wrongCurrentPassword);
+    }
     // v4 : Argon2id + re-wrap fresh hwSecret. Le slot opposé n'est pas affecté.
     final slot = _activeSlot ?? _Slot.primary;
     final salt = SecretBytes.randomBytes(32);

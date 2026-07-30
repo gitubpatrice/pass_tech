@@ -385,13 +385,13 @@
   "snackbarCopied": "Copié",
 
   "panicDialogTitle": "Mode panique ?",
-  "panicDialogBody": "Cette action effectue immédiatement :\n\n• Verrouillage du coffre\n• Vidage du presse-papiers\n• Camouflage de l'icône en « Calculatrice » sur le launcher\n\nVous pourrez restaurer l'icône depuis les Réglages quand vous serez en sécurité.",
+  "panicDialogBody": "Cette action effectue immédiatement :\n\n• Verrouillage du coffre\n• Vidage du presse-papiers\n• Désactivation du déverrouillage biométrique\n• Renommage de l'app en « Calculatrice » sur le launcher\n\n⚠ L'ICÔNE NE CHANGE PAS : seul le nom affiché est modifié. Le logo Pass Tech reste visible sur le launcher.\n\nVous devrez réactiver la biométrie avec votre mot de passe maître. Le nom se restaure depuis les Réglages quand vous serez en sécurité.",
   "panicDialogActivate": "Activer",
   "panicSection": "Mode panique",
   "panicTriggerTitle": "Activer le mode panique",
-  "panicTriggerSubtitle": "Verrouille immédiatement, vide le presse-papiers et camoufle l'icône en « Calculatrice »",
-  "panicRevealTitle": "Restaurer l'icône Pass Tech",
-  "panicRevealSubtitle": "L'app est actuellement camouflée en « Calculatrice »",
+  "panicTriggerSubtitle": "Verrouille, vide le presse-papiers, désactive la biométrie et renomme l'app en « Calculatrice » (l'icône reste inchangée)",
+  "panicRevealTitle": "Restaurer le nom Pass Tech",
+  "panicRevealSubtitle": "L'app est actuellement renommée « Calculatrice » (icône inchangée)",
   "panicRevealSnack": "Icône Pass Tech restaurée — relancez le launcher si elle n'apparaît pas",
 
   "decoyDialogTitle": "Coffre leurre",
@@ -539,6 +539,18 @@
   "importFormatEncryptedBackup": "Sauvegarde chiffrée",
 
   "changePasswordDialogTitle": "Nouveau mot de passe",
+  "changePasswordCurrentLabel": "Mot de passe actuel",
+  "@changePasswordCurrentLabel": {
+    "description": "Champ de réauthentification avant rotation du mot de passe maître (SEC F10)."
+  },
+  "changePasswordErrorCurrentRequired": "Saisissez votre mot de passe actuel.",
+  "@changePasswordErrorCurrentRequired": {
+    "description": "Erreur affichée quand le champ mot de passe actuel est vide."
+  },
+  "changePasswordErrorWrongCurrent": "Mot de passe actuel incorrect.",
+  "@changePasswordErrorWrongCurrent": {
+    "description": "Erreur affichée quand la vérification du mot de passe actuel échoue."
+  },
   "changePasswordNewLabel": "Nouveau mot de passe (min. 12)",
   "changePasswordConfirmLabel": "Confirmer",
   "changePasswordErrorMin": "Minimum 12 caractères",

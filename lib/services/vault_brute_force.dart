@@ -158,5 +158,7 @@ extension VaultBruteForce on VaultService {
     await VaultService._storage.delete(key: VaultService._lockoutKey);
     await VaultService._storage.delete(key: VaultService._lockoutRemainingKey);
     await VaultService._storage.delete(key: VaultService._lockoutAnchorKey);
+    // SEC F16 v2.5.2 — filet de rattrapage sur les sauvegardes v3.
+    await _purgeLegacyV3Backups();
   }
 }

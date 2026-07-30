@@ -640,6 +640,34 @@ class VaultService {
   @visibleForTesting
   static int get paddingBaseRungForTest => _paddingBaseRungBytes;
 
+  /// SEC F16 v2.5.2 — purge tout résidu `*_v3.enc.bak`.
+  ///
+  /// `_migrateV3ToV4` copie le fichier v3 en `.bak` SANS condition, mais ne le
+  /// purge qu'à la toute fin de son `try`. Or `_saveVaultV4` termine son
+  /// renommage atomique AVANT l'écriture du stockage sécurisé qui suit : une
+  /// exception dans cette fenêtre laisse le fichier en v4 pour toujours, donc
+  /// `_migrateV3ToV4` n'est plus jamais atteignable — les chemins de
+  /// déverrouillage prennent la branche v4 — et le `.bak` ne peut plus être
+  /// purgé par le flux normal.
+  ///
+  /// Ce résidu est une copie COMPLÈTE du coffre chiffrée en PBKDF2 + AES-CBC
+  /// à partir du seul mot de passe maître, sans liaison Keystore : attaquable
+  /// hors ligne à la vitesse GPU, là où le fichier v4 voisin résiste grâce à
+  /// Argon2id et au `hwSecret` lié au TEE.
+  ///
+  /// Appelé à CHAQUE déverrouillage réussi, pour qu'aucun résidu ne survive à
+  /// un échec quelconque — plutôt que de dépendre du seul chemin nominal.
+  Future<void> _purgeLegacyV3Backups() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      for (final ent in dir.listSync(followLinks: false)) {
+        if (ent is File && ent.path.endsWith('_v3.enc.bak')) _shredSync(ent);
+      }
+    } catch (_) {
+      /* best-effort : ne doit jamais faire échouer un déverrouillage */
+    }
+  }
+
   /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
   /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.
   /// Best-effort : sur un système de fichiers à copie sur écriture (F2FS,
@@ -669,6 +697,11 @@ class VaultService {
   /// coffre principal existe — le message d'erreur ne doit RIEN dire de plus
   /// que « opération indisponible ».
   static const decoySessionDeleteRefused = 'pt_delete_refused_decoy_session';
+
+  /// SEC F10 v2.5.2 — sentinelle levée par `changeMasterPassword` quand le mot
+  /// de passe actuel fourni ne correspond pas. L'appelant doit la traduire en
+  /// message dédié plutôt que d'exposer la sentinelle brute.
+  static const wrongCurrentPassword = 'pt_change_pwd_wrong_current';
 
   Future<void> deleteVault() async {
     // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI
@@ -745,6 +778,12 @@ class VaultService {
     // un verrouillage survivait à la suppression complète du coffre.
     await _storage.delete(key: _lockoutRemainingKey);
     await _storage.delete(key: _lockoutAnchorKey);
+    // SEC F17 v2.5.2 — `pt_max_seen_ms` est un plancher persisté qui ne
+    // décroît JAMAIS. Une valeur très future observée une fois (horloge réglée
+    // à 2099 puis corrigée) restait le « maintenant » de l'app indéfiniment.
+    // Ne pas l'effacer ici laissait un coffre fraîchement recréé hériter de ce
+    // plancher empoisonné.
+    await _storage.delete(key: 'pt_max_seen_ms');
   }
 
   /// Désactive le VRAI coffre leurre sans toucher au primary. Utilisé depuis

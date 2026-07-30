@@ -58,9 +58,40 @@ extension VaultUnlock on VaultService {
     }
   }
 
-  Future<bool> _passwordMatchesPrimaryInternal(String password) async {
+  /// SEC F10 v2.5.2 — vérifie [password] contre l'emplacement ACTIF.
+  ///
+  /// Destiné à la réauthentification avant une opération sensible
+  /// (changement de mot de passe maître). Contrairement à
+  /// [passwordMatchesPrimary], le comptage d'échecs est ici LÉGITIME : une
+  /// non-correspondance est un vrai échec d'authentification, pas un résultat
+  /// attendu.
+  ///
+  /// Retourne `false` si le coffre est verrouillé, si aucun coffre n'est
+  /// ouvert, ou si un déverrouillage est déjà en cours.
+  Future<bool> verifyCurrentPassword(String password) async {
+    if (!_isOpen || _activeSlot == null) return false;
+    if (await getLockoutRemaining() != null) return false;
+    if (_unlockGate != null) return false;
+    final gate = _unlockGate = Completer<void>();
     try {
-      final file = await _vaultFileFor(_Slot.primary);
+      final ok = await _passwordMatchesPrimaryInternal(
+        password,
+        slot: _activeSlot!,
+      );
+      if (!ok) await _onUnlockFail();
+      return ok;
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  Future<bool> _passwordMatchesPrimaryInternal(
+    String password, {
+    _Slot slot = _Slot.primary,
+  }) async {
+    try {
+      final file = await _vaultFileFor(slot);
       if (!await file.exists()) return false;
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final version = raw['version'] as int? ?? 1;
@@ -76,11 +107,7 @@ extension VaultUnlock on VaultService {
       final savedSlot = _activeSlot;
       try {
         if (version >= VaultService._currentVersion) {
-          final r = await _v4Unlock(
-            slot: _Slot.primary,
-            password: password,
-            raw: raw,
-          );
+          final r = await _v4Unlock(slot: slot, password: password, raw: raw);
           if (r == null) return false;
           // F3 v2.4.4 — `_v4Unlock` est désormais pur. On wipe tous les
           // buffers retournés ; `r.entries` est juste une `List<Entry>`
@@ -93,7 +120,7 @@ extension VaultUnlock on VaultService {
         }
         // v3 path — derive PBKDF2 then attempt MAC check.
         final saltB64 = await VaultService._storage.read(
-          key: _saltKeyFor(_Slot.primary),
+          key: _saltKeyFor(slot),
         );
         if (saltB64 == null) return false;
         final salt = base64Decode(saltB64);
