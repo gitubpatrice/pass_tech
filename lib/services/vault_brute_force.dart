@@ -7,8 +7,16 @@
 //    selon la table `_lockoutSteps`,
 //  - `_onUnlockSuccess` : reset compteur + lockout.
 //
-// Le state est persisté dans flutter_secure_storage via les clés `pt_fail_count`
-// et `pt_lockout_until`, partagées avec le reste de VaultService.
+// Le state est persisté dans flutter_secure_storage, partagé avec le reste de
+// VaultService :
+//  - `pt_fail_count`          : compteur d'échecs consécutifs.
+//  - `pt_lockout_remaining_ms`: durée de verrouillage restante (format courant,
+//    SEC F5/F17) — ancrée sur `SystemClock.elapsedRealtime()`, insensible aux
+//    manipulations de l'horloge murale.
+//  - `pt_lockout_anchor_ms`   : valeur d'elapsedRealtime au moment de l'écriture.
+//  - `pt_lockout_until`       : ANCIEN format (échéance absolue sur horloge
+//    murale). Lu uniquement en repli — pour les installations verrouillées au
+//    moment de la mise à jour, et quand elapsedRealtime est indisponible.
 
 part of 'vault_service.dart';
 
@@ -110,10 +118,27 @@ extension VaultBruteForce on VaultService {
       );
       final lockSec = VaultService._lockoutSteps[stepIdx];
       // SEC F5/F17 v2.5.2 — on persiste une DURÉE plus une ancre monotone, et
-      // non une échéance absolue sur l'horloge murale (avancable a volonte).
-      // Si `elapsedRealtime` est indisponible, l'ancre vaut 0 : le décompte
-      // sera alors fail-closed côté lecture (verrouillage maintenu entier).
-      final anchor = await MonotonicClock.elapsedRealtimeMs() ?? 0;
+      // non une échéance absolue sur l'horloge murale (avançable à volonté).
+      final anchor = await MonotonicClock.elapsedRealtimeMs();
+      if (anchor == null) {
+        // Pas d'ancre monotone disponible à l'écriture. On NE DOIT PAS écrire
+        // une ancre bidon : une ancre à 0 ferait consommer, à la première
+        // lecture réussie, tout le temps écoulé depuis le démarrage — le
+        // verrouillage serait levé instantanément. Fail-OUVERT, exactement le
+        // défaut qu'on corrige. On retombe donc sur l'ancien format horloge
+        // murale, moins bon mais cohérent, et on purge le nouveau pour que la
+        // lecture emprunte bien le chemin hérité.
+        final until = (await MonotonicClock.nowMs()) + lockSec * 1000;
+        await VaultService._storage.write(
+          key: VaultService._lockoutKey,
+          value: until.toString(),
+        );
+        await VaultService._storage.delete(
+          key: VaultService._lockoutRemainingKey,
+        );
+        await VaultService._storage.delete(key: VaultService._lockoutAnchorKey);
+        return;
+      }
       await VaultService._storage.write(
         key: VaultService._lockoutRemainingKey,
         value: (lockSec * 1000).toString(),
