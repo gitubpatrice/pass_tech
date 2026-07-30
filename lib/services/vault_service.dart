@@ -549,44 +549,86 @@ class VaultService {
     '  ',
   ).convert(_entries.map((e) => e.toJson()).toList());
 
-  /// SEC F6 v2.5.2 — granularité du rembourrage du clair avant chiffrement.
-  /// 4 Kio : assez large pour qu'un coffre naissant et un leurre factice
-  /// tombent dans le même palier, assez fin pour que le surcoût de stockage
-  /// reste négligeable.
-  static const int _paddingBucketBytes = 4096;
+  /// SEC F6 v2.5.2 — premier barreau de l'échelle de rembourrage : 64 Kio.
+  ///
+  /// Volontairement GÉNÉREUX. Le déni plausible exige que les deux
+  /// emplacements aient la MÊME taille ; le moyen le plus robuste d'y parvenir
+  /// est que tous les coffres réalistes tiennent sur le même barreau. 64 Kio
+  /// de JSON représentent plusieurs centaines d'entrées : en pratique un
+  /// coffre réel, un coffre leurre réel et un leurre factice sont tous les
+  /// trois à 64 Kio, donc rigoureusement indistinguables par la taille.
+  /// Le surcoût de stockage est négligeable et le coût AES-GCM sur 64 Kio est
+  /// sous la milliseconde.
+  static const int _paddingBaseRungBytes = 65536;
 
-  /// Rembourre [plain] par des espaces jusqu'au palier supérieur de
-  /// [_paddingBucketBytes], avec un plancher de [minBuckets] paliers.
+  /// Barreau de l'échelle couvrant [bytes]. Progression ×4 : 64 Kio, 256 Kio,
+  /// 1 Mio, 4 Mio… Les barreaux sont rares et très espacés, pour que franchir
+  /// l'un d'eux reste un événement exceptionnel.
+  static int _ladderRungFor(int bytes) {
+    var rung = _paddingBaseRungBytes;
+    while (rung < bytes) {
+      rung *= 4;
+    }
+    return rung;
+  }
+
+  /// Rembourre [plain] par des espaces jusqu'au barreau couvrant à la fois sa
+  /// propre longueur et [minPlainBytes] — la longueur de clair de l'AUTRE
+  /// emplacement, pour que les deux fichiers coïncident.
   ///
-  /// Le remplissage utilise l'espace (0x20) et non des octets nuls : `jsonDecode`
-  /// ignore les espaces de fin, donc le clair rembourré se relit avec le
-  /// décodeur EXISTANT. Aucun bump de version de format, aucune migration, et
-  /// les coffres déjà écrits sans rembourrage continuent de s'ouvrir —
-  /// vérifié empiriquement avant implémentation.
-  ///
-  /// ⚠️ Limite résiduelle : ceci supprime le tell « 24 octets = manifestement
-  /// vide », mais ne rend PAS un gros coffre réel indistinguable d'un petit
-  /// leurre. Deux fichiers de paliers différents restent différents. Rendre les
-  /// deux emplacements strictement équivalents demanderait de les rembourrer au
-  /// MÊME palier, donc de faire croître le leurre avec le vrai coffre.
-  static Uint8List _padToBucket(Uint8List plain, {int minBuckets = 1}) {
-    final needed = (plain.length / _paddingBucketBytes).ceil();
-    final buckets = needed < minBuckets ? minBuckets : needed;
-    final target = (buckets < 1 ? 1 : buckets) * _paddingBucketBytes;
+  /// Le remplissage utilise l'espace (0x20) et non des octets nuls :
+  /// `jsonDecode` ignore les espaces de fin, donc le clair rembourré se relit
+  /// avec le décodeur EXISTANT. Aucun bump de version de format, aucune
+  /// migration, et les coffres déjà écrits sans rembourrage continuent de
+  /// s'ouvrir — vérifié empiriquement avant implémentation.
+  static Uint8List _padToLadder(Uint8List plain, {int minPlainBytes = 0}) {
+    final need = plain.length > minPlainBytes ? plain.length : minPlainBytes;
+    final target = _ladderRungFor(need);
     final out = Uint8List(target)..fillRange(0, target, 0x20);
     out.setRange(0, plain.length, plain);
     return out;
   }
 
-  /// Entrée de test pour [_padToBucket] et [_paddingBucketBytes], qui sont
-  /// privés à la bibliothèque. Le rembourrage conditionne le déni plausible :
-  /// il doit être couvert par des tests, pas seulement par relecture.
+  /// Longueur du CLAIR de l'emplacement opposé à [slot], sans posséder sa clé.
+  ///
+  /// AES-GCM préserve la longueur et `cipher.data` vaut `ciphertext || tag`,
+  /// donc `longueurClair = base64Decode(data).length - tagBytes`. C'est ce qui
+  /// rend l'appariement possible depuis une session leurre, qui ne détient pas
+  /// la clé du principal — et c'est aussi, par construction, exactement
+  /// l'information dont disposait l'examinateur pour distinguer les deux
+  /// fichiers. On s'en sert ici pour la neutraliser.
+  ///
+  /// Retourne 0 (aucune contrainte) si le fichier est absent, illisible, ou au
+  /// format v3 hérité qui n'a pas de champ `cipher`.
+  Future<int> _otherSlotPlainLength(_Slot slot) async {
+    final other = slot == _Slot.primary ? _Slot.decoy : _Slot.primary;
+    try {
+      final f = await _vaultFileFor(other);
+      if (!f.existsSync()) return 0;
+      final raw = jsonDecode(await f.readAsString());
+      if (raw is! Map<String, dynamic>) return 0;
+      final cipher = raw['cipher'];
+      if (cipher is! Map) return 0;
+      final data = cipher['data'];
+      if (data is! String) return 0;
+      final len = base64Decode(data).length - AeadService.tagBytes;
+      return len > 0 ? len : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Entrées de test pour le rembourrage, privé à la bibliothèque. Le
+  /// rembourrage conditionne le déni plausible : il doit être couvert par des
+  /// tests, pas seulement par relecture.
   @visibleForTesting
-  static Uint8List padToBucketForTest(Uint8List plain, {int minBuckets = 1}) =>
-      _padToBucket(plain, minBuckets: minBuckets);
+  static Uint8List padToLadderForTest(
+    Uint8List plain, {
+    int minPlainBytes = 0,
+  }) => _padToLadder(plain, minPlainBytes: minPlainBytes);
 
   @visibleForTesting
-  static int get paddingBucketBytesForTest => _paddingBucketBytes;
+  static int get paddingBaseRungForTest => _paddingBaseRungBytes;
 
   /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
   /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.

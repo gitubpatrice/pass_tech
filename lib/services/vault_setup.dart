@@ -234,22 +234,21 @@ extension VaultSetup on VaultService {
 
       // Liste d'entrées VIDE chiffrée en AES-GCM, AAD identique au format v4.
       //
-      // SEC F6 v2.5.2 — le clair est rembourré sur un nombre ALÉATOIRE de
-      // paliers (1 à 4, soit 4 à 16 Kio). Avant, `jsonEncode([])` produisait
-      // 2 octets, donc 18 octets de sortie GCM et 24 caractères base64 dans
-      // `cipher.data`, alors qu'un coffre réel produit un chiffré proportionnel
-      // au nombre d'entrées. AES-GCM préservant la longueur et aucun
-      // rembourrage n'étant appliqué, la longueur du chiffré était le SEUL
-      // discriminant entre les deux emplacements — et il était décisif. Le code
-      // étant public sous Apache 2.0, la taille exacte du leurre était même
-      // calculable à l'avance.
+      // SEC F6 v2.5.2 — le clair est rembourré sur le MÊME barreau que l'autre
+      // emplacement. Avant, `jsonEncode([])` produisait 2 octets, donc 18
+      // octets de sortie GCM et 24 caractères base64 dans `cipher.data`, alors
+      // qu'un coffre réel produit un chiffré proportionnel au nombre d'entrées.
+      // AES-GCM préservant la longueur et aucun rembourrage n'étant appliqué,
+      // la longueur du chiffré était le SEUL discriminant entre les deux
+      // emplacements — et il était décisif. Le code étant public sous
+      // Apache 2.0, la taille exacte du leurre était même calculable à l'avance.
       //
-      // Le tirage aléatoire du palier casse en outre l'heuristique « le plus
-      // petit des deux fichiers est le leurre » : le leurre peut être le plus
-      // gros des deux.
-      ptBytes = VaultService._padToBucket(
-        Uint8List.fromList(utf8.encode(jsonEncode(const <dynamic>[]))),
-        minBuckets: 1 + Random.secure().nextInt(4),
+      // L'appariement sur l'autre emplacement (et non un tirage aléatoire)
+      // donne l'équivalence STRICTE recherchée : le leurre factice fait
+      // exactement la taille du vrai coffre.
+      ptBytes = VaultService._padToLadder(
+        utf8.encode(jsonEncode(const <dynamic>[])),
+        minPlainBytes: await _otherSlotPlainLength(_Slot.decoy),
       );
       final aead = await AeadService.encryptGcm(
         key: finalKey,

@@ -10,95 +10,121 @@ import 'package:pass_tech/services/vault_service.dart';
 /// applique, la taille du fichier etait un discriminant DETERMINISTE entre un
 /// leurre et un vrai second coffre : le deni plausible tombait sur un `ls -l`.
 void main() {
-  final bucket = VaultService.paddingBucketBytesForTest;
+  final rung = VaultService.paddingBaseRungForTest;
 
-  Uint8List pad(String s, {int minBuckets = 1}) =>
-      VaultService.padToBucketForTest(
+  Uint8List pad(String s, {int minPlainBytes = 0}) =>
+      VaultService.padToLadderForTest(
         Uint8List.fromList(utf8.encode(s)),
-        minBuckets: minBuckets,
+        minPlainBytes: minPlainBytes,
       );
 
-  group('padToBucket — alignement sur les paliers', () {
-    test('le palier fait 4 Kio', () {
-      expect(bucket, 4096);
+  String coffre(int nEntrees) => jsonEncode([
+    for (var i = 0; i < nEntrees; i++)
+      {
+        'id': 'id-$i',
+        'name': 'Compte numero $i',
+        'username': 'utilisateur$i@exemple.fr',
+        'password': 'MotDePasseAssezLong-$i',
+        'notes': 'quelques notes de contexte pour l\'entree $i',
+      },
+  ]);
+
+  group('echelle de rembourrage', () {
+    test('le premier barreau fait 64 Kio', () {
+      expect(rung, 65536);
     });
 
-    test('un coffre vide et un coffre garni tombent au meme palier', () {
-      final leurre = pad('[]');
-      final petitCoffreReel = pad(
-        jsonEncode([
-          {'id': '1', 'name': 'Banque', 'password': 'hunter2'},
-          {'id': '2', 'name': 'Mail', 'password': 'correct-horse'},
-        ]),
-      );
-      expect(leurre.length, petitCoffreReel.length);
-      expect(leurre.length, bucket);
+    test('progression x4 entre barreaux', () {
+      expect(pad('x' * (rung - 1)).length, rung);
+      expect(pad('x' * rung).length, rung);
+      expect(pad('x' * (rung + 1)).length, rung * 4);
+      expect(pad('x' * (rung * 4 + 1)).length, rung * 16);
     });
 
-    test('un clair depassant un palier passe au palier suivant', () {
-      expect(pad('x' * (bucket - 1)).length, bucket);
-      expect(pad('x' * bucket).length, bucket);
-      expect(pad('x' * (bucket + 1)).length, bucket * 2);
-    });
-
-    test('minBuckets impose un plancher', () {
-      expect(pad('[]', minBuckets: 3).length, bucket * 3);
-      // Un contenu deja plus grand que le plancher n'est PAS retreci.
-      expect(pad('x' * (bucket * 5), minBuckets: 2).length, bucket * 5);
-    });
-
-    test('la longueur est toujours un multiple exact du palier', () {
-      for (final n in [0, 1, 2, 999, 4095, 4096, 4097, 20000]) {
-        expect(pad('x' * n).length % bucket, 0, reason: 'longueur $n');
+    test('la longueur est toujours exactement un barreau', () {
+      for (final n in [0, 1, 2, 999, 65535, 65536, 65537, 300000]) {
+        final len = pad('x' * n).length;
+        var r = rung;
+        while (r < len) {
+          r *= 4;
+        }
+        expect(len, r, reason: 'longueur $n');
       }
     });
   });
 
-  group('padToBucket — retro-compatibilite de lecture', () {
+  group('EQUIVALENCE STRICTE des deux emplacements', () {
+    test('leurre vide et coffre reel garni sont de MEME taille', () {
+      final leurre = pad('[]');
+      final reel = pad(coffre(100));
+      expect(reel.length, leurre.length);
+      expect(leurre.length, rung);
+    });
+
+    test(
+      'un coffre de plusieurs centaines d\'entrees tient sur le 1er barreau',
+      () {
+        // C'est ce qui rend l'equivalence effective en pratique : tant que les
+        // deux coffres tiennent sous 64 Kio, ils sont rigoureusement
+        // indistinguables par la taille.
+        final src = coffre(300);
+        expect(src.length, lessThan(rung));
+        expect(pad(src).length, rung);
+      },
+    );
+
+    test('l\'appariement aligne un petit coffre sur un gros voisin', () {
+      // Simule : l'autre emplacement contient un clair de 200 000 octets.
+      // Ce coffre-ci, minuscule, doit neanmoins atterrir sur le meme barreau.
+      final gros = pad('x' * 200000);
+      final petitAppariE = pad('[]', minPlainBytes: 200000);
+      expect(petitAppariE.length, gros.length);
+    });
+
+    test('l\'appariement ne retrecit jamais le contenu reel', () {
+      final grosContenu = pad('x' * 200000, minPlainBytes: 10);
+      expect(grosContenu.length, greaterThanOrEqualTo(200000));
+    });
+
+    test('appariement sur un voisin absent (0) = comportement nominal', () {
+      expect(pad('[]', minPlainBytes: 0).length, pad('[]').length);
+    });
+  });
+
+  group('retro-compatibilite de lecture', () {
     // Point CRITIQUE : le rembourrage utilise l'espace (0x20), que `jsonDecode`
     // ignore en fin de chaine. Le clair rembourre se relit donc avec le
     // decodeur EXISTANT — aucun bump de version, aucune migration, et les
     // coffres deja ecrits SANS rembourrage continuent de s'ouvrir.
     test('un coffre rembourre se decode avec le decodeur existant', () {
-      final entrees = [
-        {'id': 'a', 'name': 'Compte', 'password': 'p@ss'},
-        {'id': 'b', 'name': 'Autre', 'notes': 'ligne1\nligne2'},
-      ];
-      final padded = pad(jsonEncode(entrees));
-      final relu = jsonDecode(utf8.decode(padded)) as List;
-      expect(relu.length, 2);
-      expect((relu[0] as Map)['name'], 'Compte');
-      expect((relu[1] as Map)['notes'], 'ligne1\nligne2');
+      final relu = jsonDecode(utf8.decode(pad(coffre(3)))) as List;
+      expect(relu.length, 3);
+      expect((relu[0] as Map)['name'], 'Compte numero 0');
     });
 
     test('un leurre vide rembourre se decode en liste vide', () {
-      expect((jsonDecode(utf8.decode(pad('[]'))) as List), isEmpty);
+      expect(jsonDecode(utf8.decode(pad('[]'))) as List, isEmpty);
     });
 
     test('un coffre LEGACY non rembourre se decode toujours', () {
-      // Simule un fichier ecrit par une version anterieure au correctif.
-      final legacy = utf8.encode(
-        jsonEncode([
-          {'id': 'x', 'name': 'Ancien'},
-        ]),
-      );
-      final relu = jsonDecode(utf8.decode(legacy)) as List;
-      expect((relu.single as Map)['name'], 'Ancien');
+      final legacy = utf8.encode(coffre(2));
+      expect((jsonDecode(utf8.decode(legacy)) as List).length, 2);
     });
 
     test('le contenu utile precede exactement le rembourrage', () {
-      final src = jsonEncode([
-        {'id': '1'},
-      ]);
+      final src = coffre(1);
       final padded = pad(src);
       expect(utf8.decode(padded.sublist(0, src.length)), src);
-      // Tout le reste est de l'espace, jamais un octet nul (qui casserait
-      // `jsonDecode`).
-      expect(
-        padded.sublist(src.length),
-        everyElement(0x20),
-        reason: 'le rembourrage doit etre uniquement des espaces',
-      );
+      // Uniquement des espaces ensuite — un octet nul casserait `jsonDecode`.
+      expect(padded.sublist(src.length), everyElement(0x20));
+    });
+
+    test('les accents survivent au round-trip utf8', () {
+      final src = jsonEncode([
+        {'name': 'Crédit Agricole', 'notes': 'clé de récupération : àéîôù'},
+      ]);
+      final relu = jsonDecode(utf8.decode(pad(src))) as List;
+      expect((relu.single as Map)['notes'], 'clé de récupération : àéîôù');
     });
   });
 }

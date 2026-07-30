@@ -85,17 +85,27 @@ extension VaultStorage on VaultService {
     final plainText = utf8.encode(
       jsonEncode(_entries.map((e) => e.toJson()).toList()),
     );
-    // SEC F6 v2.5.2 — rembourrage par paliers AVANT chiffrement. AES-GCM
-    // préserve la longueur : sans ça, la taille du chiffré révèle la taille du
-    // coffre, et un leurre factice (qui chiffre `[]`, soit 24 caractères
-    // base64) se distinguait d'un vrai coffre de façon déterministe. Le déni
-    // plausible que le nommage neutre `_a`/`_b` existe pour offrir tombait sur
-    // un simple `ls -l`.
+    // SEC F6 v2.5.2 — rembourrage AVANT chiffrement, sur un barreau qui couvre
+    // AUSSI la taille de clair de l'autre emplacement. AES-GCM préserve la
+    // longueur : sans ça, la taille du chiffré révèle la taille du coffre, et
+    // un leurre factice (qui chiffrait `[]`, soit 24 caractères base64) se
+    // distinguait d'un vrai coffre de façon déterministe. Le déni plausible
+    // que le nommage neutre `_a`/`_b` existe pour offrir tombait sur un simple
+    // `ls -l`.
+    //
+    // L'appariement inter-emplacements est ce qui rend l'équivalence STRICTE :
+    // à chaque écriture, cet emplacement s'aligne sur le plus grand des deux.
+    // Les barreaux étant très espacés (64 Kio puis ×4), les deux fichiers
+    // coïncident en pratique en permanence.
+    final otherLen = await _otherSlotPlainLength(slot);
     // `utf8.encode` rend déjà un Uint8List : on le passe TEL QUEL. Un
     // `Uint8List.fromList(plainText)` intermédiaire créerait une troisième
     // copie du JSON en clair — contenant tous les mots de passe — que le wipe
     // ci-dessous ne couvrirait pas.
-    final ptBytes = VaultService._padToBucket(plainText);
+    final ptBytes = VaultService._padToLadder(
+      plainText,
+      minPlainBytes: otherLen,
+    );
 
     final aead = await AeadService.encryptGcm(
       key: _key!,
