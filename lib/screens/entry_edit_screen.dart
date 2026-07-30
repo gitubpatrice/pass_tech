@@ -1,3 +1,5 @@
+import 'dart:ui' show BoxWidthStyle;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
@@ -494,7 +496,11 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
-        maxLines: 3,
+        // UI v2.5.3 — cf. le champ Contenu des notes : croissance au lieu d'un
+        // défilement imbriqué, et sélection collée aux glyphes.
+        maxLines: null,
+        minLines: 3,
+        selectionWidthStyle: BoxWidthStyle.tight,
         decoration: InputDecoration(
           labelText: t.entryEditFieldNotesOptional,
           hintText: t.entryEditHintNotes,
@@ -513,8 +519,23 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
-        maxLines: 12,
+        // UI v2.5.3 — `maxLines: null` fait GRANDIR le champ au lieu de lui
+        // donner son propre défilement interne. Avec `maxLines: 12`, le champ
+        // devenait un scrollable imbriqué dans le `SingleChildScrollView` de
+        // l'écran : le glissement de sélection se disputait le geste avec le
+        // défilement parent, d'où une sélection saccadée. Le défilement est
+        // désormais assuré par le seul parent.
+        maxLines: null,
         minLines: 6,
+        // UI v2.5.3 — sur les plateformes non-web, `selectionWidthStyle` vaut
+        // par défaut `BoxWidthStyle.max`, qui « ajoute des boîtes
+        // supplémentaires en fin de ligne pour que toutes fassent la largeur
+        // de la ligne la plus large du paragraphe » (dart:ui). La sélection
+        // débordait donc jusqu'au bord au lieu de s'arrêter au dernier
+        // caractère. `tight` colle aux glyphes réels.
+        // NB : `textWidthBasis` n'y pouvait rien — il agit sur la largeur du
+        // paragraphe, pas sur les boîtes de sélection.
+        selectionWidthStyle: BoxWidthStyle.tight,
         textCapitalization: TextCapitalization.sentences,
         decoration: InputDecoration(
           labelText: t.entryEditFieldContent,
@@ -646,7 +667,10 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
-        maxLines: 2,
+        // UI v2.5.3 — cf. le champ Contenu des notes.
+        maxLines: null,
+        minLines: 2,
+        selectionWidthStyle: BoxWidthStyle.tight,
         decoration: InputDecoration(
           labelText: t.entryEditFieldNotesOptional,
           hintText: t.entryEditHintCardNotes,
