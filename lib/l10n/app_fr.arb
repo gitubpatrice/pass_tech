@@ -539,6 +539,10 @@
   "importFormatEncryptedBackup": "Sauvegarde chiffrée",
 
   "changePasswordDialogTitle": "Nouveau mot de passe",
+  "vaultBusyRetry": "Une autre opération est en cours. Réessayez.",
+  "@vaultBusyRetry": {
+    "description": "Refus quand une opération concurrente détient déjà le mutex du coffre (SEC-R1)."
+  },
   "changePasswordCurrentLabel": "Mot de passe actuel",
   "@changePasswordCurrentLabel": {
     "description": "Champ de réauthentification avant rotation du mot de passe maître (SEC F10)."

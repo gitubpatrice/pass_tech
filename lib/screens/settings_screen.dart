@@ -541,7 +541,25 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (action != 'delete' || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    await VaultService().deleteDecoyVault();
+    // SEC-R3 v2.5.2 — depuis une session leurre, le service refuse et lève.
+    //
+    // On garde volontairement la section « Coffre leurre » VISIBLE et on
+    // affiche un refus neutre, plutôt que de masquer l'entrée. Masquer
+    // révélerait l'emplacement actif : le code étant public sous Apache 2.0,
+    // un adversaire sait qu'une section absente signifie « vous êtes dans le
+    // leurre ». Même raisonnement que pour « Tout supprimer » (F12).
+    try {
+      await VaultService().deleteDecoyVault();
+    } on StateError {
+      if (mounted) {
+        SnackUtils.showError(
+          context,
+          messenger,
+          t.settingsDeleteAllUnavailable,
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() {});
     SnackUtils.showInfo(messenger, t.decoyDeletedSnack);
@@ -1034,13 +1052,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       // qu'une erreur générique exposant le sentinel interne.
       if (!mounted) return;
       nav.pop();
-      SnackUtils.showError(
-        context,
-        messenger,
-        e.message == VaultService.wrongCurrentPassword
-            ? t.changePasswordErrorWrongCurrent
-            : t.genericError('$e'),
-      );
+      SnackUtils.showError(context, messenger, switch (e.message) {
+        VaultService.wrongCurrentPassword => t.changePasswordErrorWrongCurrent,
+        // SEC-R1 v2.5.2 — opération concurrente : rien n'a été muté.
+        VaultService.vaultBusy => t.vaultBusyRetry,
+        _ => t.genericError('$e'),
+      });
     } catch (e) {
       if (!mounted) return;
       nav.pop(); // close progress dialog

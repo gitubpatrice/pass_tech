@@ -87,9 +87,17 @@ android {
             // Désormais : on n'échoue que si un build RELEASE est réellement
             // demandé, pour ne pas casser les builds debug/profile sur une
             // machine sans keystore.
+            // SEC-R2 v2.5.2 — on cible les tâches d'ASSEMBLAGE, pas tout ce qui
+            // contient « release ». Un `contains("elease")` matchait aussi
+            // `testReleaseUnitTest`, `lintRelease` ou `compileReleaseKotlin`,
+            // qui n'impliquent aucune signature : un futur job CI exécutant
+            // l'une d'elles sans keystore aurait échoué sur un message
+            // trompeur parlant de refus de signature.
             val keyPropsFile = rootProject.file("key.properties")
             if (!keyPropsFile.exists() &&
-                gradle.startParameter.taskNames.any { it.contains("elease") }
+                gradle.startParameter.taskNames.any {
+                    it.contains("assembleRelease") || it.contains("bundleRelease")
+                }
             ) {
                 throw GradleException(
                     "key.properties introuvable : refus de signer un build " +

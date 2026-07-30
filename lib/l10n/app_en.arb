@@ -556,6 +556,10 @@
   "importFormatEncryptedBackup": "Encrypted backup",
 
   "changePasswordDialogTitle": "New password",
+  "vaultBusyRetry": "Another operation is in progress. Please retry.",
+  "@vaultBusyRetry": {
+    "description": "Refusal when a concurrent operation already holds the vault mutex (SEC-R1)."
+  },
   "changePasswordCurrentLabel": "Current password",
   "@changePasswordCurrentLabel": {
     "description": "Re-authentication field before master password rotation (SEC F10)."

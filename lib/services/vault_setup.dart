@@ -90,7 +90,31 @@ extension VaultSetup on VaultService {
     String newPassword, {
     required String currentPassword,
   }) async {
-    if (!await verifyCurrentPassword(currentPassword)) {
+    // SEC-R1 v2.5.2 — le mutex est tenu sur TOUTE l'opération, vérification
+    // ET rotation. Avant, `verifyCurrentPassword` le relâchait en sortant et
+    // la rotation lisait `_activeSlot` sans protection : un `unlock()`
+    // concurrent pouvait s'intercaler et faire pivoter la clé du MAUVAIS
+    // emplacement.
+    if (_unlockGate != null) {
+      throw StateError(VaultService.vaultBusy);
+    }
+    final gate = _unlockGate = Completer<void>();
+    try {
+      await _changeMasterPasswordLocked(
+        newPassword,
+        currentPassword: currentPassword,
+      );
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
+  Future<void> _changeMasterPasswordLocked(
+    String newPassword, {
+    required String currentPassword,
+  }) async {
+    if (!await verifyCurrentPasswordLocked(currentPassword)) {
       throw StateError(VaultService.wrongCurrentPassword);
     }
     // v4 : Argon2id + re-wrap fresh hwSecret. Le slot opposé n'est pas affecté.

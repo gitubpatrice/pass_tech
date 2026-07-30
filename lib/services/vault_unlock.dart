@@ -69,21 +69,39 @@ extension VaultUnlock on VaultService {
   /// Retourne `false` si le coffre est verrouillé, si aucun coffre n'est
   /// ouvert, ou si un déverrouillage est déjà en cours.
   Future<bool> verifyCurrentPassword(String password) async {
-    if (!_isOpen || _activeSlot == null) return false;
-    if (await getLockoutRemaining() != null) return false;
     if (_unlockGate != null) return false;
     final gate = _unlockGate = Completer<void>();
     try {
-      final ok = await _passwordMatchesPrimaryInternal(
-        password,
-        slot: _activeSlot!,
-      );
-      if (!ok) await _onUnlockFail();
-      return ok;
+      return await verifyCurrentPasswordLocked(password);
     } finally {
       if (!gate.isCompleted) gate.complete();
       _unlockGate = null;
     }
+  }
+
+  /// Corps de [verifyCurrentPassword] SANS acquisition du mutex.
+  ///
+  /// SEC-R1 v2.5.2 — `changeMasterPassword` doit tenir `_unlockGate` sur TOUTE
+  /// sa durée, vérification comprise. Avant, il appelait
+  /// [verifyCurrentPassword], qui relâchait le mutex en sortant, puis lisait
+  /// `_activeSlot` et faisait pivoter salt / hwSecret / finalKey SANS le
+  /// reprendre. Un `unlock()` concurrent — atteignable par double-appui rapide,
+  /// deeplink ou Retour rapide, le même scénario que la garde F4 v2.4.4
+  /// documente déjà — pouvait s'intercaler dans cette fenêtre et réassigner
+  /// `_activeSlot` / `_key`. La rotation portait alors sur le MAUVAIS
+  /// emplacement, sans que rien ne le signale : perte d'accès définitive au
+  /// coffre visé.
+  ///
+  /// L'appelant DOIT détenir `_unlockGate`.
+  Future<bool> verifyCurrentPasswordLocked(String password) async {
+    if (!_isOpen || _activeSlot == null) return false;
+    if (await getLockoutRemaining() != null) return false;
+    final ok = await _passwordMatchesPrimaryInternal(
+      password,
+      slot: _activeSlot!,
+    );
+    if (!ok) await _onUnlockFail();
+    return ok;
   }
 
   Future<bool> _passwordMatchesPrimaryInternal(

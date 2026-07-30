@@ -729,6 +729,10 @@ class VaultService {
   /// message dédié plutôt que d'exposer la sentinelle brute.
   static const wrongCurrentPassword = 'pt_change_pwd_wrong_current';
 
+  /// SEC-R1 v2.5.2 — une opération concurrente détient déjà `_unlockGate`.
+  /// L'appelant doit inviter l'utilisateur à réessayer, sans rien muter.
+  static const vaultBusy = 'pt_vault_busy';
+
   Future<void> deleteVault() async {
     // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI
     // aucune réauthentification, et son unique appelant l'exposait derrière un
@@ -822,6 +826,21 @@ class VaultService {
   /// attaquant forensic voit toujours 2 fichiers indistinguables et ne peut
   /// pas prouver qu'un decoy réel a existé.
   Future<void> deleteDecoyVault() async {
+    // SEC-R3 v2.5.2 — garde analogue à celle de `deleteVault` (F12), qui
+    // manquait ici. Cette fonction écrase `pt_vault_b.enc` par un leurre
+    // factice dont le mot de passe aléatoire n'est JAMAIS persisté : le
+    // fichier devient définitivement non déverrouillable.
+    //
+    // Or la section « Coffre leurre » des Réglages s'affiche selon
+    // `hasDecoyVault`, un drapeau GLOBAL, et non selon l'emplacement actif.
+    // Un utilisateur se trouvant dans sa propre session leurre pouvait donc
+    // écraser le coffre qu'il avait justement ouvert. Les buffers en RAM
+    // réparent la situation au prochain CRUD, mais verrouiller ou fermer
+    // l'app avant toute autre écriture perdait le vrai contenu — sans
+    // recours, y compris pour le propriétaire légitime.
+    if (_activeSlot == _Slot.decoy) {
+      throw StateError(decoySessionDeleteRefused);
+    }
     await _createDummyDecoy();
     await _storage.write(key: _decoyConfiguredKey, value: 'false');
   }
