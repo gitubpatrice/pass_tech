@@ -22,6 +22,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:biometric_storage/biometric_storage.dart';
@@ -548,27 +549,98 @@ class VaultService {
     '  ',
   ).convert(_entries.map((e) => e.toJson()).toList());
 
+  /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
+  /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.
+  /// Best-effort : sur un système de fichiers à copie sur écriture (F2FS,
+  /// couche flash) l'écrasement ne garantit pas la destruction physique.
+  static void _shredSync(File file) {
+    try {
+      if (!file.existsSync()) return;
+      final len = file.lengthSync();
+      if (len > 0) {
+        final rnd = Random.secure();
+        file.writeAsBytesSync(
+          Uint8List.fromList(List<int>.generate(len, (_) => rnd.nextInt(256))),
+          flush: true,
+        );
+      }
+      file.deleteSync();
+    } catch (_) {
+      // Best-effort : on tente quand même l'unlink si l'écrasement a échoué.
+      try {
+        if (file.existsSync()) file.deleteSync();
+      } catch (_) {}
+    }
+  }
+
+  /// Levée par [deleteVault] quand l'appel vient d'une session leurre.
+  /// L'appelant doit présenter ce refus à l'utilisateur sans révéler qu'un
+  /// coffre principal existe — le message d'erreur ne doit RIEN dire de plus
+  /// que « opération indisponible ».
+  static const decoySessionDeleteRefused = 'pt_delete_refused_decoy_session';
+
   Future<void> deleteVault() async {
+    // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI
+    // aucune réauthentification, et son unique appelant l'exposait derrière un
+    // simple dialogue de confirmation, sans garde `isDecoyActive`. Une session
+    // ouverte avec le mot de passe LEURRE pouvait donc anéantir le coffre
+    // principal : `_keystore.deleteAll()` détruit les DEUX KEK liées au TEE,
+    // rendant même une copie antérieure de `pt_vault_a.enc` définitivement
+    // indéchiffrable. C'est l'inverse exact de l'objet du leurre — la victime
+    // livre le mot de passe leurre en comptant sur le fait que le vrai coffre
+    // reste sûr ET caché.
+    if (_activeSlot != _Slot.primary) {
+      throw StateError(decoySessionDeleteRefused);
+    }
     lock();
     final dir = await getApplicationDocumentsDirectory();
-    // Supprime les 2 slots — NOUVEAUX (H1) ET anciens noms (pré-H1) + leurs
-    // `.bak` v3 — pour un reset complet quel que soit l'état de migration.
+    // SEC F1 v2.5.2 — Avant : liste de noms CODÉE EN DUR, qui oubliait
+    // `pt_heir.enc` (l'instantané Héritage). Après « Tout supprimer », une
+    // copie déchiffrable de CHAQUE entrée survivait donc dans le stockage
+    // privé — et contrairement au coffre principal, cet instantané est dérivé
+    // du seul mot de passe héritier SANS liaison hwSecret/TEE : il est
+    // attaquable hors ligne depuis une simple copie de fichier. Le dialogue
+    // promettait pourtant une suppression définitive.
+    // Désormais : on ÉNUMÈRE les artefacts `pt_*` du répertoire documents,
+    // pour que tout artefact futur soit couvert par défaut au lieu d'attendre
+    // qu'on pense à l'ajouter ici.
+    try {
+      for (final ent in dir.listSync(followLinks: false)) {
+        if (ent is! File) continue;
+        final name = ent.uri.pathSegments.last;
+        if (name.startsWith('pt_')) _shredSync(ent);
+      }
+    } catch (_) {
+      /* Répertoire illisible : on retombe sur la liste explicite ci-dessous. */
+    }
+    // Filet de sécurité si l'énumération a échoué (et couvre les `.bak` v3).
     for (final name in const [
       'pt_vault_a.enc',
       'pt_vault_b.enc',
       'pt_vault.enc',
       'pt_vault_decoy.enc',
+      'pt_heir.enc',
     ]) {
-      final file = File('${dir.path}/$name');
-      if (file.existsSync()) file.deleteSync();
-      final bak = File('${file.path}_v3.enc.bak');
-      if (bak.existsSync()) bak.deleteSync();
+      _shredSync(File('${dir.path}/$name'));
+      _shredSync(File('${dir.path}/${name}_v3.enc.bak'));
     }
     for (final slot in _Slot.values) {
       await _storage.delete(key: _saltKeyFor(slot));
     }
     // v2.5.x (H1) — efface le flag decoy (repart à zéro).
     await _storage.delete(key: _decoyConfiguredKey);
+    // SEC F1 v2.5.2 — état Héritage : sans ça, `pt_heir_enabled` restait à '1'
+    // et le bouton « Accès héritier » réapparaissait sur l'écran de
+    // déverrouillage après le délai de grâce, servant l'ancien coffre.
+    for (final k in const [
+      'pt_heir_salt',
+      'pt_heir_enabled',
+      'pt_heir_threshold_days',
+      'pt_heir_grace_start_ts',
+      'pt_last_active_ts',
+    ]) {
+      await _storage.delete(key: k);
+    }
     await deleteBiometricKey();
     // v4 : détruit aussi les 2 KEK keystore (decision #4).
     try {

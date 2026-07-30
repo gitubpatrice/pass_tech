@@ -518,6 +518,10 @@
   "settingsDeleteAllDialogTitle": "Delete all data?",
   "settingsDeleteAllDialogBody": "All your entries and the vault will be permanently deleted.",
   "settingsDeleteAllConfirm": "Delete everything",
+  "settingsDeleteAllUnavailable": "Operation unavailable.",
+  "@settingsDeleteAllUnavailable": {
+    "description": "Neutral refusal when a full wipe is requested from a decoy session. Must reveal NOTHING about the existence of a primary vault."
+  },
 
   "exportPlainDialogTitle": "UNENCRYPTED export",
   "exportPlainWarningHeadline": "The exported file will contain ALL your passwords IN CLEAR TEXT (readable by anyone).",

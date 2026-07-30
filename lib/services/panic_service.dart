@@ -59,7 +59,22 @@ class PanicService {
       await _storage.delete(key: _failCountKey);
       await _storage.delete(key: _lockoutKey);
     } catch (_) {}
-    // 5. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
+    // 5. SEC F4 v2.5.2 — désarme le déverrouillage biométrique.
+    // Avant : `lock()` ne remettait que `_bioFile` à null ; le drapeau
+    // `pt_biometric_enabled` et l'entrée `biometric_storage` survivaient à la
+    // panique. `hasBiometricKey` restait donc vrai, l'écran de déverrouillage
+    // RÉAFFICHAIT et déclenchait AUTOMATIQUEMENT l'invite d'empreinte, et
+    // `unlockWithBiometric` ouvre le slot PRIMARY — celui-là même que la
+    // panique doit protéger. Un adversaire capable de faire poser (ou de
+    // contraindre) le doigt du propriétaire ouvrait donc le coffre principal
+    // sans jamais demander le mot de passe maître : exactement le scénario de
+    // coercition que cette fonction existe pour déjouer.
+    // Le réenrôlement biométrique exige de toute façon le mot de passe maître,
+    // donc le coût pour l'utilisateur légitime est faible.
+    try {
+      await VaultService().deleteBiometricKey();
+    } catch (_) {}
+    // 6. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
     if (disguise) {
       try {
         await _channel.invokeMethod('setDisguised', {'disguised': true});

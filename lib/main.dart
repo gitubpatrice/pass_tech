@@ -189,6 +189,10 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
+      // SEC F3 v2.5.2 — réarme FLAG_SECURE AVANT tout le reste : Android prend
+      // son instantané de fenêtre au moment du passage en arrière-plan, donc
+      // tout `await` placé avant cet appel est une fenêtre de capture.
+      await SecureWindow.suspendRelaxForBackground();
       // B2 — horodatage monotonique (Stopwatch) immune au clock-skew.
       _pausedAtMonoMs ??= _stopwatch.elapsedMilliseconds;
       // Wipe clipboard immediately on background : don't risk leaving secrets
@@ -199,6 +203,8 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // Immediate lock: wipe key now, navigate on resume
       if (lockSec == 0 && VaultService().isOpen) VaultService().lock();
     } else if (state == AppLifecycleState.resumed) {
+      // SEC F3 v2.5.2 — rétablit la relaxation si un écran la demande encore.
+      await SecureWindow.resumeRelaxAfterBackground();
       final pausedMs = _pausedAtMonoMs;
       _pausedAtMonoMs = null;
 

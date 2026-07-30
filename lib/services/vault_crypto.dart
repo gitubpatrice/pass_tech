@@ -69,6 +69,19 @@ extension VaultCrypto on VaultService {
       // (ex. version 99999) qui pourraient déclencher des branches non
       // auditées au fil de futurs refactors.
       if (version < 1 || version > VaultService._v3Version) return false;
+
+      // SEC F13 v2.5.2 — Le format v3 dérive DEUX clés de 32 octets d'une clé
+      // maître de 64 : `encKey = _key[0..32]`, `macKey = _key[32..64]`.
+      // Sans cette garde, un `_key` de 32 octets (cas du cache biométrique v4,
+      // imposé à exactement 32 par `_unlockWithBiometricInternal`) faisait
+      // renvoyer une liste VIDE à `sublist(32)`. `Hmac` ne rejette pas une clé
+      // vide — il la complète en un bloc nul — donc le MAC devenait
+      // publiquement calculable et un fichier v3 forgé passait la comparaison
+      // en temps constant ligne ~96.
+      // Fail-closed : une clé v4 de 32 octets ne peut légitimement JAMAIS
+      // ouvrir un fichier v3 (un vrai coffre v3 a un cache biométrique de 64).
+      if (_key == null || _key!.length != 64) return false;
+
       final iterations =
           raw['iterations'] as int? ?? VaultService._legacyIterations;
       final saltB64 = raw['salt'] as String? ?? '';

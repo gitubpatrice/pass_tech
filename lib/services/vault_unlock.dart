@@ -25,6 +25,29 @@ extension VaultUnlock on VaultService {
   /// via deeplinks / Back rapide) pouvait corrompre `_key`/`_entries`
   /// pendant le snapshot/restore du path v3.
   Future<bool> passwordMatchesPrimary(String password) async {
+    // SEC F7 v2.5.2 — Cette fonction est un oracle oui/non sur le mot de passe
+    // maître RÉEL. Avant, elle était atteignable depuis une session LEURRE
+    // (`_manageHeritage` → « Mettre à jour », sans garde de slot) et ne
+    // consultait NI le lockout NI le compteur d'échecs : un adversaire à qui
+    // l'on avait remis le mot de passe leurre — la situation exacte pour
+    // laquelle le leurre existe — disposait d'un oracle illimité sur le
+    // secret principal. La frontière de déni plausible était franchie.
+    //
+    // Garde 1 : interdire l'appel hors du slot principal. C'est ce qui tue
+    // l'oracle : depuis un leurre, on ne peut plus rien apprendre du primary.
+    if (_activeSlot != _Slot.primary) return false;
+
+    // Garde 2 : respecter le verrouillage anti-force-brute, comme `unlock()`.
+    if (await getLockoutRemaining() != null) return false;
+
+    // NB : on n'incrémente délibérément PAS `_onUnlockFail()` sur non-
+    // correspondance, contrairement à ce que suggérait l'audit. Le principal
+    // appelant est la création du coffre leurre, qui vérifie que le mot de
+    // passe leurre DIFFÈRE du principal : la non-correspondance y est le
+    // résultat ATTENDU et souhaitable. Compter ces essais verrouillerait un
+    // utilisateur légitime en train de configurer son leurre. La garde de slot
+    // ci-dessus supprime déjà la valeur d'oracle ; le comptage n'apporterait
+    // qu'un faux positif.
     if (_unlockGate != null) return false;
     final gate = _unlockGate = Completer<void>();
     try {

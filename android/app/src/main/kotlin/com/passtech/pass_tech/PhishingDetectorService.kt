@@ -199,8 +199,19 @@ class PhishingDetectorService : AccessibilityService() {
         if (trimmed.contains(' ')) return null
         if (!trimmed.contains('.')) return null
 
+        // SEC F14 v2.5.2 — Le schéma DOIT être retiré avant le découpage.
+        // Avant : `trimmed.substringBefore('/')` coupait à la PREMIÈRE barre,
+        // c'est-à-dire celle du `//` du schéma : "https://evil.com/login"
+        // donnait hostPart = "https:", que TLD_REGEX ne peut pas matcher.
+        // La fonction retournait donc null pour TOUTE barre d'adresse affichant
+        // son schéma, l'instantané n'était jamais mis à jour, et le domaine
+        // précédent restait servi pendant la fenêtre FRESHNESS_MS de 15 s —
+        // une page d'hameçonnage pouvait ainsi être validée par un instantané
+        // périmé. Cela rendait aussi mort le code de schéma des lignes suivantes.
+        val schemeless = trimmed.substringAfter("://", trimmed)
+
         // Validation TLD stricte sur la partie avant '/' ou '?'
-        val hostPart = trimmed
+        val hostPart = schemeless
             .substringBefore('/')
             .substringBefore('?')
             .lowercase()

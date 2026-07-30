@@ -748,17 +748,43 @@ class _SettingsScreenState extends State<SettingsScreen>
       // F20 v2.3.7 — overwrite plaintext avec random bytes AVANT delete
       // (best-effort — F2FS/SSD wear-leveling ne garantit pas l'effacement
       // physique, mais empêche la récupération via lecture brute fichier).
-      try {
-        if (file.existsSync()) {
-          final len = file.lengthSync();
-          if (len > 0) {
-            final rand = SecretBytes.randomBytes(len);
-            file.writeAsBytesSync(rand, flush: true);
-          }
-          file.deleteSync();
-        }
-      } catch (_) {}
+      _shredFile(file);
+      // SEC F8 v2.5.2 — `Share.shareXFiles` ne PARTAGE PAS notre fichier : il
+      // le RECOPIE dans `<cache>/share_plus/` (share_plus `copyToShareCacheFolder`)
+      // et n'y fait le ménage qu'au DÉBUT du prochain appel à `shareFiles`.
+      // On écrasait donc soigneusement notre propre fichier temporaire pendant
+      // qu'un vidage JSON en clair de TOUTES les entrées survivait
+      // indéfiniment à côté — sans mot de passe, sans Keystore, sans Argon2id
+      // pour le protéger. Le plugin accorde en outre une permission de lecture
+      // sur cette copie à toute activité résolvant le sélecteur.
+      _shredShareCache(dir);
     }
+  }
+
+  /// Écrase un fichier par des octets aléatoires puis le supprime.
+  static void _shredFile(File file) {
+    try {
+      if (!file.existsSync()) return;
+      final len = file.lengthSync();
+      if (len > 0) {
+        file.writeAsBytesSync(SecretBytes.randomBytes(len), flush: true);
+      }
+      file.deleteSync();
+    } catch (_) {}
+  }
+
+  /// Purge le répertoire de cache de `share_plus`, où le plugin recopie tout
+  /// fichier partagé. Appelé après chaque partage et au verrouillage, pour
+  /// couvrir aussi le cas où le processus est tué pendant l'affichage du
+  /// sélecteur (le `finally` ne s'exécute alors jamais).
+  static void _shredShareCache(Directory cacheDir) {
+    try {
+      final shareDir = Directory('${cacheDir.path}/share_plus');
+      if (!shareDir.existsSync()) return;
+      for (final ent in shareDir.listSync(followLinks: false)) {
+        if (ent is File) _shredFile(ent);
+      }
+    } catch (_) {}
   }
 
   Future<void> _exportEncrypted() async {
@@ -1009,6 +1035,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final nav = Navigator.of(context);
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -1037,7 +1064,22 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (ok != true) return;
     // U9 v2.4.4 — feedback haptique sur action destructive ultime.
     await HapticFeedback.heavyImpact();
-    await VaultService().deleteVault();
+    // SEC F12 v2.5.2 — depuis une session leurre, `deleteVault()` refuse et
+    // lève. On affiche un refus NEUTRE : révéler « vous n'êtes pas sur le
+    // coffre principal » prouverait à l'adversaire qu'un coffre principal
+    // existe, ce qui annulerait le déni plausible.
+    try {
+      await VaultService().deleteVault();
+    } on StateError {
+      if (mounted) {
+        SnackUtils.showError(
+          context,
+          messenger,
+          t.settingsDeleteAllUnavailable,
+        );
+      }
+      return;
+    }
     if (mounted) {
       nav.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const SetupScreen()),
