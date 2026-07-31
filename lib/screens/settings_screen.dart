@@ -22,6 +22,7 @@ import '../services/secure_window.dart';
 import '../services/vault_service.dart';
 import '../utils/snack_utils.dart';
 import '../widgets/password_text_field.dart';
+import '../widgets/destructive.dart';
 import '../l10n/app_localizations.dart';
 import '../main.dart'
     show
@@ -157,13 +158,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               onPressed: () => Navigator.pop(ctx, false),
               child: Text(t.actionCancel),
             ),
-            FilledButton(
+            DestructiveButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
-                foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
-              ),
-              child: Text(t.heritageDisable),
+              label: t.actionDisable,
             ),
           ],
         ),
@@ -356,7 +353,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     final action = await showDialog<String>(
       context: context,
       builder: (_) {
-        final cs = Theme.of(context).colorScheme;
         return AlertDialog(
           title: Text(t.heritageManageTitle),
           content: Text(
@@ -371,13 +367,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               onPressed: () => Navigator.pop(context, 'cancel'),
               child: Text(t.actionCancel),
             ),
-            FilledButton.tonal(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.errorContainer,
-                foregroundColor: cs.onErrorContainer,
-              ),
+            DestructiveButton(
               onPressed: () => Navigator.pop(context, 'disable'),
-              child: Text(t.heritageDisable),
+              label: t.heritageDisable,
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, 'update'),
@@ -512,7 +504,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     final action = await showDialog<String>(
       context: context,
       builder: (_) {
-        final cs = Theme.of(context).colorScheme;
         return AlertDialog(
           title: Text(t.decoyDialogTitle),
           content: Text(
@@ -527,13 +518,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               onPressed: () => Navigator.pop(context, 'cancel'),
               child: Text(t.actionCancel),
             ),
-            FilledButton.tonal(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.errorContainer,
-                foregroundColor: cs.onErrorContainer,
-              ),
+            DestructiveButton(
               onPressed: () => Navigator.pop(context, 'delete'),
-              child: Text(t.decoyDelete),
+              label: t.decoyDelete,
             ),
           ],
         );
@@ -740,13 +727,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               onPressed: () => Navigator.of(ctx).pop(false),
               child: Text(t.actionCancel),
             ),
-            FilledButton.tonal(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.errorContainer,
-                foregroundColor: cs.onErrorContainer,
-              ),
+            DestructiveButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(t.exportPlainConfirm),
+              label: t.exportPlainConfirm,
             ),
           ],
         );
@@ -1067,7 +1050,6 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _deleteAll() async {
     final nav = Navigator.of(context);
-    final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
@@ -1084,13 +1066,10 @@ class _SettingsScreenState extends State<SettingsScreen>
             onPressed: () => nav.pop(false),
             child: Text(t.actionCancel),
           ),
-          FilledButton.tonal(
+          DestructiveButton(
             onPressed: () => nav.pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: cs.errorContainer,
-              foregroundColor: cs.onErrorContainer,
-            ),
-            child: Text(t.settingsDeleteAllConfirm),
+            label: t.settingsDeleteAllConfirm,
+            icon: Icons.delete_forever_outlined,
           ),
         ],
       ),
@@ -1513,7 +1492,10 @@ class _SettingsScreenState extends State<SettingsScreen>
 
           _section(t.settingsSectionDanger),
           ListTile(
-            leading: Icon(Icons.delete_forever_outlined, color: cs.error),
+            leading: const Icon(
+              Icons.delete_forever_outlined,
+              color: kDestructiveRed,
+            ),
             title: Text(
               t.settingsDeleteAllTitle,
               style: TextStyle(color: cs.error),

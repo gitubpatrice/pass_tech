@@ -419,6 +419,10 @@
   "heritageConfiguredSnack": "Héritage configuré ✓ Snapshot du coffre chiffré.",
   "heritageManageTitle": "Gérer l'héritage",
   "heritageManageBody": "L'héritier accède à un instantané du coffre. Vous pouvez :\n\n• Mettre à jour le snapshot (avec le mot de passe héritier)\n• Désactiver l'héritage et supprimer le snapshot",
+  "actionDisable": "Désactiver",
+  "@actionDisable": {
+    "description": "Action générique de désactivation. Distincte de heritageDisable : ce dernier est propre à l'Héritage et peut être reformulé sans impacter les autres dialogues."
+  },
   "heritageDisable": "Désactiver",
   "heritageUpdate": "Mettre à jour",
   "heritageDisabledSnack": "Héritage désactivé, snapshot supprimé",

@@ -436,6 +436,10 @@
   "heritageConfiguredSnack": "Heritage configured ✓ Encrypted vault snapshot.",
   "heritageManageTitle": "Manage heritage",
   "heritageManageBody": "The heir accesses a snapshot of the vault. You can:\n\n• Update the snapshot (with the heir password)\n• Disable heritage and delete the snapshot",
+  "actionDisable": "Disable",
+  "@actionDisable": {
+    "description": "Generic disable action. Distinct from heritageDisable, which is Heritage-specific and may be reworded independently."
+  },
   "heritageDisable": "Disable",
   "heritageUpdate": "Update",
   "heritageDisabledSnack": "Heritage disabled, snapshot deleted",

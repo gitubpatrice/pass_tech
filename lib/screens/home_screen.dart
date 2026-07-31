@@ -14,6 +14,7 @@ import 'generator_screen.dart';
 import 'settings_screen.dart';
 import 'about_screen.dart';
 import 'unlock_screen.dart';
+import '../widgets/destructive.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -698,8 +699,8 @@ class _EntryCard extends StatelessWidget {
                 duration: const Duration(seconds: 2),
               );
             },
-            backgroundColor: cs.error,
-            foregroundColor: Colors.white,
+            backgroundColor: kDestructiveRed,
+            foregroundColor: kDestructiveOn,
             icon: Icons.delete_outline,
             label: AppLocalizations.of(context).actionDelete,
             borderRadius: BorderRadius.circular(12),

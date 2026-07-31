@@ -13,6 +13,7 @@ import '../services/totp_service.dart';
 import '../services/vault_service.dart';
 import '../utils/snack_utils.dart';
 import 'entry_edit_screen.dart';
+import '../widgets/destructive.dart';
 
 class EntryDetailScreen extends StatefulWidget {
   final Entry entry;
@@ -184,7 +185,6 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
 
   Future<void> _delete() async {
     final nav = Navigator.of(context);
-    final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
@@ -200,13 +200,9 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
             onPressed: () => nav.pop(false),
             child: Text(t.actionCancel),
           ),
-          FilledButton.tonal(
+          DestructiveButton(
             onPressed: () => nav.pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: cs.errorContainer,
-              foregroundColor: cs.onErrorContainer,
-            ),
-            child: Text(t.actionDelete),
+            label: t.actionDelete,
           ),
         ],
       ),
@@ -275,7 +271,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
             onPressed: _edit,
           ),
           IconButton(
-            icon: Icon(Icons.delete_outline, color: cs.error),
+            icon: const Icon(Icons.delete_outline, color: kDestructiveRed),
             tooltip: t.entryDetailDeleteTooltip,
             onPressed: _delete,
           ),
