@@ -49,15 +49,12 @@ jobs:
         with:
           repository: gitubpatrice/files_tech_core
           path: files_tech_core
-          # SEC F25 2026-07-31 — epinglage EXPLICITE. Sans `ref:`, ce
-          # checkout prenait la tete de la branche par defaut AU MOMENT DU
-          # BUILD. Or `files_tech_core` fournit `SecretBytes` (effacement
-          # memoire, comparaison en temps constant, decodage hex) : un APK
-          # signe embarquait donc un etat non determine de code
-          # crypto-critique, et deux builds du meme tag pouvaient differer.
-          # v0.3.3 = 7b6bae9, qui contient les correctifs de securite
-          # SecretBytes. NE PAS retomber sur v0.3.2 : elle ne les a pas.
-          ref: v0.3.3
+          # 2026-07-31 — l'epinglage vit desormais dans `pubspec.yaml`, qui
+          # declare files_tech_core en dependance GIT sur un SHA. Ce checkout
+          # ne sert plus qu'a garder un repertoire frere pour d'eventuels
+          # outils ; `flutter pub get` resout la dependance par le SHA du
+          # pubspec, pas par ce repertoire. Un seul endroit a maintenir.
+          ref: v0.3.4
 
       - name: Setup Java 17
         uses: actions/setup-java@v4

@@ -7,8 +7,21 @@ environment:
   sdk: ^3.11.5
 
 dependencies:
+  # Dépendance GIT et non plus `path:`. F-Droid — comme toute CI ou tout clone
+  # frais — ne récupère que ce dépôt : un chemin relatif vers un répertoire
+  # frère est irrésolvable chez lui, et `flutter pub get` échouait. C'est ce qui
+  # bloquait la MR fdroiddata !37884 depuis mai 2026.
+  #
+  # Épinglé sur un SHA et non sur un tag : un tag peut être déplacé, or F-Droid
+  # exige des builds reproductibles. 7b6bae9 = v0.3.3, qui contient les
+  # correctifs de sécurité SecretBytes (wipe silencieux, fromHex permissif).
+  #
+  # Pour le développement local, `pubspec_overrides.yaml` (non versionné)
+  # rétablit le chemin relatif : on continue d'éditer files_tech_core à côté.
   files_tech_core:
-    path: ../files_tech_core
+    git:
+      url: https://github.com/gitubpatrice/files_tech_core.git
+      ref: 4a69aa89a7a7bf6791a03692ca2dbdbb7e66efae
   flutter:
     sdk: flutter
   flutter_localizations:
