@@ -428,7 +428,24 @@ extension VaultUnlock on VaultService {
     try {
       final store = await _bioStorage();
       final keyB64 = await store.read();
-      if (keyB64 == null || keyB64.isEmpty) return UnlockResult.wrongPassword;
+      if (keyB64 == null || keyB64.isEmpty) {
+        // SEC F20 v2.5.4 — une lecture VIDE alors que la biométrie est
+        // marquée active est anormale : l'entrée devrait exister. C'est ce que
+        // produit `biometric_storage` sur ce chemin quand la clé Keystore a
+        // été invalidée par un réenrôlement d'empreinte — il rend `null`
+        // SANS lever d'AuthException (vérifié sur émulateur : le diagnostic
+        // posé dans le `catch on AuthException` n'a JAMAIS été atteint).
+        //
+        // Avant, on retournait `wrongPassword` : l'UI affichait « Échec
+        // biométrique », le drapeau `pt_biometric_enabled` survivait, et le
+        // bouton « Empreinte / Face ID » restait proposé en échouant
+        // indéfiniment. L'utilisateur bouclait sans explication ni marche à
+        // suivre.
+        try {
+          await deleteBiometricKey();
+        } catch (_) {}
+        return UnlockResult.biometricInvalidated;
+      }
 
       // La biométrique est volontairement liée au coffre PRIMARY uniquement.
       // Permettre la bio sur le coffre leurre briserait le déni plausible.
