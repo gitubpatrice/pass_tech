@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ (API 31) impose son propre écran de démarrage système, affiché
+      AVANT que Flutter ne dessine quoi que ce soit. Il prend l'icône ADAPTATIVE
+      du lanceur et la MASQUE selon la forme de l'OS — un cercle sur Pixel, un
+      squircle sur Samsung. Ce masque n'est pas contournable : même un
+      `windowSplashScreenAnimatedIcon` dédié serait rogné de la même façon.
+
+      Sans configuration, le fond de cet écran suivait `launch_background`, soit
+      du BLANC. On voyait donc une pastille ronde découpée sur du blanc — d'où
+      l'impression que le logo Pass Tech était devenu rond.
+
+      On aligne le fond sur la couleur de fond de l'icône adaptative
+      (`#262660`). Le disque se fond alors dans l'aplat : on perçoit le logo sur
+      un fond uniforme au lieu d'une pastille détourée. Bénéfice secondaire, le
+      flash blanc qui précédait l'apparition de Flutter disparaît.
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+    </style>
+
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

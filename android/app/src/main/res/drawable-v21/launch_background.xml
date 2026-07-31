@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+<!--
+  Fond de la fenêtre pendant le démarrage du processus, AVANT la première frame
+  Flutter. `minSdk = 24`, donc c'est CE fichier qui sert — la variante sans
+  qualificateur n'est jamais atteinte.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+  Avant : `?android:colorBackground`, qui suit le thème système, donc du BLANC
+  en mode clair. D'où un flash blanc avant l'apparition du splash Flutter, et un
+  fond blanc derrière le disque du splash système Android 12+.
+
+  Désormais : la couleur de fond de l'icône adaptative, la même que
+  `windowSplashScreenBackground` (voir values-v31/styles.xml). Le démarrage est
+  d'un seul tenant, sans rupture de couleur.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
 </layer-list>
