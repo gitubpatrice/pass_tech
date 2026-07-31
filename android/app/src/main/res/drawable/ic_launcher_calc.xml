@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SEC F2 v2.5.4 — icône du camouflage « Calculatrice ».
+
+  Jeu d'icônes DISTINCT de `@mipmap/ic_launcher`. Avant, l'alias leurre
+  pointait sur la MÊME ressource que l'alias normal : le logo Pass Tech
+  restait visible sur le lanceur sous le nom « Calculatrice », ce qui était
+  plus suspect que l'absence de camouflage.
+
+  Vecteur plutôt qu'un jeu de PNG par densité : net à toutes les tailles, un
+  seul fichier, et pas de masque adaptatif appliqué par le lanceur — l'icône
+  s'affiche telle quelle, sans découpe circulaire.
+
+  Gris neutre volontaire : une calculatrice système générique n'attire pas le
+  regard. Toute couleur de marque irait à l'encontre du but.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Corps de la calculatrice, coins arrondis. -->
+    <path
+        android:fillColor="#546E7A"
+        android:pathData="M26,10h56a8,8 0,0 1,8 8v72a8,8 0,0 1,-8 8h-56a8,8 0,0 1,-8 -8v-72a8,8 0,0 1,8 -8z" />
+
+    <!-- Écran. -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M28,20h52v18h-52z" />
+
+    <!-- Touches : 4 rangées de 3. -->
+    <path
+        android:fillColor="#ECEFF1"
+        android:pathData="M28,46h12v10h-12z M48,46h12v10h-12z M68,46h12v10h-12z
+                          M28,62h12v10h-12z M48,62h12v10h-12z M68,62h12v10h-12z
+                          M28,78h12v10h-12z M48,78h12v10h-12z" />
+
+    <!-- Touche « = », accentuée comme sur une calculatrice réelle. -->
+    <path
+        android:fillColor="#FF8A65"
+        android:pathData="M68,78h12v10h-12z" />
+</vector>

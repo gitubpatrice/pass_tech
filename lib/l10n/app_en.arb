@@ -402,13 +402,13 @@
   "snackbarCopied": "Copied",
 
   "panicDialogTitle": "Panic mode?",
-  "panicDialogBody": "This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Renames the app to \"Calculator\" on the launcher\n\n⚠ THE ICON DOES NOT CHANGE: only the displayed name is altered. The Pass Tech logo stays visible on the launcher.\n\nYou will need your master password to re-enable biometrics. The name can be restored from Settings once you are safe.",
+  "panicDialogBody": "This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Replaces the app with a CALCULATOR on the launcher: name, icon and opening screen. The calculator really works.\n\n⚠ TO COME BACK: long-press for 2 seconds on the calculator's DISPLAY (the result area, at the top). Remember this — it is the only way back to your vault while the disguise is active.\n\nYou will need your master password to re-enable biometrics. Name and icon can be restored from Settings once you are safe.",
   "panicDialogActivate": "Activate",
   "panicSection": "Panic mode",
   "panicTriggerTitle": "Activate panic mode",
-  "panicTriggerSubtitle": "Locks, clears the clipboard, disables biometrics and renames the app to \"Calculator\" (icon unchanged)",
+  "panicTriggerSubtitle": "Locks, clears the clipboard, disables biometrics and replaces the app with a working calculator (name + icon)",
   "panicRevealTitle": "Restore the Pass Tech name",
-  "panicRevealSubtitle": "The app is currently renamed \"Calculator\" (icon unchanged)",
+  "panicRevealSubtitle": "The app currently looks like a calculator. To get back without coming here: long-press its display for 2 s",
   "panicRevealSnack": "Pass Tech icon restored — relaunch the launcher if it does not appear",
 
   "decoyDialogTitle": "Decoy vault",

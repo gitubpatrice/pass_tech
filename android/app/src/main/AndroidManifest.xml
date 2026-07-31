@@ -51,32 +51,38 @@
             </intent-filter>
         </activity-alias>
 
-        <!-- Alias camouflage : label "Calculatrice". Désactivé par défaut.
-             Le mode panique active celui-ci et désactive l'alias normal.
+        <!-- Alias camouflage « Calculatrice ». Désactivé par défaut ; le mode
+             panique l'active et désactive l'alias normal.
 
-             SEC F2 v2.5.2 — LIMITE ASSUMÉE ET DOCUMENTÉE : seul le LIBELLÉ
-             change. `android:icon` pointe sur @mipmap/ic_launcher, la MÊME
-             ressource que MainAliasNormal, et le projet ne contient qu'un seul
-             jeu d'icônes de lanceur — aucun échange n'est possible à
-             l'exécution. Le logo Pass Tech reste donc visible sur le launcher,
-             sous le nom "Calculatrice", et toucher l'entrée ouvre l'écran de
-             déverrouillage Pass Tech : aucune façade calculatrice n'existe.
+             SEC F2 v2.5.4 — camouflage RÉEL. Deux changements par rapport à la
+             version précédente, où seul le LIBELLÉ changeait :
 
-             Le commentaire précédent affirmait que « l'icône Pass Tech
-             disparaît du launcher » — c'était FAUX, et les textes de l'app
-             promettaient la même chose. Les chaînes panicDialogBody /
-             panicTriggerSubtitle / panicRevealSubtitle ont été corrigées pour
-             annoncer exactement ce que le code fait : un utilisateur qui
-             compte sur ce camouflage à une frontière doit savoir que le logo
-             reste visible.
+               1. `android:icon` pointe sur un jeu d'icônes DISTINCT
+                  (@drawable/ic_launcher_calc). Avant, l'alias réutilisait
+                  @mipmap/ic_launcher : le logo Pass Tech restait visible sur le
+                  lanceur sous le nom « Calculatrice », incohérence plus
+                  suspecte que l'absence de camouflage.
+               2. `android:targetActivity` vise CalculatorActivity et non
+                  MainActivity. Avant, toucher l'entrée ouvrait l'écran de
+                  déverrouillage Pass Tech : le camouflage se démentait au
+                  premier appui.
 
-             Un vrai camouflage exigerait un jeu de mipmap calculatrice dédié
-             ET une activité leurre affichant une calculatrice fonctionnelle. -->
+             La calculatrice est fonctionnelle — une façade inerte serait tout
+             aussi révélatrice. Sortie de secours : appui long de 2 s sur
+             l'affichage. Voir CalculatorActivity pour le raisonnement complet
+             et les limites assumées. -->
+        <activity
+            android:name=".CalculatorActivity"
+            android:label="Calculatrice"
+            android:icon="@drawable/ic_launcher_calc"
+            android:exported="false"
+            android:theme="@style/NormalTheme" />
+
         <activity-alias
             android:name=".MainAliasDecoy"
-            android:targetActivity=".MainActivity"
+            android:targetActivity=".CalculatorActivity"
             android:label="Calculatrice"
-            android:icon="@mipmap/ic_launcher"
+            android:icon="@drawable/ic_launcher_calc"
             android:exported="true"
             android:enabled="false">
             <intent-filter>

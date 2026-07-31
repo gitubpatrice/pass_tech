@@ -385,13 +385,13 @@
   "snackbarCopied": "Copié",
 
   "panicDialogTitle": "Mode panique ?",
-  "panicDialogBody": "Cette action effectue immédiatement :\n\n• Verrouillage du coffre\n• Vidage du presse-papiers\n• Désactivation du déverrouillage biométrique\n• Renommage de l'app en « Calculatrice » sur le launcher\n\n⚠ L'ICÔNE NE CHANGE PAS : seul le nom affiché est modifié. Le logo Pass Tech reste visible sur le launcher.\n\nVous devrez réactiver la biométrie avec votre mot de passe maître. Le nom se restaure depuis les Réglages quand vous serez en sécurité.",
+  "panicDialogBody": "Cette action effectue immédiatement :\n\n• Verrouillage du coffre\n• Vidage du presse-papiers\n• Désactivation du déverrouillage biométrique\n• Remplacement de l'app par une CALCULATRICE sur le launcher : nom, icône et écran d'ouverture. La calculatrice fonctionne réellement.\n\n⚠ POUR REVENIR : appui long de 2 secondes sur l'AFFICHAGE de la calculatrice (la zone du résultat, en haut). Retenez-le — c'est le seul chemin vers votre coffre tant que le camouflage est actif.\n\nVous devrez réactiver la biométrie avec votre mot de passe maître. Le nom et l'icône se restaurent depuis les Réglages quand vous serez en sécurité.",
   "panicDialogActivate": "Activer",
   "panicSection": "Mode panique",
   "panicTriggerTitle": "Activer le mode panique",
-  "panicTriggerSubtitle": "Verrouille, vide le presse-papiers, désactive la biométrie et renomme l'app en « Calculatrice » (l'icône reste inchangée)",
+  "panicTriggerSubtitle": "Verrouille, vide le presse-papiers, désactive la biométrie et remplace l'app par une calculatrice fonctionnelle (nom + icône)",
   "panicRevealTitle": "Restaurer le nom Pass Tech",
-  "panicRevealSubtitle": "L'app est actuellement renommée « Calculatrice » (icône inchangée)",
+  "panicRevealSubtitle": "L'app se présente actuellement comme une calculatrice. Pour y revenir sans passer par ici : appui long de 2 s sur son affichage",
   "panicRevealSnack": "Icône Pass Tech restaurée — relancez le launcher si elle n'apparaît pas",
 
   "decoyDialogTitle": "Coffre leurre",

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SEC F2 v2.5.4 — façade « Calculatrice » du mode panique.
+
+  Volontairement générique : aucune couleur de marque, aucun texte
+  identifiable, rien qui rappelle Pass Tech. Une calculatrice système
+  quelconque.
+
+  L'affichage (`display`) porte la SORTIE DE SECOURS : un appui long de 2 s
+  ouvre Pass Tech. Aucun indice visuel — ce serait le trahir.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FAFAFA">
+
+    <TextView
+        android:id="@+id/display"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="bottom|end"
+        android:padding="24dp"
+        android:text="0"
+        android:textColor="#212121"
+        android:textSize="56sp"
+        android:maxLines="2"
+        android:ellipsize="start"
+        android:longClickable="true"
+        android:textIsSelectable="false" />
+
+    <GridLayout
+        android:id="@+id/pad"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2"
+        android:columnCount="4"
+        android:rowCount="5"
+        android:padding="8dp" />
+</LinearLayout>
