@@ -219,6 +219,19 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
 
       // If vault was locked while paused (immediate option) → go to unlock
       if (!VaultService().isOpen) {
+        // SEC F19 v2.5.4 — « coffre fermé » ne veut pas dire « coffre
+        // existant ». Après « Tout supprimer », l'app repart sur l'écran de
+        // création ; il suffisait alors de basculer vers une autre app et de
+        // revenir pour que ce bloc pousse l'écran de DÉVERROUILLAGE d'un
+        // coffre supprimé. L'utilisateur se retrouvait devant une demande de
+        // mot de passe sans issue — aucune saisie ne pouvait aboutir — et
+        // seul un redémarrage complet du processus permettait d'en sortir.
+        // Reproduit sur émulateur le 2026-07-31.
+        //
+        // On ne navigue pas du tout dans ce cas : l'écran de création déjà
+        // affiché est le bon, et le pousser de nouveau effacerait une saisie
+        // en cours.
+        if (!await VaultService().vaultExists) return;
         _navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const UnlockScreen()),
           (_) => false,
