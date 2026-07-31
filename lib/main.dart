@@ -5,6 +5,7 @@ import 'l10n/app_localizations.dart';
 import 'services/app_update.dart';
 import 'services/clipboard_service.dart';
 import 'services/first_launch_flag.dart';
+import 'services/panic_service.dart';
 import 'services/secure_window.dart';
 import 'services/vault_service.dart';
 import 'screens/onboarding_screen.dart';
@@ -174,6 +175,28 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   Future<void> _checkForUpdate() async {
     if (_updateCheckedThisSession) return;
     _updateCheckedThisSession = true;
+    // SEC F22 v2.5.4 — aucune sonde réseau quand le mode panique est actif.
+    //
+    // Avant, cette vérification partait à CHAQUE démarrage à froid, avant tout
+    // déverrouillage, sans aucune condition. Or après une panique l'app se
+    // présente comme une calculatrice : une calculatrice qui contacte l'API
+    // GitHub au lancement est une anomalie observable sur l'appareil même —
+    // journal de connexions, application pare-feu type NetGuard, VPN local.
+    // Le camouflage tombait donc au niveau réseau, alors qu'il tient au niveau
+    // de l'interface.
+    //
+    // NB de précision : le nom du dépôt voyage dans le CHEMIN de l'URL, qui est
+    // chiffré par TLS. Un observateur purement passif ne voit que le SNI
+    // `api.github.com`, partagé par quantité d'applications. Ce n'est donc pas
+    // une divulgation du nom de l'app — c'est l'existence même du trafic qui
+    // contredit le camouflage.
+    try {
+      if (await PanicService.isDisguised()) return;
+    } catch (_) {
+      // Canal indisponible : on s'abstient. Fail-CLOSED — mieux vaut sauter
+      // une vérification de mise à jour que trahir un camouflage actif.
+      return;
+    }
     await appUpdateService.checkForUpdate();
   }
 

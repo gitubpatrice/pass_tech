@@ -119,7 +119,7 @@ class ImportExportService {
                 username: username,
                 password: password,
                 url: url,
-                totpSecret: totp,
+                totpSecret: _boundTotp(totp),
                 notes: notes,
                 isFavorite: favorite,
               ),
@@ -226,7 +226,7 @@ class ImportExportService {
           username: at(iUser),
           password: at(iPass),
           url: url,
-          totpSecret: at(iTotp),
+          totpSecret: _boundTotp(at(iTotp)),
           notes: at(iNote),
         ),
       );
@@ -263,6 +263,33 @@ class ImportExportService {
     if (url.startsWith('http')) return 'Web';
     return 'Autres';
   }
+
+  /// SEC F23 v2.5.4 — borne le secret TOTP repris d'un fichier importé.
+  ///
+  /// Un secret TOTP réel fait quelques dizaines de caractères (RFC 6238 :
+  /// 160 bits en base32 = 32 caractères ; les plus longs rencontrés en
+  /// pratique restent sous 128). Rien ne bornait ce champ côté JSON : seul le
+  /// cap global de 50 Mo s'appliquait, alors que le cap par cellule de 64 Ko
+  /// ne couvre que le CSV. Un fichier hostile pouvait donc faire décoder en
+  /// base32 une chaîne de plusieurs mégaoctets SUR L'ISOLAT D'INTERFACE, et
+  /// figer l'application.
+  ///
+  /// On tronque plutôt que de rejeter : un import ne doit pas échouer en bloc
+  /// à cause d'un seul champ aberrant, et un secret tronqué se voit
+  /// immédiatement (le code TOTP ne correspondra pas).
+  static const _maxTotpSecretChars = 512;
+
+  static String _boundTotp(String raw) => raw.length <= _maxTotpSecretChars
+      ? raw
+      : raw.substring(0, _maxTotpSecretChars);
+
+  /// Entrées de test : la borne conditionne la réactivité de l'interface à
+  /// l'import, elle doit être couverte par des tests et pas seulement relue.
+  @visibleForTesting
+  static int get maxTotpSecretCharsForTest => _maxTotpSecretChars;
+
+  @visibleForTesting
+  static String boundTotpForTest(String raw) => _boundTotp(raw);
 
   /// Cap par cellule CSV (M-8). Un CSV malicieux avec une cellule de 50 Mo
   /// en quotes ouvertes aurait fait croître le StringBuffer sans borne. La

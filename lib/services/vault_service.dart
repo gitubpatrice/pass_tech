@@ -481,6 +481,23 @@ class VaultService {
         // héritée. Pour le leurre, c'est ce qui retire du disque le mot
         // « decoy » écrit en clair.
         await _migrateFileLabelIfLegacy(matchedSlot);
+      } else {
+        // SEC F21 v2.5.4 — le chemin v3 a DÉJÀ posé `_key` / `_entries`
+        // lui-même ; `winnerKey` n'est qu'une copie de contrôle, créée par
+        // `Uint8List.fromList` donc sur un buffer DISTINCT de `_key`.
+        //
+        // Avant : la branche `if (!winnerIsV3)` était sautée et la fonction
+        // retournait directement, si bien qu'une copie COMPLÈTE de la clé du
+        // coffre restait en RAM jusqu'au passage du GC — à une date non
+        // déterministe, hors de portée de `_wipeKey()` qui n'agit que sur
+        // `_key`. Portée étroite (coffres v3 hérités, migrés vers v4 dans la
+        // foulée) mais c'est du matériel de clé, donc on l'efface.
+        //
+        // `winnerEntries` n'est pas effaçable de la même façon : c'est une
+        // `List<Entry>` d'objets immuables que seul le GC peut reprendre. On
+        // la déréférence au moins explicitement.
+        SecretBytes.wipe(winnerKey);
+        winnerEntries = null;
       }
       return UnlockResult.success;
     }

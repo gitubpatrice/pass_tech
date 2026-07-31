@@ -16,12 +16,31 @@ on:
 
 jobs:
   claude:
-    # Skip si commentaire sans mention @claude (économie de tokens).
+    # SEC F24 2026-07-31 — le dépôt est PUBLIC, et un déclencheur
+    # `issue_comment` s'exécute dans le contexte du dépôt de BASE, sur la
+    # branche par défaut, AVEC les secrets et les permissions déclarées
+    # ci-dessous. C'est la différence majeure avec `pull_request` depuis un
+    # fork, qui lui reçoit un jeton en lecture seule et aucun secret.
+    #
+    # Avant, la condition ne filtrait que sur la présence de « @claude » dans
+    # le corps du commentaire, SANS aucun contrôle de l'auteur. N'importe quel
+    # utilisateur GitHub pouvait donc, en commentant une issue, déclencher ce
+    # job avec `contents: write` et la clé `ANTHROPIC_API_KEY`. Deux
+    # conséquences concrètes :
+    #   - facturation : invocation illimitée d'une API payante (le coût est
+    #     estimé plus haut dans ce fichier à 0,10-0,50 € par exécution) ;
+    #   - intégrité : sur une mention, l'action suit l'instruction contenue
+    #     dans le commentaire — c'est un vecteur d'injection de consigne, avec
+    #     un droit d'écriture sur le dépôt.
+    #
+    # On exige désormais que l'auteur du commentaire soit rattaché au dépôt.
+    # `author_association` est calculé par GitHub, pas fourni par l'auteur.
     if: |
       github.event_name == 'pull_request' ||
-      (github.event.issue.pull_request != null &&
-       contains(github.event.comment.body, '@claude')) ||
-      contains(github.event.comment.body, '@claude')
+      (contains(github.event.comment.body, '@claude') &&
+       (github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
