@@ -1051,7 +1051,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _deleteAll() async {
     final nav = Navigator.of(context);
     final t = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -1077,28 +1076,21 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (ok != true) return;
     // U9 v2.4.4 — feedback haptique sur action destructive ultime.
     await HapticFeedback.heavyImpact();
-    // SEC F12 v2.5.2 — depuis une session leurre, `deleteVault()` refuse et
-    // lève. On affiche un refus NEUTRE : révéler « vous n'êtes pas sur le
-    // coffre principal » prouverait à l'adversaire qu'un coffre principal
-    // existe, ce qui annulerait le déni plausible.
-    try {
-      await VaultService().deleteVault();
-    } on StateError {
-      if (mounted) {
-        SnackUtils.showError(
-          context,
-          messenger,
-          t.settingsDeleteAllUnavailable,
-        );
-      }
-      return;
-    }
-    if (mounted) {
-      nav.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const SetupScreen()),
-        (_) => false,
-      );
-    }
+    // v2.5.4 — plus de refus opaque depuis une session leurre. `deleteVault()`
+    // supprime alors le SEUL emplacement leurre et le signale par son retour.
+    // L'écran suivant en dépend, et ce n'est pas cosmétique : pousser l'écran
+    // de création après un `decoyOnly` laisserait créer un coffre par-dessus
+    // le principal, qui existe toujours. On revient donc au déverrouillage.
+    final outcome = await VaultService().deleteVault();
+    if (!mounted) return;
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => outcome == VaultDeleteOutcome.fullWipe
+            ? const SetupScreen()
+            : const UnlockScreen(),
+      ),
+      (_) => false,
+    );
   }
 
   String _clipLabelOf(AppLocalizations t) {

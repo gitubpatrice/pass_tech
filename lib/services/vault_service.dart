@@ -132,6 +132,23 @@ enum UnlockResult {
 /// L'attaquant qui voit le device ne peut pas savoir lequel est "réel".
 enum _Slot { primary, decoy }
 
+/// Ce que [VaultService.deleteVault] a réellement supprimé.
+///
+/// L'appelant DOIT s'en servir pour choisir l'écran suivant : après un
+/// [fullWipe] plus aucun coffre n'existe (écran de création), tandis qu'après
+/// un [decoyOnly] le coffre principal est toujours là (écran de
+/// déverrouillage). Pousser l'écran de création après un [decoyOnly] serait
+/// dangereux : y créer un coffre écraserait le principal.
+enum VaultDeleteOutcome {
+  /// Session principale : tout est détruit, coffres et KEK Keystore compris.
+  fullWipe,
+
+  /// Session leurre : seul l'emplacement leurre est écrasé par un leurre
+  /// factice non déverrouillable. Le principal n'est PAS touché, et le profil
+  /// de fichiers reste constant (deux fichiers, tailles identiques).
+  decoyOnly,
+}
+
 class VaultService {
   static final VaultService _instance = VaultService._();
   factory VaultService() => _instance;
@@ -780,10 +797,9 @@ class VaultService {
     }
   }
 
-  /// Levée par [deleteVault] quand l'appel vient d'une session leurre.
-  /// L'appelant doit présenter ce refus à l'utilisateur sans révéler qu'un
-  /// coffre principal existe — le message d'erreur ne doit RIEN dire de plus
-  /// que « opération indisponible ».
+  /// Levée par [deleteDecoyVault] quand l'appel vient d'une session leurre.
+  /// L'appelant doit présenter ce refus sans révéler qu'un coffre principal
+  /// existe — le message ne doit RIEN dire de plus que « indisponible ».
   static const decoySessionDeleteRefused = 'pt_delete_refused_decoy_session';
 
   /// SEC F10 v2.5.2 — sentinelle levée par `changeMasterPassword` quand le mot
@@ -795,7 +811,7 @@ class VaultService {
   /// L'appelant doit inviter l'utilisateur à réessayer, sans rien muter.
   static const vaultBusy = 'pt_vault_busy';
 
-  Future<void> deleteVault() async {
+  Future<VaultDeleteOutcome> deleteVault() async {
     // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI
     // aucune réauthentification, et son unique appelant l'exposait derrière un
     // simple dialogue de confirmation, sans garde `isDecoyActive`. Une session
@@ -805,8 +821,24 @@ class VaultService {
     // indéchiffrable. C'est l'inverse exact de l'objet du leurre — la victime
     // livre le mot de passe leurre en comptant sur le fait que le vrai coffre
     // reste sûr ET caché.
+    //
+    // v2.5.4 — le refus opaque introduit alors est REMPLACÉ. Un message
+    // « opération indisponible » est en soi une anomalie : sous contrainte, il
+    // signale à l'adversaire que quelque chose est protégé, et le propriétaire
+    // légitime le lit comme une panne (constaté par Patrice le 2026-07-31).
+    // Désormais, depuis une session leurre, la suppression PORTE sur le seul
+    // emplacement leurre. La personne qui manipule l'app obtient ce qu'elle
+    // demande, et le coffre principal reste intact et invisible.
     if (_activeSlot != _Slot.primary) {
-      throw StateError(decoySessionDeleteRefused);
+      // Ordre IMPÉRATIF : verrouiller AVANT d'écraser. `_entries` et `_key`
+      // tiennent encore le contenu du leurre ; tout CRUD survenant entre
+      // l'écrasement et le verrouillage le réécrirait par-dessus le leurre
+      // factice. C'est exactement le risque que documente la garde SEC-R3 de
+      // `deleteDecoyVault`.
+      lock();
+      await _createDummyDecoy();
+      await _storage.write(key: _decoyConfiguredKey, value: 'false');
+      return VaultDeleteOutcome.decoyOnly;
     }
     lock();
     final dir = await getApplicationDocumentsDirectory();
@@ -876,6 +908,7 @@ class VaultService {
     // Ne pas l'effacer ici laissait un coffre fraîchement recréé hériter de ce
     // plancher empoisonné.
     await _storage.delete(key: 'pt_max_seen_ms');
+    return VaultDeleteOutcome.fullWipe;
   }
 
   /// Désactive le VRAI coffre leurre sans toucher au primary. Utilisé depuis
