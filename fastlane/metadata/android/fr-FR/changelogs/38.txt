@@ -1,0 +1,7 @@
+Version de sécurité. Failles trouvées en testant sur appareil.
+
+• Déni plausible : le fichier du leurre contenait « decoy » en clair et différait en taille. Les deux fichiers sont désormais identiques.
+• Panique : l'app devient une VRAIE calculatrice (nom, icône, écran). Retour : appui long 2 s sur l'affichage.
+• Empreinte : message clair et clé morte supprimée.
+• Suppression depuis le leurre : supprime le leurre, sans erreur.
+• Actions de suppression en rouge.

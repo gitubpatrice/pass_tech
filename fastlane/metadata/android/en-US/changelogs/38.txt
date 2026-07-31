@@ -1,0 +1,7 @@
+Security release. Flaws found by testing on device.
+
+• Plausible deniability: the decoy vault file contained "decoy" in clear text and differed in size. Both files are now identical.
+• Panic mode: the app becomes a REAL calculator (name, icon, screen). To return: long-press the display for 2 s.
+• Fingerprint: clear message and dead key removed after adding a fingerprint.
+• Delete from the decoy: deletes the decoy, no error.
+• Delete actions in red.
