@@ -158,15 +158,19 @@ extension VaultCrypto on VaultService {
       final kek = raw['kek'];
       final cipher = raw['cipher'];
       if (kek is! Map || cipher is! Map) return null;
+      // SEC F18 v2.5.4 — contrôle de forme sur l'étiquette de fichier. Elle
+      // sert d'AAD : elle doit donc être reprise TELLE QUELLE du fichier, y
+      // compris pour les coffres antérieurs qui portent encore l'ancien alias
+      // d'adressage — sinon leur tag AES-GCM ne vérifierait plus.
       final alias = kek['alias'] as String?;
-      if (alias != KeystoreAliases.primary && alias != KeystoreAliases.decoy) {
+      if (alias == null || !KeystoreAliases.isKnownFileLabel(alias)) {
         return null;
       }
       final nonce = base64Decode(cipher['nonce'] as String);
       final dataBlob = base64Decode(cipher['data'] as String);
       final split = AeadService.splitCipherAndTag(dataBlob);
 
-      final aad = _aadV4(alias!);
+      final aad = _aadV4(alias);
       final pt = await AeadService.decryptGcm(
         key: finalKey,
         nonce: nonce,

@@ -79,8 +79,12 @@ extension VaultStorage on VaultService {
     if (_key == null || _key!.length != 32) {
       throw StateError('v4 save requires a 32-byte finalKey');
     }
-    final alias = _aliasFor(slot);
-    final aad = _aadV4(alias);
+    // SEC F18 v2.5.4 — ce qui part dans le FICHIER est l'étiquette neutre, pas
+    // l'alias d'adressage du Keystore. `_saveVaultV4` ne touche pas au
+    // Keystore (elle reçoit `wrappedDek` / `wrapNonce` déjà calculés), donc
+    // l'étiquette suffit ici pour l'AAD comme pour le champ écrit.
+    final label = _fileLabelFor(slot);
+    final aad = _aadV4(label);
 
     final plainText = utf8.encode(
       jsonEncode(_entries.map((e) => e.toJson()).toList()),
@@ -141,7 +145,7 @@ extension VaultStorage on VaultService {
       },
       'kek': <String, dynamic>{
         'algo': 'AES-GCM-256',
-        'alias': alias,
+        'alias': label,
         'wrappedDek': base64Encode(wrappedDek),
         'wrapNonce': base64Encode(wrapNonce),
       },

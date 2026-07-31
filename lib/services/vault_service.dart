@@ -316,6 +316,13 @@ class VaultService {
     await _storage.write(key: _decoyConfiguredKey, value: 'true');
   }
 
+  /// SEC F18 v2.5.4 — étiquette NEUTRE écrite dans le fichier et utilisée comme
+  /// AAD, à ne pas confondre avec [_aliasFor] qui adresse la clé matérielle.
+  /// Voir [KeystoreAliases.fileLabelPrimary] pour le raisonnement complet.
+  String _fileLabelFor(_Slot slot) => slot == _Slot.primary
+      ? KeystoreAliases.fileLabelPrimary
+      : KeystoreAliases.fileLabelDecoy;
+
   String _aliasFor(_Slot slot) =>
       slot == _Slot.primary ? KeystoreAliases.primary : KeystoreAliases.decoy;
 
@@ -453,6 +460,10 @@ class VaultService {
         _cachedWrappedDek = winnerWrappedDek;
         _cachedWrapNonce = winnerWrapNonce;
         await _onUnlockSuccess();
+        // SEC F18 v2.5.4 — réécrit ce coffre s'il porte encore l'étiquette
+        // héritée. Pour le leurre, c'est ce qui retire du disque le mot
+        // « decoy » écrit en clair.
+        await _migrateFileLabelIfLegacy(matchedSlot);
       }
       return UnlockResult.success;
     }
@@ -637,6 +648,57 @@ class VaultService {
       return len > 0 ? len : 0;
     } catch (_) {
       return 0;
+    }
+  }
+
+  /// SEC F18 v2.5.4 — étiquette `kek.alias` réellement présente sur disque pour
+  /// [slot], sans déchiffrer quoi que ce soit. Sert à détecter les coffres
+  /// écrits avant ce correctif, qui portent encore l'alias d'adressage —
+  /// c'est-à-dire, pour le leurre, le mot « decoy » en clair.
+  ///
+  /// Retourne `null` si le fichier est absent, illisible, ou au format v3.
+  Future<String?> _fileLabelOnDisk(_Slot slot) async {
+    try {
+      final f = await _vaultFileFor(slot);
+      if (!f.existsSync()) return null;
+      final raw = jsonDecode(await f.readAsString());
+      if (raw is! Map<String, dynamic>) return null;
+      final kek = raw['kek'];
+      if (kek is! Map) return null;
+      final a = kek['alias'];
+      return a is String ? a : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Réécrit le coffre de [slot] si son étiquette de fichier est héritée.
+  ///
+  /// À appeler juste après un déverrouillage v4 réussi, quand `_key`, `_entries`
+  /// et le cache méta sont peuplés. La réécriture change l'étiquette ET l'AAD,
+  /// donc re-chiffre — mais le `wrappedDek` reste valide : l'alias
+  /// d'ADRESSAGE du Keystore, lui, n'a pas bougé. C'est tout l'intérêt du
+  /// découplage.
+  ///
+  /// Best-effort et silencieux : un échec de réécriture ne doit JAMAIS
+  /// empêcher l'ouverture du coffre. La prochaine tentative aura lieu au
+  /// déverrouillage suivant.
+  Future<void> _migrateFileLabelIfLegacy(_Slot slot) async {
+    try {
+      final onDisk = await _fileLabelOnDisk(slot);
+      if (onDisk == null || onDisk == _fileLabelFor(slot)) return;
+      final salt = _cachedSalt;
+      final wrappedDek = _cachedWrappedDek;
+      final wrapNonce = _cachedWrapNonce;
+      if (salt == null || wrappedDek == null || wrapNonce == null) return;
+      await _saveVaultV4(
+        slot: slot,
+        salt: salt,
+        wrappedDek: wrappedDek,
+        wrapNonce: wrapNonce,
+      );
+    } catch (_) {
+      /* réessai au prochain déverrouillage */
     }
   }
 

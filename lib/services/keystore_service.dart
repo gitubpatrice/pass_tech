@@ -29,8 +29,40 @@ import 'package:flutter/services.dart';
 /// the vault file portable across reinstalls on the same device.
 class KeystoreAliases {
   KeystoreAliases._();
+
+  /// Alias d'ADRESSAGE de la clé dans l'AndroidKeyStore. **Jamais écrits dans
+  /// le fichier de coffre** depuis SEC F18 : `decoy` contient le mot « decoy »
+  /// et fait 6 caractères de plus que `primary`, ce qui suffisait à identifier
+  /// le leurre. Ils restent inchangés pour ne PAS imposer de migration du
+  /// Keystore (la clé matérielle ne se renomme pas).
   static const primary = 'pt_vault_kek_v1';
   static const decoy = 'pt_vault_kek_decoy_v1';
+
+  /// SEC F18 v2.5.4 — étiquette écrite dans le fichier de coffre et utilisée
+  /// comme AAD. Neutre et de LONGUEUR ÉGALE d'un emplacement à l'autre.
+  ///
+  /// Avant, le fichier portait l'alias d'adressage : `pt_vault_b.enc`
+  /// contenait littéralement `pt_vault_kek_decoy_v1`. Un examinateur n'avait
+  /// même pas besoin de comparer des tailles — `grep decoy` suffisait. Et les
+  /// 6 caractères d'écart rendaient les deux fichiers distinguables par un
+  /// simple `ls -l`, ce que le rembourrage SEC F6 était pourtant censé
+  /// supprimer.
+  ///
+  /// L'étiquette reste DISTINCTE par emplacement, et c'est délibéré : le nom
+  /// de fichier (`_a` / `_b`) révèle déjà l'emplacement, donc l'étiquette
+  /// n'apprend rien de plus à un examinateur — tandis qu'une étiquette
+  /// commune aux deux détruirait la défense anti-copie inter-emplacements de
+  /// `_v4Unlock` (A3 v2.3.8).
+  static const fileLabelPrimary = 'pt_vault_kek_a_v2';
+  static const fileLabelDecoy = 'pt_vault_kek_b_v2';
+
+  /// Vrai si [label] est une étiquette de fichier légitime, ancienne ou
+  /// nouvelle. Sert aux contrôles de forme à la lecture.
+  static bool isKnownFileLabel(String label) =>
+      label == fileLabelPrimary ||
+      label == fileLabelDecoy ||
+      label == primary ||
+      label == decoy;
 }
 
 class WrapResult {

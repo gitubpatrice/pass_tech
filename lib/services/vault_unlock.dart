@@ -224,6 +224,10 @@ extension VaultUnlock on VaultService {
         _cachedWrappedDek = r.wrappedDek;
         _cachedWrapNonce = r.wrapNonce;
         await _onUnlockSuccess();
+        // SEC F18 v2.5.4 — voir `_migrateFileLabelIfLegacy`. Ce chemin est
+        // secondaire (`_unlockInternal` est le principal) mais doit migrer
+        // aussi, sinon un coffre ouvert par ici garderait son étiquette héritée.
+        await _migrateFileLabelIfLegacy(slot);
         return UnlockResult.success;
       }
 
@@ -327,15 +331,27 @@ extension VaultUnlock on VaultService {
     final salt = base64Decode(kdf['salt'] as String);
     final wrappedDek = base64Decode(kek['wrappedDek'] as String);
     final wrapNonce = base64Decode(kek['wrapNonce'] as String);
-    final alias = kek['alias'] as String;
+    // SEC F18 v2.5.4 — `fileLabel` est l'étiquette NEUTRE lue dans le fichier.
+    // Elle sert à l'AAD et au contrôle anti-copie, JAMAIS à adresser le
+    // Keystore : cet adressage passe par `_aliasFor(slot)`, qui ne quitte
+    // jamais la RAM. Confondre les deux réintroduirait le mot « decoy » dans
+    // le fichier.
+    final fileLabel = kek['alias'] as String;
 
     // A3 v2.3.8 — défense en profondeur : refuse les blobs cross-slot.
     // Avant : un attaquant root copiant pt_vault_decoy.enc sur le chemin
     // pt_vault.enc faisait quand même tourner un unwrap KEK decoy (la
     // protection AEAD finale neutralisait l'attaque mais on consommait
     // un appel TEE → side channel mineur). Maintenant : refuse immédiat
-    // si alias ne match pas le slot tenté.
-    if (alias != _aliasFor(slot)) return null;
+    // si l'étiquette ne correspond pas au slot tenté.
+    //
+    // L'étiquette de fichier reste DISTINCTE par emplacement précisément pour
+    // conserver ce contrôle. On accepte aussi l'ancien alias d'adressage, le
+    // temps que les coffres antérieurs à SEC F18 soient réécrits au premier
+    // déverrouillage réussi (voir `_needsFileLabelMigration`).
+    if (fileLabel != _fileLabelFor(slot) && fileLabel != _aliasFor(slot)) {
+      return null;
+    }
 
     Uint8List? pwHash;
     Uint8List? hwSecret;
@@ -343,7 +359,15 @@ extension VaultUnlock on VaultService {
     try {
       pwHash = await KdfService.argon2id(password: password, salt: salt);
       try {
-        hwSecret = await _keystore.unwrap(alias, wrappedDek, wrapNonce);
+        // SEC F18 v2.5.4 — adressage du Keystore par `_aliasFor(slot)` et NON
+        // par l'étiquette lue dans le fichier. C'est ce découplage qui permet
+        // de neutraliser l'étiquette écrite sur disque sans renommer la clé
+        // matérielle (une clé AndroidKeyStore ne se renomme pas).
+        hwSecret = await _keystore.unwrap(
+          _aliasFor(slot),
+          wrappedDek,
+          wrapNonce,
+        );
       } catch (_) {
         return null;
       }

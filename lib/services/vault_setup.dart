@@ -222,6 +222,35 @@ extension VaultSetup on VaultService {
       } catch (_) {
         return;
       }
+    } else {
+      // SEC F18 v2.5.4 — un leurre FACTICE écrit avant ce correctif porte
+      // encore `pt_vault_kek_decoy_v1` dans son enveloppe : le mot « decoy »
+      // en clair sur disque, plus 6 octets d'écart de taille avec le coffre
+      // principal. C'est précisément le fichier que l'utilisateur n'ouvre
+      // JAMAIS, donc aucun déverrouillage ne viendra le réécrire.
+      //
+      // Le leurre factice est chiffré sous un mot de passe aléatoire de 32
+      // octets qui n'est écrit nulle part : il est irrécupérable par
+      // conception, donc le régénérer ne perd RIEN.
+      //
+      // ⚠️ Ne JAMAIS régénérer quand un VRAI leurre est configuré : on
+      // détruirait le second coffre de l'utilisateur. Ce cas-là migre au
+      // premier déverrouillage du leurre, via `_migrateFileLabelIfLegacy`.
+      try {
+        final decoyConfigured =
+            await VaultService._storage.read(
+              key: VaultService._decoyConfiguredKey,
+            ) ==
+            'true';
+        if (!decoyConfigured) {
+          final onDisk = await _fileLabelOnDisk(_Slot.decoy);
+          if (onDisk != null && onDisk != _fileLabelFor(_Slot.decoy)) {
+            await _createDummyDecoy();
+          }
+        }
+      } catch (_) {
+        /* best-effort : re-tenté au prochain boot */
+      }
     }
 
     // 4. Le flag a toujours une valeur explicite (profil de storage constant).
@@ -272,8 +301,13 @@ extension VaultSetup on VaultService {
     Uint8List? finalKey;
     Uint8List? ptBytes;
     try {
-      final alias = _aliasFor(_Slot.decoy);
-      final wrap = await _keystore.wrap(alias, hwSecret);
+      // SEC F18 v2.5.4 — DEUX identifiants distincts, à ne jamais confondre :
+      //   `keystoreAlias` adresse la clé matérielle et ne quitte JAMAIS la RAM ;
+      //   `fileLabel`     part dans le fichier et sert d'AAD, neutre et de
+      //                   longueur égale à celle de l'autre emplacement.
+      final keystoreAlias = _aliasFor(_Slot.decoy);
+      final fileLabel = _fileLabelFor(_Slot.decoy);
+      final wrap = await _keystore.wrap(keystoreAlias, hwSecret);
       finalKey = await _hkdfFinalKey(
         salt: salt,
         pwHash: pwHash,
@@ -301,7 +335,7 @@ extension VaultSetup on VaultService {
       final aead = await AeadService.encryptGcm(
         key: finalKey,
         plaintext: ptBytes,
-        aad: _aadV4(alias),
+        aad: _aadV4(fileLabel),
       );
 
       final out = <String, dynamic>{
@@ -316,7 +350,7 @@ extension VaultSetup on VaultService {
         },
         'kek': <String, dynamic>{
           'algo': 'AES-GCM-256',
-          'alias': alias,
+          'alias': fileLabel,
           'wrappedDek': base64Encode(wrap.ciphertext),
           'wrapNonce': base64Encode(wrap.nonce),
         },
