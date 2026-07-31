@@ -361,11 +361,18 @@ class _HomeScreenState extends State<HomeScreen> {
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset(
-                    'assets/logo_damier.png',
-                    width: 28,
-                    height: 28,
-                    filterQuality: FilterQuality.high,
+                  // Coins arrondis sur le damier : 6 px pour 28 px de côté.
+                  // `ClipRRect` plutôt qu'une décoration de conteneur :
+                  // l'image est opaque et remplit tout le carré, donc c'est
+                  // bien elle qu'il faut rogner.
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.asset(
+                      'assets/logo_damier.png',
+                      width: 28,
+                      height: 28,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Text(t.homeTitle),
