@@ -18,10 +18,42 @@ class UnlockScreen extends StatefulWidget {
   const UnlockScreen({super.key});
 
   @override
-  State<UnlockScreen> createState() => _UnlockScreenState();
+  State<UnlockScreen> createState() => UnlockScreenState();
 }
 
-class _UnlockScreenState extends State<UnlockScreen> {
+/// Rendu public (et non `_UnlockScreenState`) pour que `main.dart` puisse
+/// interroger [estAffiche] avant de pousser un nouvel écran de déverrouillage.
+class UnlockScreenState extends State<UnlockScreen> {
+  /// UX 2026-08-03 — nombre d'écrans de déverrouillage vivants.
+  ///
+  /// Lu par `main.dart` avant de pousser un écran de déverrouillage au retour
+  /// au premier plan : sans ce compteur, il en empilait un NOUVEAU alors qu'un
+  /// autre était déjà affiché, en écrasant la pile au passage.
+  static int _instancesVivantes = 0;
+
+  /// Vrai si un écran de déverrouillage est déjà à l'écran.
+  static bool get estAffiche => _instancesVivantes > 0;
+
+  /// UX 2026-08-03 — l'invite biométrique automatique n'est tentée qu'UNE fois
+  /// par cycle de verrouillage.
+  ///
+  /// Défaut signalé en usage réel : au lancement, annuler l'invite biométrique
+  /// la faisait revenir aussitôt, en boucle, sans jamais laisser saisir le mot
+  /// de passe maître — et le bouton Retour n'y changeait rien.
+  ///
+  /// Enchaînement : l'invite est un dialogue système, elle met l'application en
+  /// arrière-plan. À l'annulation, l'application revient au premier plan, le
+  /// cycle de vie constate que le coffre est fermé et POUSSE un nouvel écran de
+  /// déverrouillage en vidant la pile. Ce nouvel écran relance l'invite dans
+  /// son `initState`, et ainsi de suite.
+  ///
+  /// Annuler l'invite est une intention claire : « je veux taper mon mot de
+  /// passe ». On la respecte. Le bouton empreinte reste disponible pour la
+  /// relancer volontairement, et le drapeau est remis à zéro par un
+  /// déverrouillage réussi, pour que le cycle suivant reproposeà nouveau la
+  /// biométrie.
+  static bool _inviteBioDejaTentee = false;
+
   final _passCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
@@ -66,6 +98,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
   @override
   void initState() {
     super.initState();
+    _instancesVivantes++;
     _heirOptionFuture = HeritageService().shouldShowHeirOption();
     _disguisedFuture = PanicService.isDisguised();
     _checkLockout();
@@ -216,6 +249,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     _passCtrl.clear();
     _passCtrl.dispose();
     _lockoutTimer?.cancel();
+    _instancesVivantes--;
     super.dispose();
   }
 
@@ -245,7 +279,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
     // `mounted` requis : `_tryBiometric` démarre par un setState inconditionnel.
     // Si l'écran est disposé pendant les await de _checkBiometric, l'appel
     // provoquerait « setState after dispose ».
-    if (enabled && _lockoutRemaining == null && mounted) _tryBiometric();
+    //
+    // UX 2026-08-03 — `_inviteBioDejaTentee` casse la boucle d'invite décrite
+    // sur ce drapeau. Une annulation ne doit plus jamais relancer l'invite
+    // toute seule ; c'est au bouton empreinte de le faire, sur geste explicite.
+    if (enabled &&
+        _lockoutRemaining == null &&
+        mounted &&
+        !_inviteBioDejaTentee) {
+      _inviteBioDejaTentee = true;
+      _tryBiometric();
+    }
   }
 
   Future<void> _tryBiometric() async {
@@ -274,6 +318,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
+        // UX 2026-08-03 — le coffre s'ouvre : le prochain cycle de
+        // verrouillage aura de nouveau droit à l'invite automatique.
+        _inviteBioDejaTentee = false;
         // Bio = forcément primary (cf. saveBiometricKey), markActive OK
         await HeritageService().markActive();
         if (!mounted) return;
@@ -358,6 +405,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
+        // UX 2026-08-03 — idem : ouverture réussie par mot de passe, on
+        // réarme l'invite biométrique pour le cycle suivant.
+        _inviteBioDejaTentee = false;
         // Marque l'utilisateur comme actif uniquement si on est sur PRIMARY.
         // Le decoy ne reset pas le timer héritage (sinon un attaquant qui
         // force l'ouverture du leurre prolongerait la vie du dead-man).

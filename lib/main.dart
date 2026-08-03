@@ -288,6 +288,24 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
         // affiché est le bon, et le pousser de nouveau effacerait une saisie
         // en cours.
         if (!await VaultService().vaultExists) return;
+        // UX 2026-08-03 — ne pas empiler un écran de déverrouillage sur un
+        // écran de déverrouillage.
+        //
+        // Défaut signalé en usage réel : au lancement, annuler l'invite
+        // biométrique la faisait revenir en boucle, sans jamais laisser saisir
+        // le mot de passe maître, et le bouton Retour n'y changeait rien.
+        //
+        // L'invite est un dialogue système : elle met l'application en
+        // arrière-plan. À l'annulation, on repasse ici, le coffre est fermé, et
+        // ce bloc poussait un NOUVEL écran en VIDANT la pile — d'où le Retour
+        // sans effet. Le nouvel écran relançait l'invite depuis son `initState`,
+        // et la boucle se refermait.
+        //
+        // Ce bloc n'a de sens que pour RAMENER vers le déverrouillage depuis un
+        // autre écran (accueil, réglages) après un verrouillage automatique. Si
+        // l'écran est déjà là, il n'y a rien à faire — et surtout pas le
+        // reconstruire, ce qui effacerait une saisie en cours.
+        if (UnlockScreenState.estAffiche) return;
         _navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const UnlockScreen()),
           (_) => false,
