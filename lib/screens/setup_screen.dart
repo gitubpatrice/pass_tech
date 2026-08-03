@@ -63,6 +63,39 @@ class _SetupScreenState extends State<SetupScreen> {
     _pass1.clear();
     _pass2.clear();
     if (!mounted) return;
+
+    // 2026-08-03 — l'utilisateur est prévenu, dès la création, qu'aucune
+    // récupération n'existe et que la sauvegarde chiffrée est le seul filet.
+    //
+    // Ajouté après la perte définitive d'un coffre : mot de passe maître
+    // oublié, biométrie supprimée par le mode panique, aucune sauvegarde. Rien
+    // dans l'application ne l'avait jamais suggéré.
+    //
+    // On ne PROPOSE pas d'exporter ici : le coffre vient d'être créé, il est
+    // vide, une sauvegarde n'aurait aucun contenu. Cet écran pose l'enjeu ; le
+    // rappel qui incite réellement à agir vit sur l'accueil et n'apparaît
+    // qu'une fois qu'il y a quelque chose à perdre.
+    final t2 = AppLocalizations.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.backup_outlined, size: 36),
+        title: Text(t2.backupReminderTitle),
+        content: SingleChildScrollView(
+          child: Text(
+            t2.backupReminderBody,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(t2.actionOk),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));

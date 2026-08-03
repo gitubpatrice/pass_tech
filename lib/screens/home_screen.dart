@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
+import '../services/backup_reminder.dart';
 import '../services/vault_service.dart';
 import '../utils/snack_utils.dart';
 import 'entry_detail_screen.dart';
@@ -467,6 +468,26 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          // 2026-08-03 — rappel de sauvegarde. N'apparaît que si le coffre
+          // contient au moins une entrée ET qu'aucune sauvegarde chiffrée n'a
+          // JAMAIS été faite. Disparaît définitivement à la première.
+          //
+          // Placé ici plutôt qu'à la création du coffre : à la création il n'y
+          // a rien à sauvegarder, donc l'invitation serait creuse. Elle n'a de
+          // sens qu'à partir du moment où il y a quelque chose à perdre.
+          //
+          // Non masquable volontairement : il n'y a ni cloud, ni compte, ni
+          // récupération. Un bandeau qu'on écarte d'un geste serait écarté le
+          // premier jour et jamais revu — c'est exactement ce qui a coûté un
+          // coffre le 2026-08-03.
+          if (VaultService().entries.isNotEmpty)
+            FutureBuilder<bool>(
+              future: BackupReminder.neverBackedUp,
+              builder: (context, snap) {
+                if (snap.data != true) return const SizedBox.shrink();
+                return _BackupBanner(onDone: () => setState(() {}));
+              },
+            ),
           SizedBox(
             height: 46,
             child: ListView.separated(
@@ -809,6 +830,61 @@ class _EntryCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Rappel de sauvegarde affiché sur l'accueil tant qu'aucune sauvegarde
+/// chiffrée n'a jamais été créée et que le coffre contient des entrées.
+///
+/// Ajouté le 2026-08-03, après la perte définitive d'un coffre faute de
+/// sauvegarde. Le texte dit ce qui est vrai, sans dramatiser : il n'existe
+/// aucun autre moyen de récupération.
+///
+/// Le bouton mène aux Réglages, où vit l'export — plutôt que de dupliquer le
+/// flux d'export ici. Au retour, l'accueil se reconstruit et le bandeau
+/// disparaît si la sauvegarde a été faite.
+class _BackupBanner extends StatelessWidget {
+  final VoidCallback onDone;
+  const _BackupBanner({required this.onDone});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: cs.errorContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.error.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.backup_outlined, size: 20, color: cs.error),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              t.backupBannerText,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 4),
+          TextButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(onChanged: onDone),
+                ),
+              );
+              onDone();
+            },
+            child: Text(t.backupBannerCta),
+          ),
+        ],
       ),
     );
   }

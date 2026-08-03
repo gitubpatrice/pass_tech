@@ -496,6 +496,12 @@
   "settingsDeleteAllDialogBody": "Toutes vos entrées et le coffre-fort seront supprimés définitivement.",
   "reauthTitle": "Confirmez votre identité",
   "reauthBody": "Saisissez votre mot de passe maître pour continuer.",
+  "panicWarnBiometricTitle": "La biométrie sera désactivée",
+  "panicWarnBiometricBody": "Le mode panique supprime l'enrôlement biométrique — sinon quelqu'un pourrait ouvrir votre coffre en vous faisant poser le doigt.\n\nAprès activation, SEUL votre mot de passe maître ouvrira le coffre. Il n'est récupérable par aucun moyen.\n\nAssurez-vous de le connaître avant de continuer.",
+  "backupReminderTitle": "Pensez à votre sauvegarde",
+  "backupReminderBody": "Votre coffre n'existe que sur ce téléphone. Ni cloud, ni compte, ni récupération : perdre le téléphone ou oublier le mot de passe maître, c'est perdre les données.\n\nDès vos premières entrées saisies, exportez une sauvegarde chiffrée (.ptbak) depuis Réglages → Données. C'est le seul filet qui existe.",
+  "backupBannerText": "Aucune sauvegarde chiffrée n'a encore été créée — c'est le seul moyen de récupérer vos données.",
+  "backupBannerCta": "Sauvegarder",
   "settingsDeleteAllConfirm": "Tout supprimer",
 
   "exportPlainDialogTitle": "Export NON CHIFFRÉ",

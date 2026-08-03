@@ -512,6 +512,12 @@
   "settingsDeleteAllDialogBody": "All your entries and the vault will be permanently deleted.",
   "reauthTitle": "Confirm your identity",
   "reauthBody": "Enter your master password to continue.",
+  "panicWarnBiometricTitle": "Biometric unlock will be disabled",
+  "panicWarnBiometricBody": "Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.",
+  "backupReminderTitle": "Remember your backup",
+  "backupReminderBody": "Your vault exists only on this phone. No cloud, no account, no recovery: losing the phone or forgetting the master password means losing the data.\n\nAs soon as you have entered your first items, export an encrypted backup (.ptbak) from Settings → Data. It is the only safety net there is.",
+  "backupBannerText": "No encrypted backup has been created yet — it is the only way to recover your data.",
+  "backupBannerCta": "Back up",
   "settingsDeleteAllConfirm": "Delete everything",
 
   "exportPlainDialogTitle": "UNENCRYPTED export",

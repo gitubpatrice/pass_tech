@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import '../main.dart' show prefKeyScreenshotProtection;
 import '../services/anti_phishing_service.dart';
+import '../services/backup_reminder.dart';
 import '../services/clipboard_service.dart';
 import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
@@ -553,6 +554,52 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _triggerPanic() async {
     final t = AppLocalizations.of(context);
+    // SEC 2026-08-03 — avertissement AVANT la panique, ajouté après un incident
+    // réel : le mode panique a été activé pour un test, il a supprimé
+    // l'enrôlement biométrique (SEC F4, voulu), et le mot de passe maître ne
+    // revenait plus. Coffre définitivement perdu.
+    //
+    // SEC F4 justifiait la suppression par « le coût pour l'utilisateur
+    // légitime est faible, puisque le réenrôlement exige de toute façon le mot
+    // de passe maître ». Ce raisonnement suppose que l'utilisateur CONNAÎT ce
+    // mot de passe. Quelqu'un qui ouvre à l'empreinte tous les jours ne le tape
+    // parfois plus depuis des mois : pour lui, la panique est une porte à sens
+    // unique.
+    //
+    // On n'affiche cet écran que si la biométrie est réellement active — sinon
+    // il n'y a rien à perdre et l'avertissement ne serait que du bruit.
+    if (_biometricEnabled) {
+      final compris = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          final cs = Theme.of(ctx).colorScheme;
+          return AlertDialog(
+            icon: Icon(Icons.fingerprint, size: 36, color: cs.error),
+            title: Text(t.panicWarnBiometricTitle),
+            content: SingleChildScrollView(
+              child: Text(
+                t.panicWarnBiometricBody,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            actions: [
+              TextButton(
+                autofocus: true,
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(t.actionCancel),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: cs.error),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(t.actionContinue),
+              ),
+            ],
+          );
+        },
+      );
+      if (compris != true || !mounted) return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -911,6 +958,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       _shredStaleExports(dir);
       final file = File('${dir.path}/pass_tech_$date.ptbak');
       await file.writeAsString(content);
+      // 2026-08-03 — trace de la sauvegarde. C'est ce qui fait disparaître le
+      // rappel de l'accueil. Enregistré dès que le fichier est écrit, sans
+      // attendre l'issue du partage : le fichier existe, l'utilisateur a fait
+      // sa part. Seule la DATE est conservée, jamais le chemin ni la phrase.
+      await BackupReminder.markBackupDone();
       if (!mounted) return;
       Navigator.of(context).pop(); // close progress
       try {
@@ -1215,6 +1267,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     // de création après un `decoyOnly` laisserait créer un coffre par-dessus
     // le principal, qui existe toujours. On revient donc au déverrouillage.
     final outcome = await VaultService().deleteVault();
+    // Un coffre recréé après une suppression totale doit repartir avec le
+    // rappel actif : ses futures entrées ne seront couvertes par aucune des
+    // sauvegardes précédentes.
+    if (outcome == VaultDeleteOutcome.fullWipe) {
+      await BackupReminder.reset();
+    }
     if (!mounted) return;
     nav.pushAndRemoveUntil(
       MaterialPageRoute(
