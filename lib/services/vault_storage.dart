@@ -28,12 +28,14 @@ extension VaultStorage on VaultService {
     final cSalt = _cachedSalt;
     final cWrap = _cachedWrappedDek;
     final cNonce = _cachedWrapNonce;
-    if (cSalt != null && cWrap != null && cNonce != null) {
+    final cParams = _cachedKdfParams;
+    if (cSalt != null && cWrap != null && cNonce != null && cParams != null) {
       await _saveVaultV4(
         slot: slot,
         salt: cSalt,
         wrappedDek: cWrap,
         wrapNonce: cNonce,
+        params: cParams,
       );
       return;
     }
@@ -56,12 +58,20 @@ extension VaultStorage on VaultService {
     final wrappedB64 = kek['wrappedDek'] as String?;
     final nonceB64 = kek['wrapNonce'] as String?;
     if (saltB64 == null || wrappedB64 == null || nonceB64 == null) return;
+    // AUDIT 2026-08-03 — les paramètres Argon2id sont repris du fichier au même
+    // titre que le sel et l'enveloppe : ce sont les entrées qui ont produit la
+    // clé sous laquelle ce coffre est chiffré. Les remplacer par les constantes
+    // de compilation reviendrait à annoncer une dérivation que la clé en cours
+    // ne respecte pas — le déverrouillage suivant échouerait définitivement.
+    final params = KdfParams.fromFileOrNull(kdf);
+    if (params == null) return;
 
     await _saveVaultV4(
       slot: slot,
       salt: base64Decode(saltB64),
       wrappedDek: base64Decode(wrappedB64),
       wrapNonce: base64Decode(nonceB64),
+      params: params,
     );
   }
 
@@ -70,11 +80,17 @@ extension VaultStorage on VaultService {
   /// Caller must have populated `_key` with the 32-byte finalKey beforehand.
   /// `salt`, `wrappedDek`, `wrapNonce` are stable across CRUD writes —
   /// generated once at vault creation / migration and reused.
+  /// [params] : les paramètres Argon2id sous lesquels `_key` a été dérivée.
+  /// Ils sont ÉCRITS dans le fichier et entrent dans l'AAD. Les appelants qui
+  /// redérivent la clé (création, migration v3→v4, changement de mot de passe)
+  /// passent [KdfParams.owaspMobile2024] ; tous les autres reportent ceux du
+  /// coffre existant — voir `_cachedKdfParams`.
   Future<void> _saveVaultV4({
     required _Slot slot,
     required Uint8List salt,
     required Uint8List wrappedDek,
     required Uint8List wrapNonce,
+    required KdfParams params,
   }) async {
     if (_key == null || _key!.length != 32) {
       throw StateError('v4 save requires a 32-byte finalKey');
@@ -84,7 +100,7 @@ extension VaultStorage on VaultService {
     // Keystore (elle reçoit `wrappedDek` / `wrapNonce` déjà calculés), donc
     // l'étiquette suffit ici pour l'AAD comme pour le champ écrit.
     final label = _fileLabelFor(slot);
-    final aad = _aadV4(label);
+    final aad = _aadV4(label, params);
 
     final plainText = utf8.encode(
       jsonEncode(_entries.map((e) => e.toJson()).toList()),
@@ -138,9 +154,13 @@ extension VaultStorage on VaultService {
       'version': VaultService._currentVersion,
       'kdf': <String, dynamic>{
         'algo': 'argon2id',
-        'm': VaultService._argon2M,
-        't': VaultService._argon2T,
-        'p': VaultService._argon2P,
+        // AUDIT 2026-08-03 — on écrit les paramètres REELLEMENT employés, pas
+        // les constantes de compilation. Ces champs sont désormais relus au
+        // déverrouillage : ils doivent décrire ce coffre-ci, pas la valeur
+        // recommandée du moment.
+        'm': params.memoryKiB,
+        't': params.iterations,
+        'p': params.parallelism,
         'salt': base64Encode(salt),
       },
       'kek': <String, dynamic>{
@@ -173,5 +193,15 @@ extension VaultStorage on VaultService {
     _cachedSalt = Uint8List.fromList(salt);
     _cachedWrappedDek = Uint8List.fromList(wrappedDek);
     _cachedWrapNonce = Uint8List.fromList(wrapNonce);
+    _cachedKdfParams = params;
+    // AUDIT 2026-08-03 — si cette écriture vient de faire franchir un barreau
+    // au coffre principal, le leurre FACTICE reste en arrière et les deux
+    // fichiers deviennent distinguables à la simple taille, définitivement.
+    // On le régénère sur le bon barreau. Ne fait rien dans le cas courant.
+    await _realignDummyDecoyIfSmaller(
+      writtenSlot: slot,
+      writtenPlainLen: ptBytes.length,
+      otherPlainLen: otherLen,
+    );
   }
 }

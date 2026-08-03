@@ -117,6 +117,20 @@ enum UnlockResult {
   /// Réglages. À distinguer de [wrongPassword] (annulation utilisateur
   /// silencieuse) pour donner un message clair au lieu d'un échec opaque.
   biometricInvalidated,
+
+  /// AUDIT 2026-08-03 — une autre opération détient déjà `_unlockGate`.
+  ///
+  /// Avant, ce refus de concurrence empruntait [wrongPassword] : un double-appui
+  /// rapide sur « Déverrouiller » affichait « mot de passe incorrect » alors que
+  /// la saisie était bonne et qu'AUCUN essai n'avait été consommé. Message
+  /// alarmant et trompeur sur l'écran le plus sensible de l'app.
+  ///
+  /// `changeMasterPassword` disposait déjà d'une sentinelle dédiée
+  /// ([VaultService.vaultBusy]) pour exactement ce cas — c'est le même
+  /// raisonnement, simplement jamais propagé à `unlock()`.
+  ///
+  /// ⚠️ Ne déclenche AUCUN comptage d'échec : rien n'a été tenté.
+  busy,
 }
 
 /// Identifie quel slot du vault est en cours d'utilisation.
@@ -139,6 +153,22 @@ enum _Slot { primary, decoy }
 /// un [decoyOnly] le coffre principal est toujours là (écran de
 /// déverrouillage). Pousser l'écran de création après un [decoyOnly] serait
 /// dangereux : y créer un coffre écraserait le principal.
+/// Ce que [VaultService.deleteDecoyVault] a fait de la session en cours.
+///
+/// L'appelant DOIT s'en servir pour choisir l'écran suivant : après un
+/// [sessionLocked] le coffre ouvert vient d'être écrasé, donc plus rien n'est
+/// déverrouillé et il faut revenir à l'écran de déverrouillage.
+enum DecoyDeleteOutcome {
+  /// L'appel venait du coffre principal : le leurre a été remplacé par un
+  /// leurre factice, la session en cours n'est pas touchée.
+  keptSession,
+
+  /// L'appel venait de la session LEURRE elle-même : cette session a été
+  /// verrouillée AVANT l'écrasement, comme le fait `deleteVault`. Le coffre
+  /// principal, lui, est intact et toujours invisible.
+  sessionLocked,
+}
+
 enum VaultDeleteOutcome {
   /// Session principale : tout est détruit, coffres et KEK Keystore compris.
   fullWipe,
@@ -256,11 +286,15 @@ class VaultService {
   static const _currentVersion = 4;
   static const _vaultMagic = 'PTVAULT';
 
-  // Argon2id baseline — source unique : KdfParams.owaspMobile2024.
-  // (decision verrouillée — ROADMAP_HARDENING.md §3).
-  static final _argon2M = KdfParams.owaspMobile2024.memoryKiB;
-  static final _argon2T = KdfParams.owaspMobile2024.iterations;
-  static final _argon2P = KdfParams.owaspMobile2024.parallelism;
+  // AUDIT 2026-08-03 — les alias `_argon2M` / `_argon2T` / `_argon2P` ont été
+  // supprimés. Ils recopiaient `KdfParams.owaspMobile2024` et servaient à la
+  // fois à l'écriture du fichier ET à la construction de l'AAD, ce qui figeait
+  // la lecture sur une constante de compilation.
+  //
+  // Désormais : la valeur d'écriture est `KdfParams.owaspMobile2024`, citée
+  // explicitement là où l'on crée ou redérive une clé ; la valeur de lecture
+  // vient du fichier, via `KdfParams.fromFileOrNull`. Un alias intermédiaire
+  // ne ferait que brouiller cette distinction, qui est tout l'enjeu.
 
   // Brute-force protection: progressive lockout after 5 fails
   static const _failThreshold = 5;
@@ -281,6 +315,25 @@ class VaultService {
   Uint8List? _cachedSalt;
   Uint8List? _cachedWrappedDek;
   Uint8List? _cachedWrapNonce;
+
+  /// AUDIT 2026-08-03 — paramètres Argon2id de l'emplacement ACTUELLEMENT
+  /// ouvert, tels que lus dans son fichier.
+  ///
+  /// Ils appartiennent au même lot que `_cachedSalt` : ce sont les entrées qui
+  /// ont produit la clé en cours d'utilisation. Toute réécriture du coffre doit
+  /// donc les REPORTER tels quels, exactement comme elle reporte le sel.
+  ///
+  /// Sans ce report, la relecture des paramètres introduirait elle-même une
+  /// perte de données : un coffre portant des paramètres différents des
+  /// constantes serait ouvert avec les siens, puis la première modification
+  /// d'entrée le réécrirait en annonçant les constantes — alors que son contenu
+  /// resterait chiffré sous l'ancienne clé. Le déverrouillage suivant
+  /// dériverait à partir des constantes annoncées et échouerait définitivement.
+  ///
+  /// Changer de paramètres est donc, par construction, réservé aux opérations
+  /// qui redérivent la clé : création du coffre, migration v3→v4, changement de
+  /// mot de passe maître.
+  KdfParams? _cachedKdfParams;
 
   bool get isOpen => _isOpen;
   List<Entry> get entries => List.unmodifiable(_entries);
@@ -355,18 +408,78 @@ class VaultService {
   Future<UnlockResult> unlock(String masterPassword) async {
     // F5 — refus immédiat si un unlock concurrent tourne déjà.
     if (_unlockGate != null) {
-      return UnlockResult.wrongPassword;
+      return UnlockResult.busy;
     }
     final gate = _unlockGate = Completer<void>();
     try {
       return await _unlockInternal(masterPassword);
     } finally {
-      gate.complete();
+      if (!gate.isCompleted) gate.complete();
       _unlockGate = null;
     }
   }
 
+  /// AUDIT 2026-08-03 — enveloppe fail-closed de [_unlockInternalUnguarded].
+  ///
+  /// `_unlockInternal` était la SEULE des trois fonctions d'ouverture à ne pas
+  /// être protégée : `_tryUnlockSlot` et `_passwordMatchesPrimaryInternal`
+  /// enveloppent toutes deux leur corps dans un `try/catch` qui rend un échec.
+  /// L'asymétrie vient du refactor F3 v2.4.4, qui a déplacé le chemin
+  /// d'ouverture PRINCIPAL de `_tryUnlockSlot` (protégée) vers ici.
+  ///
+  /// Ce qui n'était protégé nulle part :
+  ///   • `jsonDecode(await file.readAsString())` et son cast en Map ;
+  ///   • dans `_v4Unlock`, les `base64Decode` et les casts d'en-tête, placés
+  ///     AVANT son propre `try`.
+  ///
+  /// L'exception traversait `unlock()` (`try`/`finally`, sans `catch`) puis
+  /// `_unlock()` côté écran, qui ne l'attrape pas davantage : `_loading`
+  /// restait à `true` et l'utilisateur se retrouvait devant un indicateur de
+  /// progression PERMANENT, sans message ni sortie, à chaque tentative. Même
+  /// famille que SEC F19 (l'impasse dont on ne sort qu'en tuant le processus).
+  ///
+  /// Atteignabilité : l'écriture du coffre est atomique (`tmp` + `rename`), il
+  /// faut donc une corruption du système de fichiers ou un accès root pour
+  /// produire un fichier malformé. Probabilité faible, conséquence sévère.
   Future<UnlockResult> _unlockInternal(String masterPassword) async {
+    try {
+      return await _unlockInternalUnguarded(masterPassword);
+    } catch (_) {
+      // Fail-closed, aligné sur `_tryUnlockSlot` : on n'ouvre rien et on ne
+      // laisse aucun matériel de clé derrière soi.
+      _wipeKey();
+      _entries = [];
+      _isOpen = false;
+      _activeSlot = null;
+      return UnlockResult.wrongPassword;
+    }
+  }
+
+  /// Consomme ~1 Argon2id « pour rien », afin que le temps total d'une
+  /// tentative d'ouverture ne dépende pas du nombre d'emplacements réellement
+  /// présents et lisibles. Sans cela, un chronomètre distingue un appareil qui
+  /// porte un coffre leurre d'un appareil qui n'en porte pas — et le déni
+  /// plausible tombe sans qu'on ait eu à déchiffrer quoi que ce soit.
+  ///
+  /// Le mot de passe est CONSTANT et sans rapport avec la saisie : le coût
+  /// d'Argon2id croît avec la longueur de l'entrée, donc hacher le vrai mot de
+  /// passe maître rouvrirait un canal de fuite (marginal) sur sa longueur.
+  ///
+  /// AUDIT 2026-08-03 — ce bloc était recopié à l'identique à trois endroits
+  /// (deux dans `_unlockInternal`, un dans `_tryUnlockSlot`) et un quatrième
+  /// site en avait désormais besoin. Factorisé ici plutôt que dupliqué une
+  /// fois de plus : c'est une garantie de sécurité, elle doit avoir une seule
+  /// définition.
+  Future<void> _consumeDummyArgon2() async {
+    final dummySalt = SecretBytes.randomBytes(32);
+    final dummyOut = await KdfService.argon2id(
+      password: 'pt_dummy_noop_v2',
+      salt: dummySalt,
+    );
+    SecretBytes.wipe(dummyOut);
+  }
+
+  Future<UnlockResult> _unlockInternalUnguarded(String masterPassword) async {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     // Déni plausible : on tente UNE PASSE Argon2id sur CHAQUE slot, même si
     // un slot précédent a matché. Sinon le timing révèle l'existence du
@@ -386,78 +499,99 @@ class VaultService {
     Uint8List? winnerSalt;
     Uint8List? winnerWrappedDek;
     Uint8List? winnerWrapNonce;
+    KdfParams? winnerParams;
     bool winnerIsV3 = false;
 
-    for (final slot in _Slot.values) {
-      final file = await _vaultFileFor(slot);
-      if (!await file.exists()) {
-        // Anti-timing : consomme ~1 Argon2id même si le slot n'existe pas.
-        // Password constant (pt_dummy_noop_v2) pour éviter une dépendance
-        // linéaire du coût Argon2id avec la longueur du masterPassword
-        // (timing oracle marginal sinon).
-        final dummySalt = SecretBytes.randomBytes(32);
-        final dummyOut = await KdfService.argon2id(
-          password: 'pt_dummy_noop_v2',
-          salt: dummySalt,
-        );
-        SecretBytes.wipe(dummyOut);
-        continue;
-      }
-      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      final version = raw['version'] as int? ?? 1;
-
-      if (version >= _currentVersion) {
-        // ── Path v4 pur (refactor F3 v2.4.4) ────────────────────────────
-        final r = await _v4Unlock(
-          slot: slot,
-          password: masterPassword,
-          raw: raw,
-        );
-        if (r == null) continue;
-        if (matchedSlot == null) {
-          matchedSlot = slot;
-          winnerKey = r.finalKey;
-          winnerEntries = r.entries;
-          winnerSalt = r.salt;
-          winnerWrappedDek = r.wrappedDek;
-          winnerWrapNonce = r.wrapNonce;
-        } else {
-          // 2ᵉ slot déchiffre aussi (user a réutilisé le même password —
-          // erreur de config). Wipe immédiatement TOUS les buffers du
-          // perdant : sa clé v4, son cache méta, et ses entries (liste de
-          // String laissée à la merci du GC, mais on déréférence vite).
-          SecretBytes.wipe(r.finalKey);
-          SecretBytes.wipe(r.salt);
-          SecretBytes.wipe(r.wrappedDek);
-          SecretBytes.wipe(r.wrapNonce);
-          // r.entries sera GC après cette itération (référence locale).
-        }
-      } else {
-        // ── Path v3 legacy (rare, vault non-migré depuis v2.0.0) ───────
-        // Si on a déjà un winner v4, on skip la migration v3 du perdant —
-        // on ne migre que pour le winner (cas v3 winner ci-dessous).
-        // Anti-timing : consomme ~1 Argon2id dummy pour ne pas révéler
-        // qu'on a déjà un winner.
-        if (matchedSlot != null) {
-          final dummySalt = SecretBytes.randomBytes(32);
-          final dummyOut = await KdfService.argon2id(
-            password: 'pt_dummy_noop_v2',
-            salt: dummySalt,
-          );
-          SecretBytes.wipe(dummyOut);
+    // AUDIT 2026-08-03 — si une exception traverse malgré tout la boucle
+    // (Argon2id en manque de mémoire, `path_provider` indisponible…), les
+    // tampons du gagnant DÉJÀ capturés — dont sa clé de coffre — resteraient
+    // en RAM jusqu'au passage du ramasse-miettes, à une date non déterministe
+    // et hors de portée de `_wipeKey()`, qui n'agit que sur `_key`.
+    // On les efface avant de laisser l'exception remonter vers la garde
+    // fail-closed de `_unlockInternal`. Même raisonnement que SEC F21.
+    try {
+      for (final slot in _Slot.values) {
+        final file = await _vaultFileFor(slot);
+        if (!await file.exists()) {
+          // Anti-timing : consomme ~1 Argon2id même si le slot n'existe pas.
+          await _consumeDummyArgon2();
           continue;
         }
-        final r = await _tryUnlockSlot(slot, masterPassword);
-        if (r == UnlockResult.success) {
-          // Le path v3 mute déjà `_key`/`_entries`/`_isOpen`/`_activeSlot`
-          // et déclenche la migration v3→v4 inline. On capture juste un
-          // marqueur pour ne pas réécrire l'état au final.
-          matchedSlot = slot;
-          winnerKey = Uint8List.fromList(_key!);
-          winnerEntries = List<Entry>.from(_entries);
-          winnerIsV3 = true;
+        // AUDIT 2026-08-03 — lecture + parse protégés PAR EMPLACEMENT, et non
+        // seulement par la garde globale de `_unlockInternal`.
+        //
+        // Un `pt_vault_b.enc` corrompu ne doit JAMAIS empêcher d'ouvrir
+        // `pt_vault_a.enc` : avec une garde uniquement globale, la première
+        // exception rencontrée condamnait l'ouverture des DEUX emplacements,
+        // alors que le coffre principal était parfaitement lisible.
+        // On consomme le Argon2id factice pour que l'emplacement illisible reste
+        // indiscernable d'un emplacement absent du point de vue du chronomètre.
+        final Map<String, dynamic> raw;
+        final int version;
+        try {
+          raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+          version = raw['version'] as int? ?? 1;
+        } catch (_) {
+          await _consumeDummyArgon2();
+          continue;
+        }
+
+        if (version >= _currentVersion) {
+          // ── Path v4 pur (refactor F3 v2.4.4) ────────────────────────────
+          final r = await _v4Unlock(
+            slot: slot,
+            password: masterPassword,
+            raw: raw,
+          );
+          if (r == null) continue;
+          if (matchedSlot == null) {
+            matchedSlot = slot;
+            winnerKey = r.finalKey;
+            winnerEntries = r.entries;
+            winnerSalt = r.salt;
+            winnerWrappedDek = r.wrappedDek;
+            winnerWrapNonce = r.wrapNonce;
+            winnerParams = r.params;
+          } else {
+            // 2ᵉ slot déchiffre aussi (user a réutilisé le même password —
+            // erreur de config). Wipe immédiatement TOUS les buffers du
+            // perdant : sa clé v4, son cache méta, et ses entries (liste de
+            // String laissée à la merci du GC, mais on déréférence vite).
+            SecretBytes.wipe(r.finalKey);
+            SecretBytes.wipe(r.salt);
+            SecretBytes.wipe(r.wrappedDek);
+            SecretBytes.wipe(r.wrapNonce);
+            // r.entries sera GC après cette itération (référence locale).
+          }
+        } else {
+          // ── Path v3 legacy (rare, vault non-migré depuis v2.0.0) ───────
+          // Si on a déjà un winner v4, on skip la migration v3 du perdant —
+          // on ne migre que pour le winner (cas v3 winner ci-dessous).
+          // Anti-timing : consomme ~1 Argon2id dummy pour ne pas révéler
+          // qu'on a déjà un winner.
+          if (matchedSlot != null) {
+            await _consumeDummyArgon2();
+            continue;
+          }
+          final r = await _tryUnlockSlot(slot, masterPassword);
+          if (r == UnlockResult.success) {
+            // Le path v3 mute déjà `_key`/`_entries`/`_isOpen`/`_activeSlot`
+            // et déclenche la migration v3→v4 inline. On capture juste un
+            // marqueur pour ne pas réécrire l'état au final.
+            matchedSlot = slot;
+            winnerKey = Uint8List.fromList(_key!);
+            winnerEntries = List<Entry>.from(_entries);
+            winnerIsV3 = true;
+          }
         }
       }
+    } catch (_) {
+      if (winnerKey != null) SecretBytes.wipe(winnerKey);
+      if (winnerSalt != null) SecretBytes.wipe(winnerSalt);
+      if (winnerWrappedDek != null) SecretBytes.wipe(winnerWrappedDek);
+      if (winnerWrapNonce != null) SecretBytes.wipe(winnerWrapNonce);
+      winnerEntries = null;
+      rethrow;
     }
 
     if (matchedSlot != null && winnerKey != null) {
@@ -476,11 +610,16 @@ class VaultService {
         _cachedSalt = winnerSalt;
         _cachedWrappedDek = winnerWrappedDek;
         _cachedWrapNonce = winnerWrapNonce;
+        _cachedKdfParams = winnerParams;
         await _onUnlockSuccess();
         // SEC F18 v2.5.4 — réécrit ce coffre s'il porte encore l'étiquette
         // héritée. Pour le leurre, c'est ce qui retire du disque le mot
         // « decoy » écrit en clair.
         await _migrateFileLabelIfLegacy(matchedSlot);
+        // AUDIT 2026-08-03 — seul moment où l'on détient la clé de cet
+        // emplacement : si son fichier est resté sur un barreau inférieur à
+        // celui du voisin, c'est maintenant ou jamais qu'on le réaligne.
+        await _realignPaddingIfNeeded(matchedSlot);
       } else {
         // SEC F21 v2.5.4 — le chemin v3 a DÉJÀ posé `_key` / `_entries`
         // lui-même ; `winnerKey` n'est qu'une copie de contrôle, créée par
@@ -561,6 +700,11 @@ class VaultService {
     _cachedSalt = null;
     _cachedWrappedDek = null;
     _cachedWrapNonce = null;
+    // Les paramètres ne sont pas un secret (ils sont en clair dans le fichier),
+    // mais ils décrivent la session ouverte : ils partent avec elle, sinon un
+    // `_saveVault` ultérieur les reporterait sur un coffre qu'ils ne décrivent
+    // plus.
+    _cachedKdfParams = null;
     // F17 v2.3.7 — reset la référence BiometricStorageFile pour qu'un
     // unlock biométrique post-panic re-acquière le storage proprement
     // (sinon référence dangling vers un fichier potentiellement supprimé).
@@ -655,10 +799,17 @@ class VaultService {
   ///
   /// Retourne 0 (aucune contrainte) si le fichier est absent, illisible, ou au
   /// format v3 hérité qui n'a pas de champ `cipher`.
-  Future<int> _otherSlotPlainLength(_Slot slot) async {
-    final other = slot == _Slot.primary ? _Slot.decoy : _Slot.primary;
+  Future<int> _otherSlotPlainLength(_Slot slot) =>
+      _plainLengthOf(_otherSlot(slot));
+
+  static _Slot _otherSlot(_Slot slot) =>
+      slot == _Slot.primary ? _Slot.decoy : _Slot.primary;
+
+  /// Longueur du CLAIR (rembourrage compris) de l'emplacement [slot], calculée
+  /// sans posséder sa clé — voir [_otherSlotPlainLength] pour le raisonnement.
+  Future<int> _plainLengthOf(_Slot slot) async {
     try {
-      final f = await _vaultFileFor(other);
+      final f = await _vaultFileFor(slot);
       if (!f.existsSync()) return 0;
       final raw = jsonDecode(await f.readAsString());
       if (raw is! Map<String, dynamic>) return 0;
@@ -706,6 +857,81 @@ class VaultService {
     }
   }
 
+  /// AUDIT 2026-08-03 — remet les deux emplacements sur le MÊME barreau quand
+  /// celui de [slot] a pris du retard.
+  ///
+  /// SEC F6 rembourre à l'écriture, en s'alignant sur le voisin. Mais il ne
+  /// s'aligne QUE quand on écrit : dès que le coffre principal franchit un
+  /// barreau (64 Kio de JSON, soit quelques centaines d'entrées), il passe à
+  /// 256 Kio pendant que l'autre fichier reste à 64 Kio. Rien ne le rattrapait
+  /// ensuite. Pour un utilisateur sans vrai leurre, l'écart devenait
+  /// PERMANENT : le leurre factice n'est réécrit qu'à la création du coffre ou
+  /// à la réparation du schéma de fichiers.
+  ///
+  /// Résultat, `ls -l` donnait ~87 Ko contre ~350 Ko — le plus gros étant le
+  /// vrai coffre. C'est exactement ce que SEC F6 dit vouloir empêcher : « le
+  /// déni plausible que le nommage neutre `_a`/`_b` existe pour offrir tombait
+  /// sur un simple `ls -l` ».
+  ///
+  /// Ce point-ci traite le cas du VRAI leurre : on ne peut réécrire un
+  /// emplacement que si l'on détient sa clé, donc au déverrouillage. Le cas du
+  /// leurre FACTICE est traité à l'écriture, par
+  /// [_realignDummyDecoyIfSmaller], puisqu'il ne sera jamais déverrouillé.
+  ///
+  /// Best-effort et silencieux : un échec ne doit jamais empêcher l'ouverture.
+  Future<void> _realignPaddingIfNeeded(_Slot slot) async {
+    try {
+      final own = await _plainLengthOf(slot);
+      final other = await _plainLengthOf(_otherSlot(slot));
+      if (own <= 0 || other <= 0) return;
+      if (_ladderRungFor(own) >= _ladderRungFor(other)) return;
+      // `_saveVault` rembourre sur le barreau couvrant les DEUX longueurs :
+      // le simple fait de réécrire suffit à réaligner.
+      await _saveVault();
+    } catch (_) {
+      /* réessai au prochain déverrouillage */
+    }
+  }
+
+  /// Pendant de [_realignPaddingIfNeeded] pour le leurre FACTICE, qui n'est
+  /// jamais déverrouillé et ne peut donc pas se réaligner tout seul.
+  ///
+  /// Appelée après chaque écriture du coffre principal. Ne fait rien tant que
+  /// les deux fichiers sont sur le même barreau — c'est-à-dire quasiment
+  /// toujours, les barreaux étant espacés d'un facteur 4. Quand elle agit, elle
+  /// coûte un Argon2id (~1 s) : c'est le prix d'un franchissement de barreau,
+  /// événement qui n'arrive qu'une poignée de fois dans la vie d'un coffre.
+  ///
+  /// ⚠️ GARDE VITALE : ne régénère QUE si l'on sait POSITIVEMENT qu'aucun vrai
+  /// leurre n'est configuré. Le drapeau doit valoir exactement `'false'` ; une
+  /// lecture qui échoue, qui rend `null` ou toute autre valeur fait renoncer.
+  /// Se tromper ici détruirait le second coffre de l'utilisateur, dont le
+  /// contenu n'existe nulle part ailleurs.
+  Future<void> _realignDummyDecoyIfSmaller({
+    required _Slot writtenSlot,
+    required int writtenPlainLen,
+    required int otherPlainLen,
+  }) async {
+    try {
+      // Seule l'écriture du PRINCIPAL peut entraîner la régénération du leurre
+      // factice. Depuis le leurre, on ne détient pas la clé du principal.
+      if (writtenSlot != _Slot.primary) return;
+      if (_ladderRungFor(otherPlainLen) >= _ladderRungFor(writtenPlainLen)) {
+        return;
+      }
+      // Fail-safe : le drapeau doit valoir EXACTEMENT 'false'. Une lecture
+      // absente, vide ou en échec fait renoncer — on ne régénère jamais « dans
+      // le doute », puisque se tromper détruirait un vrai coffre leurre.
+      final flag = await _storage.read(key: _decoyConfiguredKey);
+      if (flag != 'false') {
+        return;
+      }
+      await _createDummyDecoy();
+    } catch (_) {
+      /* best-effort : nouvelle tentative à la prochaine écriture */
+    }
+  }
+
   /// Réécrit le coffre de [slot] si son étiquette de fichier est héritée.
   ///
   /// À appeler juste après un déverrouillage v4 réussi, quand `_key`, `_entries`
@@ -724,12 +950,23 @@ class VaultService {
       final salt = _cachedSalt;
       final wrappedDek = _cachedWrappedDek;
       final wrapNonce = _cachedWrapNonce;
-      if (salt == null || wrappedDek == null || wrapNonce == null) return;
+      // AUDIT 2026-08-03 — les paramètres du coffre OUVERT sont reportés tels
+      // quels : cette réécriture ne redérive rien, elle ne fait que changer
+      // l'étiquette. Y écrire les constantes annoncerait une dérivation que la
+      // clé en cours ne respecte pas.
+      final params = _cachedKdfParams;
+      if (salt == null ||
+          wrappedDek == null ||
+          wrapNonce == null ||
+          params == null) {
+        return;
+      }
       await _saveVaultV4(
         slot: slot,
         salt: salt,
         wrappedDek: wrappedDek,
         wrapNonce: wrapNonce,
+        params: params,
       );
     } catch (_) {
       /* réessai au prochain déverrouillage */
@@ -790,6 +1027,18 @@ class VaultService {
     }
   }
 
+  /// Point d'entrée PUBLIC du déchiquetage de fichier.
+  ///
+  /// AUDIT 2026-08-03 — il existait trois traitements distincts pour le même
+  /// besoin : `_shredSync` ici, une copie approchante dans l'écran Réglages
+  /// (`_shredFile`, sans le repli en cas d'échec d'écrasement), et RIEN du tout
+  /// dans `HeritageService.disable()`, qui se contentait d'un `deleteSync()`
+  /// alors que `deleteVault` déchiquette explicitement ce même `pt_heir.enc`.
+  /// Trois niveaux de rigueur pour supprimer des fichiers de même sensibilité.
+  ///
+  /// Une seule définition désormais, et c'est la plus stricte des trois.
+  static void shredFileSync(File file) => _shredSync(file);
+
   /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
   /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.
   /// Best-effort : sur un système de fichiers à copie sur écriture (F2FS,
@@ -814,10 +1063,18 @@ class VaultService {
     }
   }
 
-  /// Levée par [deleteDecoyVault] quand l'appel vient d'une session leurre.
-  /// L'appelant doit présenter ce refus sans révéler qu'un coffre principal
-  /// existe — le message ne doit RIEN dire de plus que « indisponible ».
-  static const decoySessionDeleteRefused = 'pt_delete_refused_decoy_session';
+  /// AUDIT 2026-08-03 — `decoySessionDeleteRefused` a été SUPPRIMÉE.
+  ///
+  /// Cette sentinelle faisait lever [deleteDecoyVault] quand l'appel venait
+  /// d'une session leurre, et l'écran Réglages la traduisait en « opération
+  /// indisponible ». Or la v2.5.4 avait justement retiré ce refus opaque de
+  /// [deleteVault] (SEC F12), avec ce raisonnement — qui vaut mot pour mot
+  /// ici : « un message "opération indisponible" est en soi une anomalie ;
+  /// sous contrainte, il signale à l'adversaire que quelque chose est protégé,
+  /// et le propriétaire légitime le lit comme une panne ».
+  ///
+  /// Le raisonnement n'avait simplement jamais été propagé à cette
+  /// fonction-ci. Il l'est désormais : voir [DecoyDeleteOutcome].
 
   /// SEC F10 v2.5.2 — sentinelle levée par `changeMasterPassword` quand le mot
   /// de passe actuel fourni ne correspond pas. L'appelant doit la traduire en
@@ -937,24 +1194,35 @@ class VaultService {
   /// factice non-déverrouillable et on remet le flag à 'false'. Après ça, un
   /// attaquant forensic voit toujours 2 fichiers indistinguables et ne peut
   /// pas prouver qu'un decoy réel a existé.
-  Future<void> deleteDecoyVault() async {
-    // SEC-R3 v2.5.2 — garde analogue à celle de `deleteVault` (F12), qui
-    // manquait ici. Cette fonction écrase `pt_vault_b.enc` par un leurre
-    // factice dont le mot de passe aléatoire n'est JAMAIS persisté : le
-    // fichier devient définitivement non déverrouillable.
+  Future<DecoyDeleteOutcome> deleteDecoyVault() async {
+    // SEC-R3 v2.5.2 — le danger identifié reste entièrement valable : cette
+    // fonction écrase `pt_vault_b.enc` par un leurre factice dont le mot de
+    // passe aléatoire n'est JAMAIS persisté, donc le fichier devient
+    // définitivement indéchiffrable. Or la section « Coffre leurre » des
+    // Réglages s'affiche selon `hasDecoyVault`, un drapeau GLOBAL et non
+    // l'emplacement actif : on peut donc demander cette suppression depuis la
+    // session leurre elle-même, et écraser le coffre qu'on vient d'ouvrir.
     //
-    // Or la section « Coffre leurre » des Réglages s'affiche selon
-    // `hasDecoyVault`, un drapeau GLOBAL, et non selon l'emplacement actif.
-    // Un utilisateur se trouvant dans sa propre session leurre pouvait donc
-    // écraser le coffre qu'il avait justement ouvert. Les buffers en RAM
-    // réparent la situation au prochain CRUD, mais verrouiller ou fermer
-    // l'app avant toute autre écriture perdait le vrai contenu — sans
-    // recours, y compris pour le propriétaire légitime.
+    // AUDIT 2026-08-03 — la parade change de nature, pas de rigueur.
+    // Le refus opaque est remplacé par le traitement gracieux que SEC F12 a
+    // introduit pour `deleteVault` : on fait ce qui est demandé, mais dans le
+    // bon ordre. Un « opération indisponible » sous contrainte trahit qu'il y a
+    // quelque chose à protéger ; ici, la personne qui manipule l'app obtient
+    // exactement ce qu'elle demande — l'emplacement leurre disparaît — et le
+    // coffre principal reste intact et invisible.
     if (_activeSlot == _Slot.decoy) {
-      throw StateError(decoySessionDeleteRefused);
+      // Ordre IMPÉRATIF, identique à `deleteVault` : verrouiller AVANT
+      // d'écraser. `_entries` et `_key` tiennent encore le contenu du leurre ;
+      // tout CRUD survenant entre l'écrasement et le verrouillage le
+      // réécrirait par-dessus le leurre factice qu'on vient de poser.
+      lock();
+      await _createDummyDecoy();
+      await _storage.write(key: _decoyConfiguredKey, value: 'false');
+      return DecoyDeleteOutcome.sessionLocked;
     }
     await _createDummyDecoy();
     await _storage.write(key: _decoyConfiguredKey, value: 'false');
+    return DecoyDeleteOutcome.keptSession;
   }
 
   // ── Internal helpers (paths) ────────────────────────────────────────────────

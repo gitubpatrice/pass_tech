@@ -68,6 +68,10 @@ extension VaultMigration on VaultService {
         salt: newSalt,
         wrappedDek: wrap.ciphertext,
         wrapNonce: wrap.nonce,
+        // La clé vient d'être redérivée : c'est l'un des trois moments où
+        // adopter la recommandation COURANTE est correct (avec la création du
+        // coffre et le changement de mot de passe maître).
+        params: KdfParams.owaspMobile2024,
       );
 
       // V1 v2.4.0 — salt en storage écrit APRÈS le save vault réussi (aligné

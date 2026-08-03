@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
-import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/material.dart';
 // ignore: unnecessary_import
 import 'package:flutter/semantics.dart';
@@ -527,27 +526,27 @@ class _SettingsScreenState extends State<SettingsScreen>
       },
     );
     if (action != 'delete' || !mounted) return;
+    final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    // SEC-R3 v2.5.2 — depuis une session leurre, le service refuse et lève.
+    // La section « Coffre leurre » reste volontairement VISIBLE quel que soit
+    // l'emplacement actif : la masquer révélerait lequel est ouvert. Le code
+    // étant public sous Apache 2.0, un adversaire sait qu'une section absente
+    // signifierait « vous êtes dans le leurre ».
     //
-    // On garde volontairement la section « Coffre leurre » VISIBLE et on
-    // affiche un refus neutre, plutôt que de masquer l'entrée. Masquer
-    // révélerait l'emplacement actif : le code étant public sous Apache 2.0,
-    // un adversaire sait qu'une section absente signifie « vous êtes dans le
-    // leurre ». Même raisonnement que pour « Tout supprimer » (F12).
-    try {
-      await VaultService().deleteDecoyVault();
-    } on StateError {
-      if (mounted) {
-        SnackUtils.showError(
-          context,
-          messenger,
-          t.settingsDeleteAllUnavailable,
-        );
-      }
+    // AUDIT 2026-08-03 — le refus opaque qui suivait est supprimé. Depuis une
+    // session leurre, le service verrouille puis écrase, exactement comme
+    // « Tout supprimer » depuis cette même session (SEC F12). On revient alors
+    // au déverrouillage, puisque plus rien n'est ouvert — y rester afficherait
+    // les Réglages d'un coffre fermé.
+    final outcome = await VaultService().deleteDecoyVault();
+    if (!mounted) return;
+    if (outcome == DecoyDeleteOutcome.sessionLocked) {
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const UnlockScreen()),
+        (_) => false,
+      );
       return;
     }
-    if (!mounted) return;
     setState(() {});
     SnackUtils.showInfo(messenger, t.decoyDeletedSnack);
   }
@@ -739,6 +738,13 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     final json = VaultService().exportJson();
     final dir = await getTemporaryDirectory();
+    // AUDIT 2026-08-03 — purge AVANT, en plus de la purge après.
+    // C'est la seule façon de rattraper un partage précédent interrompu : si le
+    // processus est tué pendant l'affichage du sélecteur, le `finally` ci-dessous
+    // ne s'exécute jamais et la copie faite par share_plus survit indéfiniment.
+    // Le commentaire de SEC F8 affirmait que ce ménage avait aussi lieu « au
+    // verrouillage » — c'était faux, la fonction n'avait qu'un seul appelant.
+    _shredShareCache(dir);
     final file = File('${dir.path}/pass_tech_export.json');
     await file.writeAsString(json);
     try {
@@ -763,21 +769,22 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   /// Écrase un fichier par des octets aléatoires puis le supprime.
-  static void _shredFile(File file) {
-    try {
-      if (!file.existsSync()) return;
-      final len = file.lengthSync();
-      if (len > 0) {
-        file.writeAsBytesSync(SecretBytes.randomBytes(len), flush: true);
-      }
-      file.deleteSync();
-    } catch (_) {}
-  }
+  ///
+  /// AUDIT 2026-08-03 — délègue désormais à [VaultService.shredFileSync] au
+  /// lieu de refaire le travail. Cette copie locale n'avait pas le repli de
+  /// l'originale : quand l'écrasement échouait, elle abandonnait AUSSI la
+  /// suppression, laissant le fichier en clair intact. Deux traitements pour
+  /// un même besoin, dont un plus faible — le genre d'écart qui ne se voit
+  /// qu'à la relecture croisée.
+  static void _shredFile(File file) => VaultService.shredFileSync(file);
 
   /// Purge le répertoire de cache de `share_plus`, où le plugin recopie tout
-  /// fichier partagé. Appelé après chaque partage et au verrouillage, pour
-  /// couvrir aussi le cas où le processus est tué pendant l'affichage du
-  /// sélecteur (le `finally` ne s'exécute alors jamais).
+  /// fichier partagé et n'y fait le ménage qu'au DÉBUT du partage suivant.
+  ///
+  /// Appelé AVANT et APRÈS chaque partage. L'appel « avant » n'est pas
+  /// redondant : c'est lui qui rattrape le cas où le processus a été tué
+  /// pendant l'affichage du sélecteur, auquel cas le `finally` du partage
+  /// précédent n'a jamais tourné.
   static void _shredShareCache(Directory cacheDir) {
     try {
       final shareDir = Directory('${cacheDir.path}/share_plus');
@@ -811,6 +818,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
       final date = DateTime.now().toIso8601String().substring(0, 10);
       final dir = await getTemporaryDirectory();
+      // AUDIT 2026-08-03 — même purge que l'export en clair, avant et après.
+      // Ce chemin ne nettoyait PAS le cache de share_plus : la copie du
+      // `.ptbak` faite par le plugin y restait jusqu'au partage suivant. Le
+      // fichier est chiffré, donc l'enjeu est moindre qu'en clair — mais c'est
+      // une copie complète du coffre, laissée dans un répertoire sur lequel le
+      // plugin accorde une permission de lecture à toute application capable
+      // de répondre au sélecteur.
+      _shredShareCache(dir);
       final file = File('${dir.path}/pass_tech_$date.ptbak');
       await file.writeAsString(content);
       if (!mounted) return;
@@ -820,9 +835,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           XFile(file.path, mimeType: 'application/octet-stream'),
         ], subject: t.exportEncryptedShareSubject);
       } finally {
-        try {
-          if (file.existsSync()) file.deleteSync();
-        } catch (_) {}
+        _shredFile(file);
+        _shredShareCache(dir);
       }
     } catch (e) {
       if (!mounted) return;

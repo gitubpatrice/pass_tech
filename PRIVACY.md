@@ -59,11 +59,33 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 
 ## 6. Network
 
-- The app uses the network for **two strictly local-impact functions** :
-  1. **Update check** : queries `api.github.com/repos/gitubpatrice/pass_tech/releases/latest` (HTTPS, no auth, no cookie).
+- **Pass Tech itself** uses the network for **two strictly local-impact functions** :
+  1. **Update check** : queries `api.github.com/repos/gitubpatrice/pass_tech/releases/latest` (HTTPS, no auth, no cookie). Suspended while panic mode is active.
   2. **HIBP breach check** (Have I Been Pwned, opt-in) : sends only the **first 5 characters of the SHA-1** of a password (k-anonymity model). The actual password never leaves the device.
 - Network Security Config rejects cleartext HTTP and user-installed CAs in release builds.
-- No telemetry, crash reporting or analytics.
+- **We operate no server.** No data is sent to the developer, no in-house analytics, no crash reporting.
+
+### Third-party library: Google ML Kit (QR code scanning)
+
+For the sake of accuracy, a third network stack is present in the app, and it does
+not come from our code:
+
+- QR code scanning (used to import a two-factor authentication secret) relies on
+  the `mobile_scanner` library, which is built on **Google ML Kit**. That library
+  in turn bundles `play-services-basement`, `play-services-base` and the
+  `com.google.android.datatransport` transport component ("CCT"), which may report
+  library usage statistics back to Google.
+- This is also where the **`ACCESS_NETWORK_STATE`** permission shown on the app
+  listing comes from: it is added automatically by that dependency, not declared
+  by Pass Tech.
+- **This component never has access to your vault contents.** It only sees the
+  camera image at the moment you scan a QR code, and only then. Your credentials,
+  master password and keys never pass through any Google library.
+- If this matters to you, do not use QR code scanning: a two-factor secret can
+  always be **typed in by hand**, and every other feature of the app works
+  entirely without it.
+
+This dependency is flagged with the `NonFreeDep` anti-feature on F-Droid.
 
 ## 7. Sharing and data transmission
 
@@ -107,6 +129,7 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability disclosure policy.
 | `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Optional biometric unlock via Android BiometricPrompt.                                            |
 | `INTERNET`                           | Update check (GitHub Releases) and HIBP breach check (k-anonymity, opt-in).                       |
 | `CAMERA`                             | Scan a 2FA QR code to add a TOTP secret. The camera feed is processed locally and never recorded. |
+| `ACCESS_NETWORK_STATE`               | **Not declared by Pass Tech.** Added automatically by the QR scanning library (Google ML Kit / `datatransport`). See §6. |
 
 ## 11. Children
 

@@ -29,9 +29,26 @@ import java.text.DecimalFormat
  * — et il est PUBLIC, le dépôt étant sous licence Apache 2.0. Un geste n'a rien
  * à mémoriser.
  *
- * ⚠️ LIMITE ASSUMÉE : ce geste est lui aussi public. Il protège d'une
- * inspection distraite, pas d'un adversaire qui sait déjà que l'appareil porte
- * Pass Tech. Dans ce cas le camouflage a de toute façon échoué en amont.
+ * ⚠️ LIMITES ASSUMÉES — les deux, pas seulement la première :
+ *
+ *  1. Le geste de sortie est PUBLIC (dépôt sous Apache 2.0). Il protège d'une
+ *     inspection distraite, pas d'un adversaire qui sait déjà que l'appareil
+ *     porte Pass Tech. Dans ce cas le camouflage a de toute façon échoué en
+ *     amont.
+ *
+ *  2. AUDIT 2026-08-03 — le camouflage porte sur le LANCEUR, pas sur le
+ *     système. `android:label` et `android:icon` sont posés sur <application>
+ *     dans le manifeste, et ces deux attributs ne sont PAS modifiables au
+ *     runtime : Réglages → Applications continue d'afficher « Pass Tech » avec
+ *     son icône, de même que le sélecteur de partage, le gestionnaire de
+ *     permissions et l'écran d'utilisation de la batterie.
+ *     Basculer les alias ne change que ce que dessine le lanceur.
+ *     Conséquence directe pour le modèle de menace : face à quelqu'un qui
+ *     OUVRE les réglages — un contrôle frontalier attentif, exactement le
+ *     scénario qui motive ce mode — le camouflage ne tient pas. Il est conçu
+ *     pour le regard porté sur un écran d'accueil, et c'est tout.
+ *     Le rendre total supposerait un second APK (autre applicationId, autre
+ *     label) : hors de portée d'un basculement d'alias.
  */
 class CalculatorActivity : Activity() {
 

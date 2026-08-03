@@ -41,12 +41,74 @@ class KdfParams {
   });
 
   /// OWASP 2024 baseline for password manager unlock on mobile.
+  ///
+  /// ⚠️ Cette constante est la valeur d'ÉCRITURE : elle s'applique aux coffres,
+  /// instantanés et sauvegardes **créés maintenant**. Elle n'est plus la valeur
+  /// de LECTURE — voir [fromFileOrNull]. C'est ce découplage qui permet de la
+  /// faire évoluer un jour sans rendre illisible ce qui existe déjà.
   static const owaspMobile2024 = KdfParams(
     memoryKiB: 19456,
     iterations: 2,
     parallelism: 1,
     outLen: 32,
   );
+
+  // Bornes de lecture. Elles ne disent pas ce qui est RECOMMANDÉ (c'est le rôle
+  // de `owaspMobile2024`) mais ce qu'on accepte d'un fichier sans se mettre en
+  // danger : un fichier hostile annonçant m = 1 Gio ou t = 64 épuiserait la
+  // mémoire et le processeur de l'appareil rien qu'à l'ouverture.
+  static const _minMemoryKiB = 4096;
+  static const _maxMemoryKiB = 1024 * 1024;
+  static const _maxIterations = 16;
+  static const _maxParallelism = 4;
+
+  /// Relit les paramètres Argon2id **écrits dans un fichier**.
+  ///
+  /// AUDIT 2026-08-03 — jusqu'ici, `kdf.m` / `kdf.t` / `kdf.p` étaient
+  /// sérialisés dans les trois formats (coffre v4, instantané héritier v2,
+  /// sauvegarde `.ptbak` v3) mais **jamais relus** : la dérivation employait
+  /// systématiquement les constantes de compilation. Les champs du fichier
+  /// étaient purement décoratifs — exactement le piège que la v2.3.2 avait
+  /// supprimé pour le champ `aad` du coffre, au motif qu'« un dev futur
+  /// croirait ce champ autoritaire ».
+  ///
+  /// Le `.ptbak` faisait pire : `importEncrypted` lisait bien m/t/p pour
+  /// dériver la clé, mais construisait l'AAD à partir des constantes. Deux
+  /// sources de vérité contradictoires dans une seule fonction.
+  ///
+  /// Conséquence si l'on relevait un jour [owaspMobile2024] — ce que la veille
+  /// OWASP finira par imposer : **tous les coffres, instantanés et sauvegardes
+  /// existants deviendraient indéchiffrables d'un coup**, en silence, sous le
+  /// message « mot de passe incorrect ». Aucun garde-fou n'existait, et aucun
+  /// test ne couvrait le cas (ceux du `.ptbak` ne forgent que des valeurs HORS
+  /// bornes, jamais des valeurs valides mais différentes).
+  ///
+  /// Contrat :
+  ///  - champs absents → [fallback] (fichier d'une version qui ne les écrivait
+  ///    pas ; en pratique aucune, mais on ne casse rien) ;
+  ///  - champs présents et sains → ces valeurs-là ;
+  ///  - champs présents mais hors bornes ou du mauvais type → `null`,
+  ///    l'appelant DOIT refuser le fichier (fail-closed).
+  static KdfParams? fromFileOrNull(
+    Map<dynamic, dynamic> kdf, {
+    KdfParams fallback = owaspMobile2024,
+    int outLen = 32,
+  }) {
+    final m = kdf['m'];
+    final t = kdf['t'];
+    final p = kdf['p'];
+    if (m == null && t == null && p == null) return fallback;
+    if (m is! int || t is! int || p is! int) return null;
+    if (m < _minMemoryKiB || m > _maxMemoryKiB) return null;
+    if (t < 1 || t > _maxIterations) return null;
+    if (p < 1 || p > _maxParallelism) return null;
+    return KdfParams(
+      memoryKiB: m,
+      iterations: t,
+      parallelism: p,
+      outLen: outLen,
+    );
+  }
 }
 
 /// Marker so callers know which algorithm was used for the derived key.

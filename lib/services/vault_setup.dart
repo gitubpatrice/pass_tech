@@ -47,6 +47,9 @@ extension VaultSetup on VaultService {
         salt: salt,
         wrappedDek: wrap.ciphertext,
         wrapNonce: wrap.nonce,
+        // Coffre neuf : on adopte la recommandation courante, et le fichier la
+        // portera pour toute sa vie.
+        params: KdfParams.owaspMobile2024,
       );
       // V1 v2.4.0 — salt en storage écrit APRÈS save vault réussi : un kill
       // mid-flight ne laisse plus de salt orphelin pointant vers un vault
@@ -143,6 +146,11 @@ extension VaultSetup on VaultService {
         salt: salt,
         wrappedDek: wrap.ciphertext,
         wrapNonce: wrap.nonce,
+        // Changement de mot de passe maître : la clé est intégralement
+        // redérivée, c'est donc le bon moment pour adopter la recommandation
+        // courante. Un coffre créé sous d'anciens paramètres se met ainsi à
+        // niveau tout seul le jour où son propriétaire change de mot de passe.
+        params: KdfParams.owaspMobile2024,
       );
       // V1 v2.4.0 — salt en storage écrit APRÈS save vault réussi : si le
       // process est tué entre les deux, on garde l'ancien salt cohérent
@@ -335,7 +343,7 @@ extension VaultSetup on VaultService {
       final aead = await AeadService.encryptGcm(
         key: finalKey,
         plaintext: ptBytes,
-        aad: _aadV4(fileLabel),
+        aad: _aadV4(fileLabel, KdfParams.owaspMobile2024),
       );
 
       final out = <String, dynamic>{
@@ -343,9 +351,11 @@ extension VaultSetup on VaultService {
         'version': VaultService._currentVersion,
         'kdf': <String, dynamic>{
           'algo': 'argon2id',
-          'm': VaultService._argon2M,
-          't': VaultService._argon2T,
-          'p': VaultService._argon2P,
+          // Leurre factice : `pwHash` ci-dessus a été dérivé avec les
+          // paramètres par défaut, on annonce donc exactement ceux-là.
+          'm': KdfParams.owaspMobile2024.memoryKiB,
+          't': KdfParams.owaspMobile2024.iterations,
+          'p': KdfParams.owaspMobile2024.parallelism,
           'salt': base64Encode(salt),
         },
         'kek': <String, dynamic>{

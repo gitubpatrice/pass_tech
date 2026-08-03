@@ -177,15 +177,9 @@ extension VaultUnlock on VaultService {
         // coffre leurre — ce qui briserait le déni plausible.
         // Mêmes paramètres (m=19 MiB, t=2, p=1) que les vrais slots.
         // P2-fix v2.3.2 : password constant, indépendant du masterPassword.
-        // Évite le timing oracle marginal sur passwords très courts (le coût
-        // Argon2id varie linéairement avec la longueur du password). Le but
-        // ici est juste de consommer ~1 Argon2id, pas de hasher quelque chose.
-        final dummySalt = SecretBytes.randomBytes(32);
-        final dummyOut = await KdfService.argon2id(
-          password: 'pt_dummy_noop_v2',
-          salt: dummySalt,
-        );
-        SecretBytes.wipe(dummyOut);
+        // AUDIT 2026-08-03 — corps factorisé dans `_consumeDummyArgon2`
+        // (il en existait trois copies).
+        await _consumeDummyArgon2();
         return UnlockResult.wrongPassword;
       }
 
@@ -228,6 +222,10 @@ extension VaultUnlock on VaultService {
         // secondaire (`_unlockInternal` est le principal) mais doit migrer
         // aussi, sinon un coffre ouvert par ici garderait son étiquette héritée.
         await _migrateFileLabelIfLegacy(slot);
+        // AUDIT 2026-08-03 — même raison : ce chemin doit réaligner le
+        // rembourrage comme le fait le chemin principal, sinon un coffre ouvert
+        // par ici resterait sur un barreau inférieur à celui de son voisin.
+        await _realignPaddingIfNeeded(slot);
         return UnlockResult.success;
       }
 
@@ -318,6 +316,7 @@ extension VaultUnlock on VaultService {
       Uint8List salt,
       Uint8List wrappedDek,
       Uint8List wrapNonce,
+      KdfParams params,
     })?
   >
   _v4Unlock({
@@ -325,18 +324,48 @@ extension VaultUnlock on VaultService {
     required String password,
     required Map<String, dynamic> raw,
   }) async {
-    final kdf = raw['kdf'];
-    final kek = raw['kek'];
-    if (kdf is! Map || kek is! Map) return null;
-    final salt = base64Decode(kdf['salt'] as String);
-    final wrappedDek = base64Decode(kek['wrappedDek'] as String);
-    final wrapNonce = base64Decode(kek['wrapNonce'] as String);
+    // AUDIT 2026-08-03 — l'en-tête est décodé sous garde.
+    //
+    // Ces `base64Decode` et ces transtypages étaient placés AVANT le `try`
+    // ci-dessous : sur un fichier malformé (champ absent, base64 invalide,
+    // type inattendu) ils levaient une exception qui remontait jusqu'à
+    // `unlock()`, laquelle ne comporte qu'un `finally`. Deux conséquences :
+    //   • côté écran, l'indicateur de progression restait affiché
+    //     indéfiniment, sans message ni issue ;
+    //   • pire, comme les deux emplacements sont parcourus dans la même
+    //     boucle, un LEURRE corrompu faisait échouer l'ouverture du coffre
+    //     PRINCIPAL, pourtant parfaitement lisible.
+    // Le contrat de cette fonction est déjà « rend `null` en cas d'échec » :
+    // on l'honore aussi pour un en-tête illisible.
+    final Uint8List salt;
+    final Uint8List wrappedDek;
+    final Uint8List wrapNonce;
+    final String fileLabel;
+    final KdfParams params;
+    try {
+      final kdf = raw['kdf'];
+      final kek = raw['kek'];
+      if (kdf is! Map || kek is! Map) return null;
+      // AUDIT 2026-08-03 — les paramètres Argon2id viennent du FICHIER.
+      // Ils y étaient écrits depuis la v4 mais n'avaient jamais été relus :
+      // la dérivation prenait les constantes de compilation. Voir
+      // `KdfParams.fromFileOrNull` pour ce que cela impliquait le jour où
+      // ces constantes bougeraient. `null` = valeurs hors bornes → on refuse.
+      final p = KdfParams.fromFileOrNull(kdf);
+      if (p == null) return null;
+      params = p;
+      salt = base64Decode(kdf['salt'] as String);
+      wrappedDek = base64Decode(kek['wrappedDek'] as String);
+      wrapNonce = base64Decode(kek['wrapNonce'] as String);
+      fileLabel = kek['alias'] as String;
+    } catch (_) {
+      return null;
+    }
     // SEC F18 v2.5.4 — `fileLabel` est l'étiquette NEUTRE lue dans le fichier.
     // Elle sert à l'AAD et au contrôle anti-copie, JAMAIS à adresser le
     // Keystore : cet adressage passe par `_aliasFor(slot)`, qui ne quitte
     // jamais la RAM. Confondre les deux réintroduirait le mot « decoy » dans
-    // le fichier.
-    final fileLabel = kek['alias'] as String;
+    // le fichier. (Lu ci-dessus, sous la garde d'en-tête.)
 
     // A3 v2.3.8 — défense en profondeur : refuse les blobs cross-slot.
     // Avant : un attaquant root copiant pt_vault_decoy.enc sur le chemin
@@ -357,7 +386,11 @@ extension VaultUnlock on VaultService {
     Uint8List? hwSecret;
     Uint8List? finalKey;
     try {
-      pwHash = await KdfService.argon2id(password: password, salt: salt);
+      pwHash = await KdfService.argon2id(
+        password: password,
+        salt: salt,
+        params: params,
+      );
       try {
         // SEC F18 v2.5.4 — adressage du Keystore par `_aliasFor(slot)` et NON
         // par l'étiquette lue dans le fichier. C'est ce découplage qui permet
@@ -376,7 +409,7 @@ extension VaultUnlock on VaultService {
         pwHash: pwHash,
         hwSecret: hwSecret,
       );
-      final entries = await _decryptVaultV4(raw, finalKey);
+      final entries = await _decryptVaultV4(raw, finalKey, params);
       if (entries == null) {
         SecretBytes.wipe(finalKey);
         return null;
@@ -396,6 +429,9 @@ extension VaultUnlock on VaultService {
         salt: Uint8List.fromList(salt),
         wrappedDek: Uint8List.fromList(wrappedDek),
         wrapNonce: Uint8List.fromList(wrapNonce),
+        // Les paramètres qui ont produit cette clé. L'appelant DOIT les
+        // conserver auprès du sel : toute réécriture du coffre les reporte.
+        params: params,
       );
     } finally {
       if (pwHash != null) SecretBytes.wipe(pwHash);
@@ -411,8 +447,12 @@ extension VaultUnlock on VaultService {
     // qui tape password puis fingerprint avant que le 1er unlock complète
     // déclenchait 2 paths en parallèle (`_key`, `_entries` mutables) →
     // corruption possible. Refus immédiat si un unlock concurrent tourne.
+    //
+    // AUDIT 2026-08-03 — rend `busy` et non plus `wrongPassword` : le cas
+    // nominal ici est justement « l'utilisateur a saisi son mot de passe puis
+    // posé son doigt », et lui répondre « échec biométrique » était faux.
     if (_unlockGate != null) {
-      return UnlockResult.wrongPassword;
+      return UnlockResult.busy;
     }
     final gate = _unlockGate = Completer<void>();
     try {
@@ -482,26 +522,92 @@ extension VaultUnlock on VaultService {
         // v4 : the cached _key IS the 32-byte finalKey, no Argon2id / KEK
         // unwrap needed. The GCM tag binds the AAD so wrong-key fails closed.
         // v2.2.0 : `_decryptVaultV4` est pur. On assigne ici en cas de succès.
-        final entries = await _decryptVaultV4(raw, _key!);
-        if (entries == null) {
+        //
+        // AUDIT 2026-08-03 — les paramètres viennent du fichier ici aussi.
+        // Ce chemin ne dérive rien (la clé est déjà en cache), mais il en a
+        // besoin pour reconstruire l'AAD à l'identique, sans quoi l'étiquette
+        // GCM ne se vérifierait pas.
+        final kdf = raw['kdf'];
+        final params = kdf is Map ? KdfParams.fromFileOrNull(kdf) : null;
+        if (params == null) {
           ok = false;
         } else {
-          _entries = entries;
-          _isOpen = true;
-          ok = true;
+          final entries = await _decryptVaultV4(raw, _key!, params);
+          if (entries == null) {
+            ok = false;
+          } else {
+            _entries = entries;
+            _isOpen = true;
+            // AUDIT 2026-08-03 — le cache méta est peuplé ICI AUSSI.
+            //
+            // Ce chemin ne le remplissait pas, et c'est ce qui le privait
+            // silencieusement de deux traitements de fin de déverrouillage :
+            //   • `_migrateFileLabelIfLegacy` (SEC F18), qui renonce quand le
+            //     cache est vide — un coffre antérieur à la v2.5.4 gardait donc
+            //     le mot « decoy » en clair sur le disque INDÉFINIMENT dès lors
+            //     que son propriétaire n'ouvre qu'à l'empreinte, ce qui est
+            //     précisément l'usage courant ;
+            //   • le réalignement du rembourrage ajouté par cet audit.
+            // Chaque modification d'entrée repassait en outre par la relecture
+            // complète du fichier, que QW2 v2.4.0 avait justement supprimée.
+            _cachedKdfParams = params;
+            final kek = raw['kek'];
+            if (kek is Map) {
+              final saltB64 = kdf['salt'];
+              final wrappedB64 = kek['wrappedDek'];
+              final nonceB64 = kek['wrapNonce'];
+              if (saltB64 is String &&
+                  wrappedB64 is String &&
+                  nonceB64 is String) {
+                if (_cachedSalt != null) {
+                  SecretBytes.wipe(_cachedSalt!);
+                }
+                if (_cachedWrappedDek != null) {
+                  SecretBytes.wipe(_cachedWrappedDek!);
+                }
+                if (_cachedWrapNonce != null) {
+                  SecretBytes.wipe(_cachedWrapNonce!);
+                }
+                _cachedSalt = base64Decode(saltB64);
+                _cachedWrappedDek = base64Decode(wrappedB64);
+                _cachedWrapNonce = base64Decode(nonceB64);
+              }
+            }
+            ok = true;
+          }
         }
       } else {
-        ok = _decryptVaultV3(raw);
+        // AUDIT 2026-08-03 — cette branche appelait `_decryptVaultV3(raw)`.
+        // Elle ne pouvait PAS aboutir, et le commentaire qui l'accompagnait
+        // décrivait un mécanisme inexistant (« filet de sécurité pour le
+        // premier déverrouillage après mise à jour »).
+        //
+        // Démonstration : `_key` vient d'être validée à EXACTEMENT 32 octets
+        // une trentaine de lignes plus haut (F2 v2.4.4), tandis que
+        // `_decryptVaultV3` exige une clé de 64 octets — c'est la garde
+        // SEC F13 v2.5.2, qui existe précisément pour qu'une clé v4 de 32
+        // octets ne puisse jamais ouvrir un fichier v3. L'appel rendait donc
+        // invariablement `false`.
+        //
+        // Le vrai filet de sécurité est ailleurs, et il fonctionne : une
+        // enveloppe biométrique d'avant la v4 fait 64 octets, elle est donc
+        // rejetée par le contrôle de longueur, l'enveloppe est supprimée et
+        // l'utilisateur reçoit `biometricInvalidated` avec la marche à suivre.
+        ok = false;
       }
 
       if (ok) {
         _activeSlot = _Slot.primary;
         await _onUnlockSuccess();
-        // If the stored key was a v3 64-byte cache, force re-enrol after the
-        // upcoming v4 migration trip — but we only reach here if the vault is
-        // already v4 (v3 unlock-with-bio still works as a safety net for the
-        // first unlock after upgrade; the bio cache will be wiped on
-        // _migrateV3ToV4 path triggered by password unlock).
+        // AUDIT 2026-08-03 — mêmes traitements de fin d'ouverture que sur le
+        // chemin par mot de passe. Ils manquaient tous les deux ici, ce qui
+        // rendait SEC F18 inopérant pour quiconque n'ouvre qu'à l'empreinte.
+        await _migrateFileLabelIfLegacy(_Slot.primary);
+        await _realignPaddingIfNeeded(_Slot.primary);
+        // On n'arrive ici que sur un coffre déjà en v4 (cf. la branche `else`
+        // ci-dessus). Un coffre encore en v3 se migre au premier
+        // déverrouillage par mot de passe, qui invalide au passage l'enveloppe
+        // biométrique — l'utilisateur la réactive ensuite depuis Réglages.
         return UnlockResult.success;
       }
       _wipeKey();

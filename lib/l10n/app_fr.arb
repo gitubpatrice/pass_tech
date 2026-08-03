@@ -505,10 +505,6 @@
   "settingsDeleteAllDialogTitle": "Supprimer toutes les données ?",
   "settingsDeleteAllDialogBody": "Toutes vos entrées et le coffre-fort seront supprimés définitivement.",
   "settingsDeleteAllConfirm": "Tout supprimer",
-  "settingsDeleteAllUnavailable": "Opération indisponible.",
-  "@settingsDeleteAllUnavailable": {
-    "description": "Refus neutre quand la suppression totale est demandée depuis une session leurre. Ne doit RIEN révéler de l'existence d'un coffre principal."
-  },
 
   "exportPlainDialogTitle": "Export NON CHIFFRÉ",
   "exportPlainWarningHeadline": "Le fichier exporté contiendra TOUS vos mots de passe EN CLAIR (lisibles par n'importe qui).",

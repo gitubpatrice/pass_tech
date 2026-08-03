@@ -27,9 +27,23 @@ class _UnlockScreenState extends State<UnlockScreen> {
   int? _lockoutRemaining;
   Timer? _lockoutTimer;
 
+  /// AUDIT 2026-08-03 — `Future` évalué UNE fois, à la création de l'écran.
+  ///
+  /// Il était auparavant construit directement dans `build()`
+  /// (`future: HeritageService().shouldShowHeirOption()`), donc relancé à
+  /// chaque reconstruction — et il y en a à chaque frappe d'erreur, chaque
+  /// bascule de chargement, chaque retour de biométrie. Chaque relance
+  /// enchaînait quatre lectures de stockage sécurisé **et un effet de bord
+  /// d'écriture** : `shouldShowHeirOption` appelle `startGraceIfNeeded`, qui
+  /// persiste le début du délai de grâce. Déclencher une écriture depuis une
+  /// méthode de rendu est une faute de conception en soi ; ici elle portait sur
+  /// l'horloge du dispositif d'héritage.
+  late final Future<bool> _heirOptionFuture;
+
   @override
   void initState() {
     super.initState();
+    _heirOptionFuture = HeritageService().shouldShowHeirOption();
     _checkLockout();
     _checkBiometric();
     _checkIntegrity();
@@ -210,7 +224,20 @@ class _UnlockScreenState extends State<UnlockScreen> {
     // unlockWithBiometric() triggers BiometricPrompt via biometric_storage —
     // the Keystore key is gated by setUserAuthenticationRequired(true), so a
     // successful read implies a successful biometric authentication.
-    final result = await VaultService().unlockWithBiometric();
+    final UnlockResult result;
+    try {
+      result = await VaultService().unlockWithBiometric();
+    } catch (e) {
+      // AUDIT 2026-08-03 — même filet que `_unlock()` : jamais d'indicateur de
+      // progression bloqué sur l'écran de déverrouillage.
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      setState(() {
+        _loading = false;
+        _error = t.genericError('$e');
+      });
+      return;
+    }
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
@@ -250,6 +277,18 @@ class _UnlockScreenState extends State<UnlockScreen> {
           _error = t.unlockBiometricEnrollmentChanged;
         });
         break;
+      case UnlockResult.busy:
+        // AUDIT 2026-08-03 — une autre ouverture est déjà en cours (typiquement
+        // l'utilisateur a validé son mot de passe puis posé son doigt). Rien
+        // n'a été tenté, donc aucun essai n'est consommé : on invite juste à
+        // recommencer, sans laisser entendre que la biométrie a échoué.
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _loading = false;
+          _error = t.vaultBusyRetry;
+        });
+        break;
     }
   }
 
@@ -260,7 +299,28 @@ class _UnlockScreenState extends State<UnlockScreen> {
       _loading = true;
       _error = null;
     });
-    final result = await VaultService().unlock(pass);
+    final UnlockResult result;
+    try {
+      result = await VaultService().unlock(pass);
+    } catch (e) {
+      // AUDIT 2026-08-03 — filet de dernier recours.
+      //
+      // `VaultService.unlock()` est désormais fail-closed en interne, mais rien
+      // ne protégeait CET appel : la moindre exception qui remontait laissait
+      // `_loading` à `true`, donc un indicateur de progression PERMANENT, sans
+      // message, sans bouton, sans issue — et le même écran au relancement.
+      // La règle vaut au-delà de ce cas précis : sur l'écran de déverrouillage,
+      // aucun chemin ne doit pouvoir laisser l'utilisateur devant un coffre
+      // qu'il ne peut ni ouvrir ni comprendre.
+      _passCtrl.clear();
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      setState(() {
+        _loading = false;
+        _error = t.genericError('$e');
+      });
+      return;
+    }
     _passCtrl.clear();
     if (!mounted) return;
     switch (result) {
@@ -302,6 +362,19 @@ class _UnlockScreenState extends State<UnlockScreen> {
         setState(() {
           _loading = false;
           _error = t.unlockWrongPassword;
+        });
+        break;
+      case UnlockResult.busy:
+        // AUDIT 2026-08-03 — double-appui sur « Déverrouiller ». Avant, ce cas
+        // empruntait `wrongPassword` : la saisie était pourtant bonne et aucun
+        // essai n'avait été consommé, mais l'écran annonçait « mot de passe
+        // incorrect ». Sur l'écran le plus sensible de l'app, c'est une
+        // fausse alerte que l'utilisateur ne peut pas distinguer d'une vraie.
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _loading = false;
+          _error = t.vaultBusyRetry;
         });
         break;
     }
@@ -502,7 +575,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         // FutureBuilder ne renvoie l'option qu'après le check
                         // crypto, pas de leak temporel.
                         FutureBuilder<bool>(
-                          future: HeritageService().shouldShowHeirOption(),
+                          future: _heirOptionFuture,
                           builder: (_, snap) {
                             if (snap.data != true) {
                               return const SizedBox.shrink();

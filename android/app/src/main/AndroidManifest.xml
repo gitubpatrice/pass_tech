@@ -1,16 +1,41 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <!-- v2.5.0 (F12) : USE_FINGERPRINT retiré. Obsolète depuis API 28
-         (Android 9, septembre 2018). USE_BIOMETRIC le remplace et couvre
-         l'ensemble des modalités biométriques (empreinte, visage, iris).
-         Garder USE_FINGERPRINT = signal inutile + permission de plus dans
-         la liste vue par le user/store. minSdk = 26 sur Pass Tech (cf.
-         android/app/build.gradle.kts), donc l'écart API 26→28 ne touche
-         pratiquement aucun device en circulation en 2026. -->
+    <!-- v2.5.0 (F12) : USE_FINGERPRINT retirée de CE fichier. Obsolète depuis
+         API 28 (Android 9), USE_BIOMETRIC la remplace et couvre l'ensemble des
+         modalités (empreinte, visage, iris).
+
+         ⚠️ AUDIT 2026-08-03 — le commentaire d'origine était doublement faux,
+         et il faut le dire pour que personne ne re-tente le « nettoyage » :
+
+           1. Il affirmait « minSdk = 26 ». C'est 24 (cf. build.gradle.kts,
+              abaissé pour pouvoir couper enableV1Signing / Janus). Le parc
+              API 24-27 est donc DANS la cible, et sur ces versions
+              androidx.biometric retombe sur FingerprintManager, qui EXIGE
+              USE_FINGERPRINT. La retirer pour de bon casserait la biométrie
+              sur Android 7.0 → 8.1.
+
+           2. Le bénéfice annoncé (« une permission de moins dans la liste vue
+              par le user/store ») n'a JAMAIS existé : le plugin
+              biometric_storage la déclare lui-même, sans maxSdkVersion, et
+              elle réapparaît donc dans le manifeste FUSIONNÉ de la release.
+              Vérifiable :
+                grep USE_FINGERPRINT build/app/intermediates/merged_manifest/\
+                  release/processReleaseMainManifest/AndroidManifest.xml
+
+         Conclusion : on la laisse hors de ce fichier (elle arrive par le
+         plugin de toute façon) et on ne tente PAS de la supprimer via
+         tools:node="remove" — ce serait une régression fonctionnelle réelle
+         pour un bénéfice cosmétique inexistant. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- AUDIT 2026-08-03 — ACCESS_NETWORK_STATE n'est PAS déclarée ici mais
+         arrive dans l'APK final via com.google.android.datatransport:
+         transport-backend-cct, tiré par mobile_scanner → ML Kit → Play
+         Services. Elle est documentée comme telle dans PRIVACY.md §6 plutôt
+         que redéclarée ici : la redéclarer masquerait son origine réelle.
+         Voir aussi THIRD_PARTY_NOTICES.md (dépendances transitives Google). -->
 
     <application
         android:label="Pass Tech"
@@ -23,9 +48,23 @@
         android:usesCleartextTraffic="false">
         <!-- L'activity n'a PAS de LAUNCHER : on passe par 2 alias activables/
              désactivables au runtime pour le mode panique + camouflage. -->
+        <!-- AUDIT 2026-08-03 — `exported` passe à false. Ce n'est PAS une
+             restriction fonctionnelle : les deux points d'entrée légitimes
+             restent ouverts.
+               • Le lanceur passe par les activity-alias ci-dessous, qui portent
+                 le filtre MAIN/LAUNCHER et leur propre `exported="true"` —
+                 c'est l'alias qui est résolu par le système, la cible n'a pas
+                 besoin d'être exportée.
+               • CalculatorActivity.revealPassTech() utilise un intent EXPLICITE
+                 dans le même UID, sur lequel `exported` n'a aucune prise.
+             Avant, n'importe quelle application installée pouvait démarrer
+             l'écran de déverrouillage par ComponentName. Aucun extra n'y est
+             traité, donc l'impact était faible — mais la surface était gratuite,
+             et l'incohérence avec CalculatorActivity (déjà `exported="false"`)
+             invitait à la recopier. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
