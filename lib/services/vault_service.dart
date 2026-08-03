@@ -685,7 +685,28 @@ class VaultService {
     _bioFile = null;
   }
 
+  /// AUDIT 2026-08-03 (Gemini PT-002) — compteur de verrouillages.
+  ///
+  /// Incrémenté à CHAQUE [lock]. Toute opération longue qui prend un
+  /// instantané de l'état du coffre pour le restaurer ensuite doit relever ce
+  /// compteur avant, et renoncer à restaurer s'il a changé.
+  ///
+  /// Sans ce garde-fou, `_passwordMatchesPrimaryInternal` — qui dure le temps
+  /// d'un Argon2id, soit près d'une seconde — remettait `_key`, `_entries`,
+  /// `_isOpen` et `_activeSlot` dans son `finally` SANS CONDITION. Un
+  /// verrouillage survenant pendant ce laps de temps était donc annulé, et le
+  /// coffre se retrouvait de nouveau déchiffré en mémoire.
+  ///
+  /// Les déclencheurs ne sont pas théoriques : passage en arrière-plan avec
+  /// verrouillage immédiat, minuterie d'inactivité, « Verrouiller maintenant »,
+  /// et surtout `PanicService.panic()`. Le scénario complet : on met à jour
+  /// l'instantané d'héritage — ce qui appelle `passwordMatchesPrimary` — et on
+  /// déclenche la panique dans la seconde. La panique verrouillait, puis la
+  /// vérification rouvrait le coffre derrière elle.
+  int _lockGeneration = 0;
+
   void lock() {
+    _lockGeneration++;
     _wipeKey();
     _entries = [];
     _isOpen = false;

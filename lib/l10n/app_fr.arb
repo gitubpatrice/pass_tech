@@ -294,8 +294,6 @@
   "entryEditTitleEdit": "Modifier",
   "entryEditTitleNew": "Nouveau {type}",
   "entryEditTitleRequired": "Le titre est obligatoire",
-  "entryEditQrInvalid": "QR code invalide pour 2FA",
-  "entryEditSecretInvalid": "Secret invalide : {error}",
   "entryEditSecretAdded": "Secret 2FA ajouté ✓",
   "entryEditAddFavorite": "Ajouter aux favoris",
   "entryEditRemoveFavorite": "Retirer des favoris",
@@ -316,7 +314,6 @@
   "entryEditField2faOptional": "Code 2FA — secret TOTP (optionnel)",
   "entryEditHint2fa": "Clé secrète Base32 ou scanner QR",
   "entryEditHelper2fa": "Génère des codes 2FA à 6 chiffres",
-  "entryEditTooltipScanQr": "Scanner QR",
   "entryEditFieldNotesOptional": "Notes (optionnel)",
   "entryEditHintNotes": "Informations supplémentaires…",
   "entryEditFieldContent": "Contenu",
@@ -365,10 +362,6 @@
   "heirViewFieldUrl": "URL",
   "heirViewFieldNotes": "Notes",
 
-  "qrScannerTitle": "Scanner un QR code",
-  "qrScannerCameraUnavailable": "Caméra non disponible",
-  "qrScannerCheckPermissions": "Vérifiez les autorisations dans les paramètres.",
-  "qrScannerPointHint": "Pointez le QR code 2FA dans le cadre",
 
   "entryDetailFavoriteTooltip": "Favori",
   "entryDetailEditTooltip": "Modifier",
@@ -376,9 +369,6 @@
   "entryDetailCopyNotesTooltip": "Copier les notes",
   "entryDetailToggleVisibility": "Afficher / masquer",
   "auditRefreshTooltip": "Actualiser",
-  "qrTorchOn": "Activer le flash",
-  "qrTorchOff": "Désactiver le flash",
-  "qrSwitchCamera": "Changer de caméra",
   "unlockShowPassword": "Afficher le mot de passe",
   "unlockHidePassword": "Masquer le mot de passe",
 

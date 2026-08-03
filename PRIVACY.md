@@ -65,27 +65,22 @@ This Privacy Policy explains how the **Pass Tech** application — a 100% local 
 - Network Security Config rejects cleartext HTTP and user-installed CAs in release builds.
 - **We operate no server.** No data is sent to the developer, no in-house analytics, no crash reporting.
 
-### Third-party library: Google ML Kit (QR code scanning)
+### No Google libraries
 
-For the sake of accuracy, a third network stack is present in the app, and it does
-not come from our code:
+The app contains **no Google components**: no Play Services, no ML Kit, no
+Firebase, no telemetry transport.
 
-- QR code scanning (used to import a two-factor authentication secret) relies on
-  the `mobile_scanner` library, which is built on **Google ML Kit**. That library
-  in turn bundles `play-services-basement`, `play-services-base` and the
-  `com.google.android.datatransport` transport component ("CCT"), which may report
-  library usage statistics back to Google.
-- This is also where the **`ACCESS_NETWORK_STATE`** permission shown on the app
-  listing comes from: it is added automatically by that dependency, not declared
-  by Pass Tech.
-- **This component never has access to your vault contents.** It only sees the
-  camera image at the moment you scan a QR code, and only then. Your credentials,
-  master password and keys never pass through any Google library.
-- If this matters to you, do not use QR code scanning: a two-factor secret can
-  always be **typed in by hand**, and every other feature of the app works
-  entirely without it.
+This was not the case until 2026-08-03. QR code scanning then relied on
+`mobile_scanner`, built on **Google ML Kit**, which pulled in
+`play-services-base`, `play-services-basement` and the
+`com.google.android.datatransport` transport component. That dependency also
+added an `ACCESS_NETWORK_STATE` permission **declared nowhere in the repository**.
 
-This dependency is flagged with the `NonFreeDep` anti-feature on F-Droid.
+Camera scanning was therefore removed, and with it the `CAMERA` and
+`ACCESS_NETWORK_STATE` permissions. To add a two-factor secret, **paste the
+`otpauth://…` URI** into the corresponding field: the app extracts the secret
+automatically. Most services display that URI in plain text below the QR code,
+behind a "can't scan?" link. The secret can also be typed by hand.
 
 ## 7. Sharing and data transmission
 
@@ -128,8 +123,9 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability disclosure policy.
 | ------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Optional biometric unlock via Android BiometricPrompt.                                            |
 | `INTERNET`                           | Update check (GitHub Releases) and HIBP breach check (k-anonymity, opt-in).                       |
-| `CAMERA`                             | Scan a 2FA QR code to add a TOTP secret. The camera feed is processed locally and never recorded. |
-| `ACCESS_NETWORK_STATE`               | **Not declared by Pass Tech.** Added automatically by the QR scanning library (Google ML Kit / `datatransport`). See §6. |
+
+`CAMERA` and `ACCESS_NETWORK_STATE` were **removed on 2026-08-03** along with QR
+code scanning — see §6.
 
 ## 11. Children
 

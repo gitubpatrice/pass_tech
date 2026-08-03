@@ -5,6 +5,7 @@ import 'l10n/app_localizations.dart';
 import 'services/app_update.dart';
 import 'services/clipboard_service.dart';
 import 'services/first_launch_flag.dart';
+import 'services/monotonic_clock.dart';
 import 'services/panic_service.dart';
 import 'services/secure_window.dart';
 import 'services/vault_service.dart';
@@ -146,7 +147,31 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   /// `DateTime.now()` suit l'horloge système : un attaquant root qui
   /// recule la date après pause empêche l'auto-lock de déclencher.
   /// `Stopwatch.elapsedMilliseconds` ne se laisse pas tromper.
+  ///
+  /// ⚠️ AUDIT 2026-08-03 (Gemini PT-001) — mais il se laisse ENDORMIR.
+  ///
+  /// Le `Stopwatch` de Dart s'appuie sur `CLOCK_MONOTONIC`, qui **cesse
+  /// d'avancer pendant la veille profonde** de l'appareil. Or c'est le cas
+  /// nominal : on repose son téléphone, l'écran s'éteint, Android entre en
+  /// Doze au bout de quelques minutes. Au retour, deux heures plus tard, le
+  /// chronomètre n'a compté que le temps d'éveil — souvent moins que le délai
+  /// de verrouillage automatique, réglé à 300 s par défaut. **Le coffre
+  /// restait donc ouvert.** Le correctif de la v2.3.8 protégeait du décalage
+  /// d'horloge et ouvrait cette brèche-là sans que personne le voie.
+  ///
+  /// La bonne source est `SystemClock.elapsedRealtime()`, qui compte le
+  /// sommeil profond — déjà exposée par `MonotonicClock.elapsedRealtimeMs()`,
+  /// introduite en v2.5.2 pour le verrouillage anti-force-brute.
+  ///
+  /// On conserve le `Stopwatch` en second témoin, pour deux raisons : il est
+  /// SYNCHRONE, donc capturable à l'instant exact du passage en arrière-plan
+  /// (l'appel de canal, lui, impose un `await` — c'est précisément le piège
+  /// qui avait affaibli SEC F3), et il reste disponible si la plateforme ne
+  /// répond pas. Au retour, on retient le **plus grand** des deux temps
+  /// écoulés : `elapsedRealtime` domine toujours, et en cas de réponse
+  /// aberrante du canal on verrouille plus tôt plutôt que plus tard.
   int? _pausedAtMonoMs;
+  int? _pausedAtBootMs;
   static final Stopwatch _stopwatch = Stopwatch()..start();
 
   /// v2.5.0 (F9) — guard cache session sur `_checkForUpdate`.
@@ -227,6 +252,12 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // passage en arrière-plan, donc chaque `await` qui précède est une
       // fenêtre de capture.
       await SecureWindow.suspendRelaxForBackground();
+      // AUDIT 2026-08-03 — ancre qui compte la veille profonde. Prise APRÈS
+      // l'horodatage synchrone et APRÈS le réarmement de FLAG_SECURE : c'est un
+      // aller-retour de canal, il ne doit précéder ni l'un ni l'autre. Le léger
+      // décalage est sans effet, puisque les deux ancres sont comparées à
+      // elles-mêmes au retour.
+      _pausedAtBootMs ??= await MonotonicClock.elapsedRealtimeMs();
       // Wipe clipboard immediately on background : don't risk leaving secrets
       // in the clipboard if the OS kills the process before the timer fires.
       await ClipboardService.cancelAndClear();
@@ -238,7 +269,9 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // SEC F3 v2.5.2 — rétablit la relaxation si un écran la demande encore.
       await SecureWindow.resumeRelaxAfterBackground();
       final pausedMs = _pausedAtMonoMs;
+      final pausedBootMs = _pausedAtBootMs;
       _pausedAtMonoMs = null;
+      _pausedAtBootMs = null;
 
       // If vault was locked while paused (immediate option) → go to unlock
       if (!VaultService().isOpen) {
@@ -265,8 +298,29 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final lockSec = prefs.getInt('auto_lock_seconds') ?? 300;
       if (lockSec < 0) return; // never
+
+      // AUDIT 2026-08-03 — temps réellement écoulé en arrière-plan.
+      //
+      // `elapsedRealtime` compte le sommeil profond, le `Stopwatch` non. On
+      // retient le PLUS GRAND des deux : en fonctionnement normal c'est
+      // toujours le premier, et si le canal rend une valeur aberrante ou
+      // indisponible, on retombe sur le second — donc on verrouille trop tôt,
+      // jamais trop tard.
+      var elapsedMs = pausedMs == null
+          ? 0
+          : _stopwatch.elapsedMilliseconds - pausedMs;
+      if (pausedBootMs != null) {
+        final nowBootMs = await MonotonicClock.elapsedRealtimeMs();
+        // Un recul signalerait un redémarrage — impossible ici, le processus
+        // n'y survit pas — ou une réponse incohérente : on l'ignore.
+        if (nowBootMs != null && nowBootMs >= pausedBootMs) {
+          final bootElapsed = nowBootMs - pausedBootMs;
+          if (bootElapsed > elapsedMs) elapsedMs = bootElapsed;
+        }
+      }
+
       if (pausedMs != null &&
-          _stopwatch.elapsedMilliseconds - pausedMs >= lockSec * 1000 &&
+          elapsedMs >= lockSec * 1000 &&
           VaultService().isOpen) {
         VaultService().lock();
         _navigatorKey.currentState?.pushAndRemoveUntil(

@@ -11,7 +11,6 @@ import '../services/vault_service.dart';
 import '../utils/snack_utils.dart';
 import '../widgets/password_text_field.dart';
 import 'generator_screen.dart';
-import 'qr_scanner_screen.dart';
 
 class EntryEditScreen extends StatefulWidget {
   final Entry? entry;
@@ -229,28 +228,40 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
     return raw.trim();
   }
 
-  Future<void> _scanQrForTotp() async {
+  /// Extrait le secret quand une URI `otpauth://` arrive dans le champ 2FA.
+  ///
+  /// AUDIT 2026-08-03 — remplace le scan de QR code par caméra, retiré avec la
+  /// dépendance `mobile_scanner` (Google ML Kit — voir `THREAT_MODEL.md` §5.2).
+  ///
+  /// La valeur du scan n'était pas la caméra en soi : c'était de n'avoir pas à
+  /// recopier une chaîne Base32 de 32 caractères à la main. Un QR code
+  /// d'authentification contient une URI
+  /// `otpauth://totp/Service:moi?secret=XXXX&issuer=Service`, et cette URI est
+  /// affichée en toutes lettres par la plupart des services, sous le QR code,
+  /// derrière un lien « impossible de scanner ? ». On la colle ici, l'app en
+  /// tire le `secret` : le confort est conservé, sans caméra, sans permission
+  /// et sans bibliothèque tierce.
+  ///
+  /// Fonctionne aussi avec un secret Base32 collé tel quel — dans ce cas
+  /// `_extractTotpSecret` rend la chaîne inchangée et rien ne se produit
+  /// visuellement.
+  ///
+  /// ⚠️ Le collage se fait DANS le champ, par le clavier. On ne lit jamais le
+  /// presse-papier par programme : `Clipboard.getData` est bloqué par Knox dès
+  /// qu'une fenêtre a porté FLAG_SECURE (limite constatée en v2.3.10), un
+  /// bouton « Coller » serait donc muet sur Samsung.
+  void _onTotpChanged(String value) {
+    if (_totpError != null) setState(() => _totpError = null);
+    final trimmed = value.trim();
+    if (!trimmed.toLowerCase().startsWith('otpauth://')) return;
+    final secret = _extractTotpSecret(trimmed);
+    if (secret == null || secret.isEmpty || secret == trimmed) return;
+    if (TotpService.validate(secret) != null) return;
     final messenger = ScaffoldMessenger.of(context);
     final t = AppLocalizations.of(context);
-    final raw = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-    );
-    if (raw == null || !mounted) return;
-    final secret = _extractTotpSecret(raw);
-    if (secret == null || secret.isEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(t.entryEditQrInvalid)));
-      return;
-    }
-    final err = TotpService.validate(secret);
-    if (err != null) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(t.entryEditSecretInvalid(err))),
-      );
-      return;
-    }
     setState(() {
       _totpCtrl.text = secret;
+      _totpCtrl.selection = TextSelection.collapsed(offset: secret.length);
       _totpError = null;
     });
     messenger.showSnackBar(SnackBar(content: Text(t.entryEditSecretAdded)));
@@ -479,16 +490,7 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
         helperText: t.entryEditHelper2fa,
         errorText: _totpError,
         prefixIcon: const Icon(Icons.shield_outlined, size: 20),
-        onChanged: (_) {
-          if (_totpError != null) setState(() => _totpError = null);
-        },
-        extraSuffixIcons: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, size: 20),
-            tooltip: t.entryEditTooltipScanQr,
-            onPressed: _scanQrForTotp,
-          ),
-        ],
+        onChanged: _onTotpChanged,
       ),
       const SizedBox(height: 16),
 

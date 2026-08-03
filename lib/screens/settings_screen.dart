@@ -744,7 +744,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     // ne s'exécute jamais et la copie faite par share_plus survit indéfiniment.
     // Le commentaire de SEC F8 affirmait que ce ménage avait aussi lieu « au
     // verrouillage » — c'était faux, la fonction n'avait qu'un seul appelant.
-    _shredShareCache(dir);
+    _shredStaleExports(dir);
     final file = File('${dir.path}/pass_tech_export.json');
     await file.writeAsString(json);
     try {
@@ -764,7 +764,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       // indéfiniment à côté — sans mot de passe, sans Keystore, sans Argon2id
       // pour le protéger. Le plugin accorde en outre une permission de lecture
       // sur cette copie à toute activité résolvant le sélecteur.
-      _shredShareCache(dir);
+      _shredStaleExports(dir);
     }
   }
 
@@ -778,19 +778,64 @@ class _SettingsScreenState extends State<SettingsScreen>
   /// qu'à la relecture croisée.
   static void _shredFile(File file) => VaultService.shredFileSync(file);
 
-  /// Purge le répertoire de cache de `share_plus`, où le plugin recopie tout
-  /// fichier partagé et n'y fait le ménage qu'au DÉBUT du partage suivant.
+  /// Vrai si [filePath] est bien une COPIE faite par le sélecteur de fichiers
+  /// dans notre propre cache, et non le document d'origine de l'utilisateur.
   ///
-  /// Appelé AVANT et APRÈS chaque partage. L'appel « avant » n'est pas
-  /// redondant : c'est lui qui rattrape le cas où le processus a été tué
-  /// pendant l'affichage du sélecteur, auquel cas le `finally` du partage
-  /// précédent n'a jamais tourné.
-  static void _shredShareCache(Directory cacheDir) {
+  /// Deux conditions, délibérément cumulatives :
+  ///  1. le chemin est sous le répertoire temporaire de l'application ;
+  ///  2. il traverse le sous-dossier `file_picker/`, que le plugin fabrique.
+  ///
+  /// Vérifié dans `file_picker` 11.0.2 (`FileUtils.kt`), qui écrit sous
+  /// `<cache>/file_picker/<horodatage>/<nom>`. Exiger les deux plutôt qu'une
+  /// seule est volontaire : au moindre écart — nouvelle version du plugin,
+  /// autre plateforme, chemin inattendu — on renonce à effacer. Le pire cas
+  /// devient « une copie survit jusqu'à `clearTemporaryFiles()` », au lieu de
+  /// « le fichier de l'utilisateur a disparu ».
+  static bool _isPickerCacheCopy(String cacheRoot, String filePath) {
+    final root = cacheRoot.replaceAll('\\', '/');
+    final path = filePath.replaceAll('\\', '/');
+    final prefix = root.endsWith('/') ? root : '$root/';
+    if (!path.startsWith(prefix)) return false;
+    if (path.contains('/../') || path.endsWith('/..')) return false;
+    return path.contains('/file_picker/');
+  }
+
+  /// Purge tout résidu d'un export précédent dans le répertoire temporaire.
+  ///
+  /// Couvre DEUX emplacements, et c'est le second qui manquait :
+  ///  1. `<cache>/share_plus/` — où le plugin recopie chaque fichier partagé,
+  ///     et où il ne fait le ménage qu'au DÉBUT du partage suivant ;
+  ///  2. **le répertoire temporaire lui-même**, où vivent NOS fichiers
+  ///     (`pass_tech_export.json`, `pass_tech_*.ptbak`).
+  ///
+  /// AUDIT 2026-08-03 (Gemini PT-001) — le point 2 est un trou du correctif
+  /// SEC F8 posé le matin même. Le `finally` de l'export déchiquette bien notre
+  /// fichier… quand il s'exécute. Si le processus est tué pendant que le
+  /// sélecteur de partage est à l'écran — l'utilisateur bascule d'application,
+  /// Android récupère la mémoire — ce `finally` ne tourne JAMAIS, et
+  /// `pass_tech_export.json`, qui contient l'intégralité des mots de passe **en
+  /// clair**, reste dans le cache indéfiniment. La purge d'ouverture ne
+  /// regardait que le sous-dossier du plugin, jamais notre propre fichier.
+  ///
+  /// Appelée AVANT et APRÈS chaque partage : c'est l'appel « avant » qui
+  /// rattrape l'export précédent interrompu.
+  static void _shredStaleExports(Directory cacheDir) {
     try {
       final shareDir = Directory('${cacheDir.path}/share_plus');
-      if (!shareDir.existsSync()) return;
-      for (final ent in shareDir.listSync(followLinks: false)) {
-        if (ent is File) _shredFile(ent);
+      if (shareDir.existsSync()) {
+        for (final ent in shareDir.listSync(followLinks: false)) {
+          if (ent is File) _shredFile(ent);
+        }
+      }
+    } catch (_) {}
+    try {
+      for (final ent in cacheDir.listSync(followLinks: false)) {
+        if (ent is! File) continue;
+        final name = ent.uri.pathSegments.last;
+        if (name == 'pass_tech_export.json' ||
+            (name.startsWith('pass_tech_') && name.endsWith('.ptbak'))) {
+          _shredFile(ent);
+        }
       }
     } catch (_) {}
   }
@@ -825,7 +870,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       // une copie complète du coffre, laissée dans un répertoire sur lequel le
       // plugin accorde une permission de lecture à toute application capable
       // de répondre au sélecteur.
-      _shredShareCache(dir);
+      _shredStaleExports(dir);
       final file = File('${dir.path}/pass_tech_$date.ptbak');
       await file.writeAsString(content);
       if (!mounted) return;
@@ -836,7 +881,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         ], subject: t.exportEncryptedShareSubject);
       } finally {
         _shredFile(file);
-        _shredShareCache(dir);
+        _shredStaleExports(dir);
       }
     } catch (e) {
       if (!mounted) return;
@@ -881,6 +926,37 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (!mounted) return;
       SnackUtils.showError(context, messenger, t.importReadError);
       return;
+    } finally {
+      // AUDIT 2026-08-03 (Gemini PT-002) — purge du cache de FilePicker.
+      //
+      // Pour rendre un `path` exploitable à partir d'un `content://`, le
+      // sélecteur RECOPIE le fichier choisi dans le cache de l'application.
+      // Cette copie n'était jamais supprimée. Or ce que l'on importe ici, c'est
+      // typiquement un export **en clair** d'un autre gestionnaire — un JSON
+      // Bitwarden, un CSV KeePass — c'est-à-dire l'intégralité des mots de
+      // passe de la personne, dans un fichier non chiffré qui s'installait à
+      // demeure dans le cache de Pass Tech.
+      //
+      // Placé en `finally` : une lecture qui échoue laisse la copie tout autant
+      // derrière elle. On déchiquette d'abord notre exemplaire, puis on demande
+      // au plugin de vider le sien.
+      //
+      // ⚠️ GARDE OBLIGATOIRE : on ne déchiquette QUE si le chemin est bien dans
+      // notre répertoire de cache. Vérifié dans `file_picker` 11.0.2, qui copie
+      // sous `<cache>/file_picker/<horodatage>/<nom>` — mais si une version
+      // future rendait le chemin RÉEL du fichier choisi, on effacerait le
+      // document de l'utilisateur lui-même. Un export que l'on vient de lui
+      // demander d'importer. Le contrôle coûte deux lignes ; l'erreur serait
+      // irréparable.
+      try {
+        final cacheRoot = (await getTemporaryDirectory()).path;
+        if (_isPickerCacheCopy(cacheRoot, filePath)) {
+          _shredFile(File(filePath));
+        }
+      } catch (_) {}
+      try {
+        await FilePicker.clearTemporaryFiles();
+      } catch (_) {}
     }
     final file = probeFile;
 

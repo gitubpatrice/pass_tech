@@ -305,9 +305,6 @@
   "entryEditTitleNew": "New {type}",
   "@entryEditTitleNew": { "placeholders": { "type": { "type": "String" } } },
   "entryEditTitleRequired": "Title is required",
-  "entryEditQrInvalid": "Invalid QR code for 2FA",
-  "entryEditSecretInvalid": "Invalid secret: {error}",
-  "@entryEditSecretInvalid": { "placeholders": { "error": { "type": "String" } } },
   "entryEditSecretAdded": "2FA secret added ✓",
   "entryEditAddFavorite": "Add to favorites",
   "entryEditRemoveFavorite": "Remove from favorites",
@@ -328,7 +325,6 @@
   "entryEditField2faOptional": "2FA code — TOTP secret (optional)",
   "entryEditHint2fa": "Base32 secret key or scan QR",
   "entryEditHelper2fa": "Generates 6-digit 2FA codes",
-  "entryEditTooltipScanQr": "Scan QR",
   "entryEditFieldNotesOptional": "Notes (optional)",
   "entryEditHintNotes": "Additional information…",
   "entryEditFieldContent": "Content",
@@ -382,10 +378,6 @@
   "heirViewFieldUrl": "URL",
   "heirViewFieldNotes": "Notes",
 
-  "qrScannerTitle": "Scan a QR code",
-  "qrScannerCameraUnavailable": "Camera unavailable",
-  "qrScannerCheckPermissions": "Check permissions in settings.",
-  "qrScannerPointHint": "Point the 2FA QR code in the frame",
 
   "entryDetailFavoriteTooltip": "Favorite",
   "entryDetailEditTooltip": "Edit",
@@ -393,9 +385,6 @@
   "entryDetailCopyNotesTooltip": "Copy notes",
   "entryDetailToggleVisibility": "Show / hide",
   "auditRefreshTooltip": "Refresh",
-  "qrTorchOn": "Turn flash on",
-  "qrTorchOff": "Turn flash off",
-  "qrSwitchCamera": "Switch camera",
   "unlockShowPassword": "Show password",
   "unlockHidePassword": "Hide password",
 

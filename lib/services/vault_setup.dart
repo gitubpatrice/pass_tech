@@ -127,6 +127,27 @@ extension VaultSetup on VaultService {
     final hwSecret = SecretBytes.randomBytes(32);
     Uint8List? pwHash;
     Uint8List? finalKey;
+    // AUDIT 2026-08-03 (Gemini PT-001, CRITIQUE) — sauvegarde de la clé en
+    // cours AVANT toute mutation, pour pouvoir revenir en arrière.
+    //
+    // Défaut corrigé : `_key` était remplacée par la NOUVELLE clé juste avant
+    // `_saveVaultV4`. Si cette écriture échouait — disque plein, erreur d'E/S —
+    // l'exception remontait jusqu'à l'écran, qui affichait « échec », mais la
+    // session restait avec :
+    //   • `_key`      = la clé NEUVE,
+    //   • le fichier  = chiffré sous l'ANCIENNE clé,
+    //   • `_cached*`  = l'ancien sel et l'ancienne enveloppe (`_saveVaultV4` ne
+    //                   les rafraîchit qu'APRÈS une écriture réussie).
+    // La moindre modification d'entrée ensuite réécrivait le coffre chiffré
+    // sous la clé NEUVE en annonçant les métadonnées ANCIENNES. Au
+    // déverrouillage suivant, la dérivation repartait de l'ancien sel et
+    // produisait l'ancienne clé : l'étiquette AES-GCM ne pouvait plus se
+    // vérifier. **Ni l'ancien ni le nouveau mot de passe n'ouvraient plus le
+    // coffre** — perte définitive, à partir d'un simple disque plein.
+    final Uint8List? previousKey = _key == null
+        ? null
+        : Uint8List.fromList(_key!);
+    var rotationCommitted = false;
     try {
       pwHash = await KdfService.argon2id(password: newPassword, salt: salt);
       final alias = _aliasFor(slot);
@@ -152,6 +173,19 @@ extension VaultSetup on VaultService {
         // niveau tout seul le jour où son propriétaire change de mot de passe.
         params: KdfParams.owaspMobile2024,
       );
+      // ⚠️ POINT DE BASCULE — ici, et pas plus bas.
+      //
+      // `_saveVaultV4` se termine par un renommage atomique : dès qu'il rend la
+      // main, le coffre sur disque EST chiffré sous la nouvelle clé. Annuler
+      // au-delà de cette ligne produirait l'incohérence exactement inverse de
+      // celle qu'on corrige — une session revenue à l'ancienne clé face à un
+      // fichier neuf.
+      //
+      // L'écriture du sel en stockage qui suit n'est PAS porteuse pour le
+      // format v4 : le déverrouillage lit `kdf.salt` DANS LE FICHIER
+      // (cf. `_v4Unlock`). Elle ne sert qu'à périmer l'ancien sel v3, donc son
+      // échec ne remet pas la rotation en cause.
+      rotationCommitted = true;
       // V1 v2.4.0 — salt en storage écrit APRÈS save vault réussi : si le
       // process est tué entre les deux, on garde l'ancien salt cohérent
       // avec l'ancien vault au lieu d'un salt orphelin.
@@ -160,6 +194,21 @@ extension VaultSetup on VaultService {
         value: base64Encode(salt),
       );
     } finally {
+      if (!rotationCommitted) {
+        // Échec en cours de route : on remet la session dans l'état EXACT
+        // d'avant l'appel. Le coffre sur disque n'a pas bougé (ou a été
+        // réécrit à l'identique), donc l'ancienne clé reste la bonne.
+        //
+        // Sans cette restauration, `_key` gardait la clé neuve alors que le
+        // fichier était resté sous l'ancienne : le premier ajout d'entrée
+        // scellait l'incohérence et rendait le coffre définitivement illisible.
+        _wipeKey();
+        _key = previousKey;
+      } else if (previousKey != null) {
+        // Rotation réussie : la copie de secours est du matériel de clé, elle
+        // ne doit pas traîner en mémoire en attendant le ramasse-miettes.
+        SecretBytes.wipe(previousKey);
+      }
       if (pwHash != null) SecretBytes.wipe(pwHash);
       SecretBytes.wipe(hwSecret);
       if (finalKey != null) SecretBytes.wipe(finalKey);

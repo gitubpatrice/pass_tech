@@ -123,38 +123,72 @@ extension VaultUnlock on VaultService {
       final savedEntries = List<Entry>.from(_entries);
       final savedOpen = _isOpen;
       final savedSlot = _activeSlot;
+      // AUDIT 2026-08-03 (Gemini PT-002) — voir `VaultService._lockGeneration`.
+      final genAvant = _lockGeneration;
+      // AUDIT 2026-08-03 — le résultat transite par une variable au lieu de
+      // sortir par des `return` depuis l'intérieur du `try`. Un `finally` ne
+      // peut pas modifier une valeur déjà rendue : sans cela, l'appelant
+      // recevait `true` alors que le coffre venait d'être verrouillé sous lui.
+      var result = false;
       try {
         if (version >= VaultService._currentVersion) {
           final r = await _v4Unlock(slot: slot, password: password, raw: raw);
-          if (r == null) return false;
-          // F3 v2.4.4 — `_v4Unlock` est désormais pur. On wipe tous les
-          // buffers retournés ; `r.entries` est juste une `List<Entry>`
-          // référencée localement (GC). Pas de mutation du state global.
-          SecretBytes.wipe(r.finalKey);
-          SecretBytes.wipe(r.salt);
-          SecretBytes.wipe(r.wrappedDek);
-          SecretBytes.wipe(r.wrapNonce);
-          return true;
+          if (r != null) {
+            // F3 v2.4.4 — `_v4Unlock` est désormais pur. On wipe tous les
+            // buffers retournés ; `r.entries` est juste une `List<Entry>`
+            // référencée localement (GC). Pas de mutation du state global.
+            SecretBytes.wipe(r.finalKey);
+            SecretBytes.wipe(r.salt);
+            SecretBytes.wipe(r.wrappedDek);
+            SecretBytes.wipe(r.wrapNonce);
+            result = true;
+          }
+        } else {
+          // v3 path — derive PBKDF2 then attempt MAC check.
+          final saltB64 = await VaultService._storage.read(
+            key: _saltKeyFor(slot),
+          );
+          final iter =
+              raw['iterations'] as int? ?? VaultService._legacyIterations;
+          if (saltB64 != null &&
+              iter >= 1 &&
+              iter <= VaultService._maxIterations) {
+            final salt = base64Decode(saltB64);
+            _key = await VaultService._deriveKey(password, salt, iter);
+            result = _decryptVaultV3(raw);
+          }
         }
-        // v3 path — derive PBKDF2 then attempt MAC check.
-        final saltB64 = await VaultService._storage.read(
-          key: _saltKeyFor(slot),
-        );
-        if (saltB64 == null) return false;
-        final salt = base64Decode(saltB64);
-        final iter =
-            raw['iterations'] as int? ?? VaultService._legacyIterations;
-        if (iter < 1 || iter > VaultService._maxIterations) return false;
-        _key = await VaultService._deriveKey(password, salt, iter);
-        final ok = _decryptVaultV3(raw);
-        return ok;
       } finally {
         _wipeKey();
-        _key = savedKey;
-        _entries = savedEntries;
-        _isOpen = savedOpen;
-        _activeSlot = savedSlot;
+        if (_lockGeneration != genAvant) {
+          // Un verrouillage est survenu pendant la vérification — mise en
+          // arrière-plan, minuterie d'inactivité, « Verrouiller maintenant »,
+          // ou mode panique. Restaurer l'instantané REVIENDRAIT À ANNULER CE
+          // VERROUILLAGE et à laisser le coffre déchiffré en mémoire.
+          //
+          // La décision de l'utilisateur (ou de la panique) prime sur une
+          // vérification en cours : on efface l'instantané et on laisse le
+          // coffre fermé. L'appelant recevra `false`, ce qu'il traite déjà
+          // comme un échec de vérification.
+          if (savedKey != null) SecretBytes.wipe(savedKey);
+          savedEntries.clear();
+          _key = null;
+          _entries = [];
+          _isOpen = false;
+          _activeSlot = null;
+        } else {
+          _key = savedKey;
+          _entries = savedEntries;
+          _isOpen = savedOpen;
+          _activeSlot = savedSlot;
+        }
       }
+      // Un verrouillage survenu pendant la vérification invalide le verdict :
+      // l'appelant enchaînerait sur une opération sensible (rotation du mot de
+      // passe maître, écriture de l'instantané d'héritage) alors que le coffre
+      // vient d'être fermé, volontairement ou par la panique.
+      if (_lockGeneration != genAvant) return false;
+      return result;
     } catch (_) {
       return false;
     }

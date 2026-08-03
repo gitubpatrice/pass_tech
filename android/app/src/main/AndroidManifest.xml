@@ -28,14 +28,31 @@
          tools:node="remove" — ce serait une régression fonctionnelle réelle
          pour un bénéfice cosmétique inexistant. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <!-- AUDIT 2026-08-03 — ACCESS_NETWORK_STATE n'est PAS déclarée ici mais
-         arrive dans l'APK final via com.google.android.datatransport:
-         transport-backend-cct, tiré par mobile_scanner → ML Kit → Play
-         Services. Elle est documentée comme telle dans PRIVACY.md §6 plutôt
-         que redéclarée ici : la redéclarer masquerait son origine réelle.
-         Voir aussi THIRD_PARTY_NOTICES.md (dépendances transitives Google). -->
+    <!-- AUDIT 2026-08-03 — CAMERA et la fonctionnalité matérielle associée ont
+         été RETIRÉES avec le scan de QR code.
+
+         Le scan reposait sur `mobile_scanner`, bâti sur Google ML Kit, qui
+         entraînait Google Play Services et le transport de télémétrie
+         `com.google.android.datatransport` — d'où la permission
+         ACCESS_NETWORK_STATE apparue dans l'APK sans être déclarée nulle part.
+         Une pile Google fermée dans un gestionnaire de mots de passe qui
+         annonce « aucun tracker » : la promesse et le binaire ne disaient pas
+         la même chose.
+
+         Le confort est conservé sans caméra : coller l'URI `otpauth://` dans
+         le champ 2FA en extrait le secret (cf. `_onTotpChanged`). Cette URI est
+         affichée en toutes lettres par la plupart des services, sous le QR
+         code.
+
+         Bénéfice net : deux permissions de moins, aucune bibliothèque Google,
+         et un APK sensiblement plus léger. -->
+    <!-- AUDIT 2026-08-03 — ACCESS_NETWORK_STATE a disparu de l'APK.
+         Elle y arrivait via com.google.android.datatransport:transport-backend-cct,
+         tiré par mobile_scanner → ML Kit → Play Services. Le retrait de cette
+         dépendance l'a emportée avec lui.
+         Le manifeste FUSIONNÉ ne déclare plus que INTERNET, USE_BIOMETRIC et
+         USE_FINGERPRINT (cette dernière injectée par biometric_storage).
+         Liste de référence vérifiée en CI : android/expected-permissions.txt -->
 
     <application
         android:label="Pass Tech"

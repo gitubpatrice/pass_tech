@@ -40,7 +40,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // P2.1 v2.4.3 — réduction APK : seuls FR + EN embarqués (vs ~50 locales
-        // tirées par biometric_storage / mobile_scanner / Material). Gain ~3-6 Mo.
+        // tirées par biometric_storage / Material). Gain ~3-6 Mo.
+        // (2026-08-03 : `mobile_scanner` ne figure plus dans cette liste, la
+        // dépendance ayant été retirée avec le scan de QR code.)
         resourceConfigurations.addAll(listOf("en", "fr"))
     }
 

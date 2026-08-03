@@ -1,0 +1,58 @@
+# Permissions ATTENDUES dans l'APK release de Pass Tech.
+#
+# Ce fichier est la référence contre laquelle la CI compare le manifeste
+# FUSIONNÉ (`.github/workflows/promesses.yml`). Toute permission qui apparaît
+# sans figurer ici fait échouer le build.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# POURQUOI CE FICHIER EXISTE — audit du 2026-08-03
+#
+# `ACCESS_NETWORK_STATE` était présente dans l'APK publié sans être déclarée
+# nulle part dans le dépôt : elle est injectée par
+# `com.google.android.datatransport:transport-backend-cct`, tiré par
+# mobile_scanner → Google ML Kit. Personne ne l'avait vue, parce que personne
+# ne regardait le manifeste FUSIONNÉ — seulement le manifeste source.
+#
+# C'est exactement le défaut que ce fichier rend impossible : une dépendance
+# ajoutée un mardi ne peut plus élargir la surface de permissions sans que
+# quelqu'un l'écrive ici, explicitement, en assumant la ligne.
+#
+# ⚠️ Ne JAMAIS ajouter une ligne ici pour « faire passer le build ». L'ajout
+# doit s'accompagner de sa justification dans PRIVACY.md §10, qui est ce que
+# l'utilisateur lit.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Déclarées par Pass Tech elle-même ────────────────────────────────────────
+
+# Déverrouillage biométrique optionnel (BiometricPrompt).
+android.permission.USE_BIOMETRIC
+
+# Vérification de mise à jour (GitHub Releases) + contrôle HIBP en k-anonymat,
+# tous deux optionnels et documentés dans PRIVACY.md §6.
+# NB : Pass Tech ne promet PAS « aucune permission Internet » — contrairement à
+# AI Tech, Notes Tech, Agenda Tech et App Manager Tech. Ne pas lui appliquer ce
+# critère (erreur corrigée dans CLAUDE.md le 2026-08-03).
+android.permission.INTERNET
+
+# ── Injectées par des dépendances ────────────────────────────────────────────
+
+# Injectée par le plugin `biometric_storage`, SANS maxSdkVersion.
+# Obsolète depuis l'API 28, mais androidx.biometric retombe dessus sur
+# API 24-27, qui sont dans la cible (minSdk = 24). Le retrait v2.5.0 (SEC F12)
+# portait sur le manifeste SOURCE : il n'a jamais retiré la permission de
+# l'APK. Voir le commentaire dans AndroidManifest.xml.
+android.permission.USE_FINGERPRINT
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RETIRÉES le 2026-08-03, à ne pas réintroduire sans décision explicite :
+#
+#   android.permission.CAMERA
+#   android.permission.ACCESS_NETWORK_STATE
+#
+# Les deux venaient du scan de QR code (`mobile_scanner` → Google ML Kit →
+# Play Services → transport de télémétrie `datatransport`). La seconde n'était
+# même pas déclarée dans le dépôt : elle arrivait par la porte de derrière.
+# Le scan a été remplacé par l'extraction du secret depuis une URI `otpauth://`
+# collée dans le champ 2FA. Voir THREAT_MODEL.md §5.2.
+# ─────────────────────────────────────────────────────────────────────────────
+

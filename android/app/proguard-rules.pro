@@ -7,7 +7,6 @@
 # Plugins natifs utilisés
 -keep class com.it_nomads.fluttersecurestorage.** { *; }
 -keep class design.codeux.biometric_storage.** { *; }
--keep class dev.steenbakker.mobile_scanner.** { *; }
 -keep class com.mr.flutter.plugin.filepicker.** { *; }
 
 # QW9 v2.4.0 — cryptography_flutter FFI : sans ces keeps, R8 peut élider

@@ -65,29 +65,23 @@ La présente Politique de confidentialité explique comment l'application **Pass
 - Network Security Config refuse le HTTP en clair et les autorités utilisateur en release.
 - **Nous n'opérons aucun serveur.** Aucune donnée n'est envoyée au développeur, aucun analytics maison, aucun rapport de crash.
 
-### Bibliothèque tierce : Google ML Kit (scan de QR code)
+### Aucune bibliothèque Google
 
-Par souci d'exactitude, une troisième pile réseau est présente dans l'application,
-et elle ne vient pas de notre code :
+L'application ne contient **aucun composant Google** : ni Play Services, ni
+ML Kit, ni Firebase, ni transport de télémétrie.
 
-- Le scan de QR code (utilisé pour importer un secret d'authentification à deux
-  facteurs) repose sur la bibliothèque `mobile_scanner`, qui s'appuie sur
-  **Google ML Kit**. Celle-ci embarque à son tour `play-services-basement`,
-  `play-services-base` et le composant de transport
-  `com.google.android.datatransport` (dit « CCT »), susceptible de remonter à
-  Google des statistiques d'utilisation de la bibliothèque.
-- C'est également l'origine de la permission **`ACCESS_NETWORK_STATE`** visible
-  dans la fiche de l'application : elle est ajoutée automatiquement par cette
-  dépendance, et non déclarée par Pass Tech.
-- **Ce composant n'a jamais accès au contenu de votre coffre.** Il ne voit que
-  l'image de la caméra au moment où vous scannez un QR code, et uniquement à ce
-  moment-là. Vos identifiants, votre mot de passe maître et vos clés ne
-  transitent par aucune bibliothèque Google.
-- Si ce point vous importe, n'utilisez pas le scan de QR code : le secret
-  d'authentification à deux facteurs peut toujours être **saisi à la main**, et
-  toutes les autres fonctions de l'application s'en passent totalement.
+Ce n'était pas le cas jusqu'au 2026-08-03. Le scan de QR code reposait alors sur
+`mobile_scanner`, bâti sur **Google ML Kit**, qui entraînait à sa suite
+`play-services-base`, `play-services-basement` et le composant de transport
+`com.google.android.datatransport`. Cette dépendance ajoutait au passage une
+permission `ACCESS_NETWORK_STATE` **que le dépôt ne déclarait nulle part**.
 
-Cette dépendance est signalée par l'anti-fonctionnalité `NonFreeDep` sur F-Droid.
+Le scan par caméra a donc été retiré, et avec lui les permissions `CAMERA` et
+`ACCESS_NETWORK_STATE`. Pour ajouter un secret d'authentification à deux
+facteurs, **collez l'URI `otpauth://…`** dans le champ prévu : l'application en
+extrait le secret automatiquement. La plupart des services affichent cette URI
+en toutes lettres sous le QR code, derrière un lien du type « impossible de
+scanner ? ». Le secret peut aussi être saisi à la main.
 
 ## 7. Partage et transmission de données
 
@@ -131,8 +125,9 @@ Voir [SECURITY.md](./SECURITY.md).
 | ------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Déverrouillage biométrique optionnel via Android BiometricPrompt.                                 |
 | `INTERNET`                           | Vérification de mises à jour (GitHub Releases) et HIBP (k-anonymity, opt-in).                     |
-| `CAMERA`                             | Scanner un QR code 2FA pour ajouter un secret TOTP. Flux caméra traité localement, jamais enregistré. |
-| `ACCESS_NETWORK_STATE`               | **Non déclarée par Pass Tech.** Ajoutée automatiquement par la bibliothèque de scan de QR code (Google ML Kit / `datatransport`). Voir §6. |
+
+`CAMERA` et `ACCESS_NETWORK_STATE` ont été **retirées le 2026-08-03** avec le
+scan de QR code — voir §6.
 
 ## 11. Enfants
 
