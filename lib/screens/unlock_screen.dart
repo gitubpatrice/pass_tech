@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
 import '../services/integrity_service.dart';
+import '../services/panic_service.dart';
+import '../utils/snack_utils.dart';
 import '../services/vault_service.dart';
 import '../widgets/password_text_field.dart';
 import 'heir_view_screen.dart';
@@ -40,10 +42,32 @@ class _UnlockScreenState extends State<UnlockScreen> {
   /// l'horloge du dispositif d'héritage.
   late final Future<bool> _heirOptionFuture;
 
+  /// SEC 2026-08-03 — le camouflage doit pouvoir être défait SANS ouvrir le
+  /// coffre.
+  ///
+  /// Défaut constaté en usage réel, pas en audit : « Révéler l'application »
+  /// n'existait que dans les Réglages, donc derrière le déverrouillage. Un
+  /// propriétaire qui active la panique puis ne retrouve plus son mot de passe
+  /// maître se retrouve avec une application **définitivement déguisée en
+  /// calculatrice** sur son lanceur, sans aucun moyen de revenir en arrière —
+  /// alors que le camouflage est réversible par conception.
+  ///
+  /// `CalculatorActivity` documentait déjà ce piège pour un code numérique
+  /// oublié (« le bouton Révéler vit dans les Réglages, devenus
+  /// inatteignables ») ; il n'avait pas été vu qu'il vaut à l'identique pour un
+  /// mot de passe oublié, cas autrement plus fréquent.
+  ///
+  /// Aucune fuite pour le déni plausible : pour lire cet écran il faut déjà
+  /// être sorti de la calculatrice, donc le camouflage est de toute façon
+  /// tombé. Et l'action ne touche QUE l'icône du lanceur — elle n'ouvre rien,
+  /// ne déchiffre rien, ne révèle aucune donnée.
+  late final Future<bool> _disguisedFuture;
+
   @override
   void initState() {
     super.initState();
     _heirOptionFuture = HeritageService().shouldShowHeirOption();
+    _disguisedFuture = PanicService.isDisguised();
     _checkLockout();
     _checkBiometric();
     _checkIntegrity();
@@ -430,6 +454,25 @@ class _UnlockScreenState extends State<UnlockScreen> {
     );
   }
 
+  /// Rétablit l'icône et le nom Pass Tech sur le lanceur, sans déverrouiller.
+  ///
+  /// Volontairement SANS confirmation : quand on arrive ici, on a déjà traversé
+  /// la calculatrice, donc le camouflage ne protège plus rien. Un dialogue de
+  /// plus ne ferait qu'ajouter un obstacle à quelqu'un qui cherche justement à
+  /// sortir d'une situation bloquée.
+  Future<void> _revealFromLockScreen() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
+    await PanicService.revealApp();
+    if (!mounted) return;
+    setState(() {}); // masque le bouton, le camouflage n'est plus actif
+    SnackUtils.showInfo(
+      messenger,
+      t.panicRevealSnack,
+      duration: const Duration(seconds: 5),
+    );
+  }
+
   String _formatLockout(int seconds) {
     if (seconds < 60) return '${seconds}s';
     final m = seconds ~/ 60;
@@ -574,6 +617,26 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         // propriétaire dépasse le seuil + grâce expirée. Le
                         // FutureBuilder ne renvoie l'option qu'après le check
                         // crypto, pas de leak temporel.
+                        // SEC 2026-08-03 — sortie de secours du camouflage,
+                        // accessible SANS ouvrir le coffre. Voir
+                        // `_disguisedFuture`. N'apparaît que si le camouflage
+                        // est effectivement actif.
+                        FutureBuilder<bool>(
+                          future: _disguisedFuture,
+                          builder: (_, snap) {
+                            if (snap.data != true) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: TextButton.icon(
+                                onPressed: _revealFromLockScreen,
+                                icon: const Icon(Icons.visibility, size: 18),
+                                label: Text(t.panicRevealTitle),
+                              ),
+                            );
+                          },
+                        ),
                         FutureBuilder<bool>(
                           future: _heirOptionFuture,
                           builder: (_, snap) {
