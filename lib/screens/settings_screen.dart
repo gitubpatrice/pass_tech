@@ -1197,8 +1197,26 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     return Scaffold(
       appBar: AppBar(title: Text(t.settingsTitle)),
+      // UI 2026-08-03 — Réglages aligné sur la présentation de « À propos ».
+      //
+      // Avant : une `ListView` de `ListTile` nus, bord à bord, où neuf sections
+      // se distinguaient uniquement par un petit titre coloré. Les réglages de
+      // sécurité, les actions destructrices et le choix du thème avaient
+      // exactement le même poids visuel.
+      //
+      // Désormais : mêmes marges (16/24/16/40), mêmes titres discrets et
+      // surtout chaque réglage posé sur sa propre carte — le vocabulaire déjà
+      // employé par « À propos ». Les cartes portent le rayon et la bordure
+      // définis par le thème, donc l'écran suit automatiquement le mode clair
+      // comme le mode sombre.
+      //
+      // La décoration est appliquée à la LISTE, pas à chaque élément : les
+      // tuiles restent inchangées, avec leurs `onTap` et leurs `FutureBuilder`.
+      // C'est le seul moyen de refondre la présentation sans risquer d'égarer
+      // un branchement au passage.
       body: ListView(
-        children: [
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+        children: _decorate([
           _section(t.settingsSectionAppearance),
           ListTile(
             leading: const Icon(Icons.brightness_6_outlined),
@@ -1487,21 +1505,29 @@ class _SettingsScreenState extends State<SettingsScreen>
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: _triggerPanic,
           ),
-          FutureBuilder<bool>(
-            future: PanicService.isDisguised(),
-            builder: (_, snap) {
-              if (snap.data != true) return const SizedBox.shrink();
-              return ListTile(
-                leading: Icon(Icons.visibility, color: cs.primary),
-                title: Text(t.panicRevealTitle),
-                subtitle: Text(
-                  t.panicRevealSubtitle,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: _revealApp,
-              );
-            },
+          // `_Undecorated` : ce bloc ne s'affiche QUE si le camouflage est
+          // actif. Sans cette marque, la décoration poserait une carte vide sur
+          // l'écran de tout le monde.
+          _Undecorated(
+            child: FutureBuilder<bool>(
+              future: PanicService.isDisguised(),
+              builder: (_, snap) {
+                if (snap.data != true) return const SizedBox.shrink();
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: ListTile(
+                    leading: Icon(Icons.visibility, color: cs.primary),
+                    title: Text(t.panicRevealTitle),
+                    subtitle: Text(
+                      t.panicRevealSubtitle,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    onTap: _revealApp,
+                  ),
+                );
+              },
+            ),
           ),
 
           _section(t.heritageSection),
@@ -1585,24 +1611,66 @@ class _SettingsScreenState extends State<SettingsScreen>
             subtitle: Text(t.settingsDeleteAllSubtitle),
             onTap: _deleteAll,
           ),
-          const SizedBox(height: 20),
-        ],
+        ]),
       ),
     );
   }
 
-  Widget _section(String title) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+  /// Pose chaque réglage sur sa propre carte, en laissant passer les titres de
+  /// section et les éléments qui gèrent déjà leur propre encadrement.
+  ///
+  /// Volontairement appliqué à la liste entière plutôt qu'écrit sur chaque
+  /// tuile : la centaine de lignes de `onTap`, de dialogues et de
+  /// `FutureBuilder` de cet écran n'est pas touchée, donc aucune régression de
+  /// comportement n'est possible — seule la présentation change.
+  List<Widget> _decorate(List<Widget> items) => [
+    for (final w in items)
+      if (w is _SectionTitle || w is _Undecorated)
+        w
+      else
+        Card(margin: const EdgeInsets.only(bottom: 6), child: w),
+  ];
+
+  Widget _section(String title) => _SectionTitle(title);
+}
+
+/// Titre de section, repris tel quel de « À propos » : discret, en
+/// `onSurfaceVariant`, il structure sans capter le regard. L'espacement fait
+/// partie du widget pour que la liste reste lisible à la lecture du code.
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 20, 2, 8),
     child: Text(
       title,
-      style: TextStyle(
-        fontSize: 12,
+      // UI 2026-08-03 — titres agrandis à la demande. `titleMedium` (16 sp)
+      // plutôt que le `titleSmall` (14 sp) de « À propos » : les Réglages
+      // comptent neuf sections, on y navigue en cherchant un titre du regard,
+      // alors qu'« À propos » se lit d'un trait.
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w700,
-        color: Theme.of(context).colorScheme.primary,
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
       ),
     ),
   );
+}
+
+/// Marque un élément qui décide lui-même de son encadrement.
+///
+/// Nécessaire pour les blocs dont le contenu peut être VIDE : les envelopper
+/// systématiquement dans une carte laisserait une carte vide à l'écran. C'est
+/// le cas du bouton « Révéler l'application », affiché seulement quand le mode
+/// panique est actif.
+class _Undecorated extends StatelessWidget {
+  final Widget child;
+  const _Undecorated({required this.child});
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 class _PassphraseDialog extends StatefulWidget {
