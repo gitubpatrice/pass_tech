@@ -1650,8 +1650,18 @@ class _SectionTitle extends StatelessWidget {
       // plutôt que le `titleSmall` (14 sp) de « À propos » : les Réglages
       // comptent neuf sections, on y navigue en cherchant un titre du regard,
       // alors qu'« À propos » se lit d'un trait.
+      //
+      // Couleur : `cs.primary`, c'est-à-dire le bleu de la marque — celui du
+      // damier du logo (#0B5FC7) en thème clair.
+      //
+      // ⚠️ Ce bleu n'est PAS codé en dur, et il ne faut pas le faire : sur le
+      // fond sombre (#0D1117) il ne donne qu'environ 3,4:1 de contraste, sous
+      // l'exigence AA de 4,5:1. `cs.primary` rend le bleu du damier en clair et
+      // bascule sur #58A6FF en sombre, où le contraste repasse au-dessus du
+      // seuil. C'est la même erreur que celle corrigée en v2.4.4 sur les
+      // `Colors.grey` codés en dur (U5).
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        color: Theme.of(context).colorScheme.primary,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.3,
       ),
