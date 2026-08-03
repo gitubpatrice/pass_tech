@@ -68,6 +68,71 @@ class HeirViewScreen extends StatelessWidget {
   }
 }
 
+/// SEC 2026-08-03 (Gemini PASS_TECH-03) — le mot de passe est MASQUÉ par défaut
+/// dans la vue héritier, comme partout ailleurs dans l'application.
+///
+/// Il s'y affichait en clair dès l'ouverture de l'entrée. L'héritier consulte
+/// souvent ce coffre dans un moment et un lieu qu'il n'a pas choisis — étude
+/// notariale, hôpital, réunion de famille — c'est-à-dire exactement les
+/// circonstances où quelqu'un regarde par-dessus l'épaule.
+///
+/// L'incohérence était double : tout le reste de l'app masque les mots de passe
+/// derrière un œil, et cet écran est le seul consulté par une personne qui ne
+/// connaît pas l'application. Le bouton de copie reste disponible sans avoir à
+/// dévoiler quoi que ce soit.
+class _HeirPasswordTile extends StatefulWidget {
+  final Entry entry;
+  final Future<void> Function(BuildContext, String, String) onCopy;
+  const _HeirPasswordTile({required this.entry, required this.onCopy});
+
+  @override
+  State<_HeirPasswordTile> createState() => _HeirPasswordTileState();
+}
+
+class _HeirPasswordTileState extends State<_HeirPasswordTile> {
+  bool _show = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return ListTile(
+      dense: true,
+      leading: const Icon(Icons.key_outlined, size: 18),
+      title: Text(
+        t.heirViewFieldPassword,
+        style: const TextStyle(fontSize: 12),
+      ),
+      subtitle: SelectableText(
+        _show ? widget.entry.password : '•' * widget.entry.password.length,
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+        textWidthBasis: TextWidthBasis.longestLine,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(
+              _show ? Icons.visibility_off : Icons.visibility,
+              size: 18,
+            ),
+            tooltip: _show ? t.unlockHidePassword : t.unlockShowPassword,
+            onPressed: () => setState(() => _show = !_show),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18),
+            tooltip: t.heirViewFieldPassword,
+            onPressed: () => widget.onCopy(
+              context,
+              t.heirViewFieldPassword,
+              widget.entry.password,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EntryTile extends StatelessWidget {
   final Entry entry;
   const _EntryTile({required this.entry});
@@ -129,25 +194,7 @@ class _EntryTile extends StatelessWidget {
             ),
           ),
         if (entry.password.isNotEmpty)
-          ListTile(
-            dense: true,
-            leading: const Icon(Icons.key_outlined, size: 18),
-            title: Text(
-              t.heirViewFieldPassword,
-              style: const TextStyle(fontSize: 12),
-            ),
-            subtitle: SelectableText(
-              entry.password,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              textWidthBasis: TextWidthBasis.longestLine,
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.copy, size: 18),
-              tooltip: t.heirViewFieldPassword,
-              onPressed: () =>
-                  _copy(context, t.heirViewFieldPassword, entry.password),
-            ),
-          ),
+          _HeirPasswordTile(entry: entry, onCopy: _copy),
         if (entry.url.isNotEmpty)
           ListTile(
             dense: true,

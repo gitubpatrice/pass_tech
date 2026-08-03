@@ -354,8 +354,24 @@ class HeritageService {
   // Inoffensif ici (HMAC-SHA256 32 octets fixes). Ne pas réutiliser pour
   // des secrets de longueur variable.
 
-  Future<Uint8List> _deriveKeyV1(String password, Uint8List salt, int iter) {
-    return compute(pbkdf2Worker, [utf8.encode(password), salt, iter, 64]);
+  /// SEC 2026-08-03 (Gemini PT-005) — la copie UTF-8 du mot de passe héritier
+  /// est effacée après l'appel.
+  ///
+  /// `compute` transfère une copie à l'isolat de travail, que `pbkdf2Worker`
+  /// efface bien de son côté — mais l'exemplaire de CE côté-ci restait en
+  /// mémoire jusqu'au ramasse-miettes. Chemin hérité (instantanés v1), donc
+  /// rare, mais c'est du matériel de mot de passe.
+  Future<Uint8List> _deriveKeyV1(
+    String password,
+    Uint8List salt,
+    int iter,
+  ) async {
+    final pw = utf8.encode(password);
+    try {
+      return await compute(pbkdf2Worker, [pw, salt, iter, 64]);
+    } finally {
+      SecretBytes.wipe(pw);
+    }
   }
 
   /// AAD bound to a v2 heir snapshot (anti-downgrade).
@@ -389,8 +405,11 @@ class HeritageService {
   ) async {
     final saltB64 = base64Encode(salt);
     final aad = _aadV2(saltB64, params);
-    final plain = Uint8List.fromList(
-      utf8.encode(jsonEncode(entries.map((e) => e.toJson()).toList())),
+    // SEC 2026-08-03 — `utf8.encode` rend déjà un `Uint8List` ; l'envelopper
+    // créait une seconde copie du coffre EN CLAIR que l'effacement du `finally`
+    // ne couvrait pas. Voir `KdfService.argon2id` pour le même motif.
+    final plain = utf8.encode(
+      jsonEncode(entries.map((e) => e.toJson()).toList()),
     );
     final AeadResult res;
     try {

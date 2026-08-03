@@ -494,6 +494,8 @@
   "settingsDeleteAllSubtitle": "Action irréversible",
   "settingsDeleteAllDialogTitle": "Supprimer toutes les données ?",
   "settingsDeleteAllDialogBody": "Toutes vos entrées et le coffre-fort seront supprimés définitivement.",
+  "reauthTitle": "Confirmez votre identité",
+  "reauthBody": "Saisissez votre mot de passe maître pour continuer.",
   "settingsDeleteAllConfirm": "Tout supprimer",
 
   "exportPlainDialogTitle": "Export NON CHIFFRÉ",

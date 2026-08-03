@@ -205,6 +205,15 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   @override
   void dispose() {
+    // SEC 2026-08-03 — effacement du tampon AVANT libération.
+    //
+    // Tous les autres champs sensibles de l'app le font depuis B8/B9 v2.3.8
+    // (`_PassphraseDialog`, `_ChangePasswordDialog`, `_HeirPasswordDialog`,
+    // l'écran d'édition d'entrée). Le champ du MOT DE PASSE MAÎTRE — le seul
+    // secret dont dépendent tous les autres — était le seul à ne pas le faire.
+    // Une saisie en cours au moment où l'écran est détruit restait dans le
+    // tampon du contrôleur jusqu'au passage du ramasse-miettes.
+    _passCtrl.clear();
     _passCtrl.dispose();
     _lockoutTimer?.cancel();
     super.dispose();
@@ -423,19 +432,26 @@ class _UnlockScreenState extends State<UnlockScreen> {
       await Future.delayed(Duration(milliseconds: delay.clamp(1000, 16000)));
       if (!mounted) return;
     }
+    // SEC 2026-08-03 (Gemini PT-002) — l'essai est persisté AVANT la
+    // vérification, et non après.
+    //
+    // P3-3 v2.2.0 avait bien vu qu'un compteur en RAM se remettait à zéro en
+    // relançant l'app, et l'avait donc persisté. Mais l'écriture restait
+    // APRÈS `unlockAsHeir`, c'est-à-dire après une seconde d'Argon2id : fermer
+    // l'application pendant ce calcul suffisait à annuler l'essai, et le délai
+    // progressif redevenait contournable exactement comme avant P3-3. Le
+    // stockage avait été durci, pas le moment de l'écriture.
+    _heirFailCount++;
+    try {
+      await _secureStorage.write(
+        key: _heirFailCountKey,
+        value: _heirFailCount.toString(),
+      );
+    } catch (_) {}
+
     final entries = await HeritageService().unlockAsHeir(pwd);
     if (!mounted) return;
     if (entries == null) {
-      _heirFailCount++;
-      // P3-3 : persiste pour résister à un force-close (sinon l'attaquant
-      // peut reset le délai progressif en relançant l'app).
-      // v2.5.0 (F1) : FlutterSecureStorage au lieu de SharedPreferences clair.
-      try {
-        await _secureStorage.write(
-          key: _heirFailCountKey,
-          value: _heirFailCount.toString(),
-        );
-      } catch (_) {}
       if (!mounted) return;
       final t = AppLocalizations.of(context);
       setState(() {

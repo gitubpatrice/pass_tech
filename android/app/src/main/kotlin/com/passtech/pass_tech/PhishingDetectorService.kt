@@ -117,9 +117,26 @@ class PhishingDetectorService : AccessibilityService() {
             "com.opera.browser" to listOf(
                 "com.opera.browser:id/url_field"
             ),
+            // SEC 2026-08-03 — `url_bar_title` RETIRÉ.
+            //
+            // Ce champ contient le TITRE DE LA PAGE, pas l'URL. Or le titre est
+            // choisi par le site : une page d'hameçonnage qui déclare
+            // `<title>mabanque.fr</title>` faisait lire « mabanque.fr » au
+            // service, qui le validait — il a un TLD plausible — et
+            // l'anti-hameçonnage rendait le verdict « ok » sur le site pirate
+            // lui-même. La protection se retournait contre l'utilisateur.
+            //
+            // Le commentaire de `TLD_REGEX` avait bien vu que des titres
+            // pouvaient apparaître ici, mais la parade retenue — « exiger un
+            // TLD » — ne vise que les titres ACCIDENTELS (« LeMonde.fr »). Elle
+            // ne peut rien contre un titre choisi exprès.
+            //
+            // Seule la barre d'adresse fait foi. Conséquence assumée : si
+            // Firefox n'expose pas ce champ dans une version donnée, le verdict
+            // devient « inconnu » — l'app le dit à l'utilisateur au lieu de le
+            // rassurer à tort.
             "org.mozilla.firefox" to listOf(
-                "org.mozilla.firefox:id/mozac_browser_toolbar_url_view",
-                "org.mozilla.firefox:id/url_bar_title"
+                "org.mozilla.firefox:id/mozac_browser_toolbar_url_view"
             ),
             "org.mozilla.fenix" to listOf(
                 "org.mozilla.fenix:id/mozac_browser_toolbar_url_view"

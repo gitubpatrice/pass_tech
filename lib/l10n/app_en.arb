@@ -510,6 +510,8 @@
   "settingsDeleteAllSubtitle": "Irreversible action",
   "settingsDeleteAllDialogTitle": "Delete all data?",
   "settingsDeleteAllDialogBody": "All your entries and the vault will be permanently deleted.",
+  "reauthTitle": "Confirm your identity",
+  "reauthBody": "Enter your master password to continue.",
   "settingsDeleteAllConfirm": "Delete everything",
 
   "exportPlainDialogTitle": "UNENCRYPTED export",

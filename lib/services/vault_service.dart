@@ -481,6 +481,12 @@ class VaultService {
 
   Future<UnlockResult> _unlockInternalUnguarded(String masterPassword) async {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
+    // SEC 2026-08-03 (Gemini PT-002) — l'essai est compté AVANT la dérivation,
+    // pas après. Tuer l'application pendant les ~2 s d'Argon2id ne permet plus
+    // d'effacer la trace de la tentative. Un déverrouillage réussi remet le
+    // compteur à zéro (`_onUnlockSuccess`), donc l'utilisateur légitime ne voit
+    // jamais la différence.
+    await _reserveUnlockAttempt();
     // Déni plausible : on tente UNE PASSE Argon2id sur CHAQUE slot, même si
     // un slot précédent a matché. Sinon le timing révèle l'existence du
     // decoy (1× Argon2id = matché primary, 2× = matché decoy ou échec avec
@@ -641,7 +647,7 @@ class VaultService {
       return UnlockResult.success;
     }
     _wipeKey();
-    await _onUnlockFail();
+    await _onUnlockFail(alreadyReserved: true);
     return UnlockResult.wrongPassword;
   }
 

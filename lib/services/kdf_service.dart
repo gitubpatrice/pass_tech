@@ -123,7 +123,15 @@ class KdfService {
     required Uint8List salt,
     KdfParams params = KdfParams.owaspMobile2024,
   }) async {
-    final pw = Uint8List.fromList(utf8.encode(password));
+    // SEC 2026-08-03 (Gemini PT-001) — plus de `Uint8List.fromList(...)`.
+    //
+    // `utf8.encode` rend DÉJÀ un `Uint8List`. L'envelopper en créait une
+    // seconde copie, et seule celle-là était effacée : l'originale, qui
+    // contient le mot de passe maître en clair, restait en mémoire jusqu'au
+    // ramasse-miettes. `vault_storage.dart` documente ce piège exact depuis la
+    // v2.5.x et l'évite — la règle n'avait pas été propagée ici, ni aux quatre
+    // autres sites du même motif.
+    final pw = utf8.encode(password);
     try {
       return await compute(_argon2idIsolate, <Object>[
         pw,

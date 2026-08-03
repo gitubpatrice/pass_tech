@@ -498,6 +498,21 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
+        // SEC 2026-08-03 (Gemini PASS_TECH-02) — pas d'apprentissage clavier.
+        //
+        // Sans ces deux drapeaux, les claviers tiers (Gboard, SwiftKey) et le
+        // dictionnaire personnel d'Android apprennent ce qui est saisi ici,
+        // le proposent ensuite en suggestion DANS D'AUTRES APPLICATIONS, et le
+        // synchronisent parfois vers le nuage de leur editeur. Or ce champ
+        // recoit precisement ce que l'utilisateur ne veut confier a personne :
+        // phrases de recuperation, codes de secours, IBAN.
+        //
+        // `PasswordTextField` posait deja ces drapeaux pour tous les champs de
+        // mot de passe ; les champs de notes, en `TextField` brut, ne les
+        // avaient jamais recus. Meme motif que d'habitude : la parade existe
+        // dans le depot, elle n'avait pas ete propagee a son jumeau.
+        enableSuggestions: false,
+        autocorrect: false,
         // UI v2.5.3 — cf. le champ Contenu des notes : croissance au lieu d'un
         // défilement imbriqué, et sélection collée aux glyphes.
         maxLines: null,
@@ -521,6 +536,21 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
+        // SEC 2026-08-03 (Gemini PASS_TECH-02) — pas d'apprentissage clavier.
+        //
+        // Sans ces deux drapeaux, les claviers tiers (Gboard, SwiftKey) et le
+        // dictionnaire personnel d'Android apprennent ce qui est saisi ici,
+        // le proposent ensuite en suggestion DANS D'AUTRES APPLICATIONS, et le
+        // synchronisent parfois vers le nuage de leur editeur. Or ce champ
+        // recoit precisement ce que l'utilisateur ne veut confier a personne :
+        // phrases de recuperation, codes de secours, IBAN.
+        //
+        // `PasswordTextField` posait deja ces drapeaux pour tous les champs de
+        // mot de passe ; les champs de notes, en `TextField` brut, ne les
+        // avaient jamais recus. Meme motif que d'habitude : la parade existe
+        // dans le depot, elle n'avait pas ete propagee a son jumeau.
+        enableSuggestions: false,
+        autocorrect: false,
         // UI v2.5.3 — `maxLines: null` fait GRANDIR le champ au lieu de lui
         // donner son propre défilement interne. Avec `maxLines: 12`, le champ
         // devenait un scrollable imbriqué dans le `SingleChildScrollView` de
@@ -669,6 +699,21 @@ class _EntryEditScreenState extends State<EntryEditScreen> {
       const SizedBox(height: 6),
       TextField(
         controller: _notesCtrl,
+        // SEC 2026-08-03 (Gemini PASS_TECH-02) — pas d'apprentissage clavier.
+        //
+        // Sans ces deux drapeaux, les claviers tiers (Gboard, SwiftKey) et le
+        // dictionnaire personnel d'Android apprennent ce qui est saisi ici,
+        // le proposent ensuite en suggestion DANS D'AUTRES APPLICATIONS, et le
+        // synchronisent parfois vers le nuage de leur editeur. Or ce champ
+        // recoit precisement ce que l'utilisateur ne veut confier a personne :
+        // phrases de recuperation, codes de secours, IBAN.
+        //
+        // `PasswordTextField` posait deja ces drapeaux pour tous les champs de
+        // mot de passe ; les champs de notes, en `TextField` brut, ne les
+        // avaient jamais recus. Meme motif que d'habitude : la parade existe
+        // dans le depot, elle n'avait pas ete propagee a son jumeau.
+        enableSuggestions: false,
+        autocorrect: false,
         // UI v2.5.3 — cf. le champ Contenu des notes.
         maxLines: null,
         minLines: 2,

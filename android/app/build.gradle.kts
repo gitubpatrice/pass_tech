@@ -95,12 +95,28 @@ android {
             // qui n'impliquent aucune signature : un futur job CI exécutant
             // l'une d'elles sans keystore aurait échoué sur un message
             // trompeur parlant de refus de signature.
+            // SEC 2026-08-03 (Gemini PT-003) — le filtre couvre aussi les
+            // tâches GÉNÉRIQUES.
+            //
+            // SEC-R2 v2.5.2 avait resserré la détection sur `assembleRelease` /
+            // `bundleRelease` pour ne plus faire échouer `testReleaseUnitTest`
+            // ou `lintRelease`. Le resserrage est allé trop loin : `gradlew
+            // assemble` et `gradlew build` construisent TOUTES les variantes,
+            // release comprise, sans jamais contenir le mot « Release ». La
+            // garde ne se déclenchait donc pas et l'APK release repartait signé
+            // avec la clé de DEBUG, publiquement connue — exactement ce que
+            // SEC F15 existe pour empêcher.
+            //
+            // On teste désormais l'égalité stricte sur les tâches génériques
+            // (et non `contains`, qui rattraperait `assembleDebug`), en plus
+            // des deux tâches explicites.
             val keyPropsFile = rootProject.file("key.properties")
-            if (!keyPropsFile.exists() &&
-                gradle.startParameter.taskNames.any {
-                    it.contains("assembleRelease") || it.contains("bundleRelease")
-                }
-            ) {
+            val releaseTaskDemande = gradle.startParameter.taskNames.any { nom ->
+                val court = nom.substringAfterLast(':')
+                court == "assemble" || court == "build" ||
+                    nom.contains("assembleRelease") || nom.contains("bundleRelease")
+            }
+            if (!keyPropsFile.exists() && releaseTaskDemande) {
                 throw GradleException(
                     "key.properties introuvable : refus de signer un build " +
                         "release avec la clé de DEBUG. Restaure " +

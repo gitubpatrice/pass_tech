@@ -679,6 +679,41 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _clipboardClear = v);
   }
 
+  /// SEC 2026-08-03 (Gemini PT-001/PT-003) — redemande le mot de passe maître
+  /// avant une opération irréversible ou exfiltrante.
+  ///
+  /// SEC F10 v2.5.2 avait ajouté cette ré-authentification au changement de mot
+  /// de passe, en désignant précisément la menace : « quiconque disposait d'un
+  /// accès momentané à une session déverrouillée ». Le raisonnement n'avait été
+  /// propagé ni à l'export en clair, ni à la suppression du coffre — alors que
+  /// l'export est PIRE que le changement de mot de passe : il emporte
+  /// l'intégralité des identifiants, en clair, hors de l'appareil.
+  ///
+  /// Le verrouillage automatique par défaut est à 300 s et n'est évalué qu'au
+  /// retour au premier plan : une application laissée ouverte devant quelqu'un
+  /// reste ouverte. C'est exactement la fenêtre que ce contrôle referme.
+  ///
+  /// Vérifie contre l'emplacement ACTIF : depuis une session leurre, c'est le
+  /// mot de passe du leurre qui est attendu — rien n'est révélé du principal.
+  Future<bool> _reauthenticate() async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final pwd = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ReauthDialog(),
+    );
+    if (pwd == null || pwd.isEmpty || !mounted) return false;
+    final ok = await VaultService().verifyCurrentPassword(pwd);
+    if (!ok && mounted) {
+      SnackUtils.showError(
+        context,
+        messenger,
+        t.changePasswordErrorWrongCurrent,
+      );
+    }
+    return ok;
+  }
+
   Future<void> _exportVault() async {
     final t = AppLocalizations.of(context);
     // H-5 : confirmation explicite avant tout export en clair, et suppression
@@ -735,6 +770,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       },
     );
     if (confirmed != true || !mounted) return;
+    // Ré-authentification APRÈS l'avertissement : on ne demande le mot de passe
+    // qu'à quelqu'un qui a lu et accepté ce que l'export implique.
+    if (!await _reauthenticate() || !mounted) return;
 
     final json = VaultService().exportJson();
     final dir = await getTemporaryDirectory();
@@ -1164,6 +1202,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
     );
     if (ok != true) return;
+    // SEC 2026-08-03 — la suppression définitive exige le mot de passe maître.
+    // Sans ce contrôle, un accès momentané à une session ouverte suffisait à
+    // anéantir le coffre — irréversible, `allowBackup="false"` interdisant
+    // toute restauration système.
+    if (!await _reauthenticate() || !mounted) return;
     // U9 v2.4.4 — feedback haptique sur action destructive ultime.
     await HapticFeedback.heavyImpact();
     // v2.5.4 — plus de refus opaque depuis une session leurre. `deleteVault()`
@@ -1773,6 +1816,65 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
             widget.confirm ? t.passphraseEncryptCta : t.passphraseDecryptCta,
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Demande le mot de passe maître avant une opération sensible.
+/// `StatefulWidget` pour disposer proprement le contrôleur et vider son tampon.
+class _ReauthDialog extends StatefulWidget {
+  const _ReauthDialog();
+
+  @override
+  State<_ReauthDialog> createState() => _ReauthDialogState();
+}
+
+class _ReauthDialogState extends State<_ReauthDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.clear();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _ctrl.text;
+    _ctrl.clear();
+    Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      icon: const Icon(Icons.lock_outline, size: 32),
+      title: Text(t.reauthTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(t.reauthBody, style: const TextStyle(fontSize: 13)),
+          const SizedBox(height: 12),
+          PasswordTextField(
+            controller: _ctrl,
+            labelText: t.changePasswordCurrentLabel,
+            autofocus: true,
+            onSubmitted: (_) => _submit(),
+            showPrefixIcon: false,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            _ctrl.clear();
+            Navigator.pop(context);
+          },
+          child: Text(t.actionCancel),
+        ),
+        FilledButton(onPressed: _submit, child: Text(t.actionContinue)),
       ],
     );
   }

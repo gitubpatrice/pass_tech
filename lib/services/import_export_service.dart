@@ -408,8 +408,11 @@ class ImportExportService {
       final aad = Uint8List.fromList(
         _aadV3(saltB64, KdfParams.owaspMobile2024),
       );
-      final plain = Uint8List.fromList(
-        utf8.encode(jsonEncode(entries.map((e) => e.toJson()).toList())),
+      // SEC 2026-08-03 — `utf8.encode` rend déjà un `Uint8List` ; l'envelopper
+      // créait une seconde copie du coffre EN CLAIR que l'effacement ci-dessous
+      // ne couvrait pas. Voir `KdfService.argon2id` pour le même motif.
+      final plain = utf8.encode(
+        jsonEncode(entries.map((e) => e.toJson()).toList()),
       );
       final AeadResult res;
       try {
@@ -562,12 +565,17 @@ class ImportExportService {
       // côté API (un futur appelant pourrait s'y fier).
       if (mac.length != 32) return null;
 
-      final key = await compute(pbkdf2Worker, [
-        utf8.encode(passphrase),
-        salt,
-        iterations,
-        64,
-      ]);
+      // SEC 2026-08-03 (Gemini PT-004) — la copie UTF-8 de la phrase secrète
+      // est effacée après l'appel. `compute` en transfère un exemplaire à
+      // l'isolat, que `pbkdf2Worker` efface bien ; celui de ce côté-ci restait
+      // en mémoire jusqu'au ramasse-miettes.
+      final pw = utf8.encode(passphrase);
+      final Uint8List key;
+      try {
+        key = await compute(pbkdf2Worker, [pw, salt, iterations, 64]);
+      } finally {
+        SecretBytes.wipe(pw);
+      }
       // M-3 : zéroïser key + sublists après usage.
       final macKey = key.sublist(32);
       Uint8List? encKeyBytes;
