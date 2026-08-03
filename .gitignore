@@ -67,3 +67,6 @@ app.*.map.json
 # Ne doit jamais être versionnée : F-Droid et la CI doivent résoudre la
 # dépendance git épinglée du pubspec.
 pubspec_overrides.yaml
+
+# Sorties d'audit IA externe (audit-gemini.ps1) — non versionnees.
+audit/
