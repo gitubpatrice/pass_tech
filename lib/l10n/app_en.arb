@@ -574,6 +574,7 @@
   "changePasswordErrorMin": "Minimum 12 characters",
   "changePasswordErrorMismatch": "Passwords do not match",
   "changePasswordCta": "Change",
+  "changePasswordDoneBiometricReset": "Password changed. Biometric unlock has been disabled — re-enable it in Settings.",
   "changePasswordDoneSnack": "Password changed ✓",
 
   "passphraseDialogConfirmHelper": "Pick a passphrase to encrypt the backup. You will need it to restore.",

@@ -558,6 +558,7 @@
   "changePasswordErrorMin": "Minimum 12 caractères",
   "changePasswordErrorMismatch": "Les mots de passe ne correspondent pas",
   "changePasswordCta": "Modifier",
+  "changePasswordDoneBiometricReset": "Mot de passe changé. Le déverrouillage biométrique a été désactivé — réactivez-le dans Réglages.",
   "changePasswordDoneSnack": "Mot de passe modifié ✓",
 
   "passphraseDialogConfirmHelper": "Choisissez une passphrase pour chiffrer la sauvegarde. Vous en aurez besoin pour restaurer.",

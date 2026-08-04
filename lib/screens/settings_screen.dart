@@ -1201,6 +1201,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     // le save réussi, le mot de passe était changé mais l'UI le croyait échoué.
     // Aligné sur les autres opérations Réglages (export/héritage) déjà en
     // try/catch avec pop du progress en cas d'erreur.
+    // UX 2026-08-04 — relevé AVANT l'appel : `changeMasterPassword` supprime
+    // l'enrôlement biométrique en cours de route, on ne pourrait plus savoir
+    // après coup s'il existait.
+    final bioEtaitActive = _biometricEnabled;
     try {
       await VaultService().changeMasterPassword(
         result.fresh,
@@ -1208,7 +1212,28 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
       if (!mounted) return;
       nav.pop(); // close progress dialog
-      SnackUtils.showInfo(messenger, t.changePasswordDoneSnack);
+      // UX 2026-08-04 — on ANNONCE la désactivation de la biométrie.
+      //
+      // Le changement de mot de passe supprime l'enrôlement biométrique, et
+      // c'est nécessaire : l'enveloppe biométrique scelle l'ANCIENNE clé
+      // finale, elle est inutilisable après la rotation. Mais l'app ne le
+      // disait pas — elle affichait « mot de passe changé » et rien d'autre.
+      // L'utilisateur relançait l'application, ne trouvait plus le bouton
+      // empreinte, et n'avait aucun moyen de comprendre pourquoi.
+      //
+      // Même motif que le mode panique corrigé la veille : un effet de bord
+      // indispensable à la sécurité, mais silencieux. Le message n'apparaît
+      // que si la biométrie était réellement active — sinon il n'apprendrait
+      // rien à personne.
+      SnackUtils.showInfo(
+        messenger,
+        bioEtaitActive
+            ? t.changePasswordDoneBiometricReset
+            : t.changePasswordDoneSnack,
+        duration: bioEtaitActive
+            ? const Duration(seconds: 6)
+            : const Duration(seconds: 3),
+      );
       setState(() => _biometricEnabled = false);
     } on StateError catch (e) {
       // SEC F10 v2.5.2 — mot de passe actuel incorrect : message dédié plutôt
