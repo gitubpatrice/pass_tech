@@ -1,7 +1,11 @@
 name: Claude Review
 
 # Review automatique des PR par Claude Code (anthropics/claude-code-action).
-# Coût : ~0.10-0.50 € par review (tokens API Anthropic, paye à l'usage).
+# Tourne sur l'ABONNEMENT Claude (jeton OAuth), pas sur l'API : aucune
+# facturation à l'usage. L'en-tête annonçait « ~0,10-0,50 € par review, tokens
+# API Anthropic, payé à l'usage » — cela n'a jamais correspondu à cette
+# configuration, et c'est ce malentendu qui a fait poser une clé API là où il
+# fallait un jeton d'abonnement.
 #
 # Mention @claude dans une issue ou PR pour invoquer manuellement.
 # Auto-review activé sur opened/synchronize.
@@ -58,7 +62,21 @@ jobs:
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # CI 2026-08-04 — authentification par ABONNEMENT et non par clé API.
+          #
+          # Le workflow réclamait `ANTHROPIC_API_KEY`. Le secret existait, mais
+          # la requête était rejetée en ~200 ms pour un coût de 0 $ — donc
+          # refusée à l'authentification, avant tout traitement, et cela avec
+          # deux modèles différents.
+          #
+          # Raison : l'abonnement Claude et l'API sont deux produits distincts,
+          # facturés séparément. Une clé API exige un compte API approvisionné,
+          # que payer l'abonnement ne fournit pas.
+          #
+          # `claude_code_oauth_token` est la voie prévue pour un abonnement. Le
+          # jeton se génère avec `claude setup-token` (« requires Claude
+          # subscription ») et vit dans le secret ci-dessous.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # CI 2026-08-04 — le jeton du workflow, au lieu de l'app GitHub.
           #
           # Sans lui, l'action tente d'obtenir un jeton via l'application
