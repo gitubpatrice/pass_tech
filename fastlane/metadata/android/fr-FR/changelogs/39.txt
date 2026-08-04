@@ -1,0 +1,7 @@
+Version majeure de confidentialité et de fiabilité.
+
+• Google retiré de l'application : plus aucune bibliothèque ni service Google embarqué.
+• Audit de sécurité corrigé : le score était trompeur sur les petits coffres et ignorait les fuites détectées.
+• Mot de passe maître : 12 caractères, sans symbole ni chiffre obligatoire.
+• Panique : avertissement avant activation, la biométrie sera désactivée.
+• Annuler l'empreinte n'enferme plus sur l'écran de déverrouillage.
