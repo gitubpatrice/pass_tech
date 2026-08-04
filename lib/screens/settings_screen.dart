@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
-import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/material.dart';
 // ignore: unnecessary_import
 import 'package:flutter/semantics.dart';
@@ -14,6 +13,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import '../main.dart' show prefKeyScreenshotProtection;
 import '../services/anti_phishing_service.dart';
+import '../services/backup_reminder.dart';
+import '../services/password_policy.dart';
 import '../services/clipboard_service.dart';
 import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
@@ -493,6 +494,17 @@ class _SettingsScreenState extends State<SettingsScreen>
       SnackUtils.showInfo(messenger, t.decoyConfiguredSnack);
       // Retour au unlock screen
       Navigator.of(context).popUntil((r) => r.isFirst);
+    } on StateError catch (e) {
+      // SEC 2026-08-04 (relecture Codex) — `setupDecoyVault` refuse désormais
+      // de créer un leurre quand la comparaison avec le mot de passe principal
+      // ne peut pas ABOUTIR (verrouillage anti-force-brute en cours, opération
+      // concurrente). Même traitement que le changement de mot de passe
+      // maître : message dédié, pas de sentinel interne à l'écran.
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, switch (e.message) {
+        VaultService.vaultBusy => t.vaultBusyRetry,
+        _ => t.genericError('$e'),
+      });
     } catch (e) {
       if (!mounted) return;
       SnackUtils.showError(context, messenger, t.genericError('$e'));
@@ -527,33 +539,79 @@ class _SettingsScreenState extends State<SettingsScreen>
       },
     );
     if (action != 'delete' || !mounted) return;
+    final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    // SEC-R3 v2.5.2 — depuis une session leurre, le service refuse et lève.
+    // La section « Coffre leurre » reste volontairement VISIBLE quel que soit
+    // l'emplacement actif : la masquer révélerait lequel est ouvert. Le code
+    // étant public sous Apache 2.0, un adversaire sait qu'une section absente
+    // signifierait « vous êtes dans le leurre ».
     //
-    // On garde volontairement la section « Coffre leurre » VISIBLE et on
-    // affiche un refus neutre, plutôt que de masquer l'entrée. Masquer
-    // révélerait l'emplacement actif : le code étant public sous Apache 2.0,
-    // un adversaire sait qu'une section absente signifie « vous êtes dans le
-    // leurre ». Même raisonnement que pour « Tout supprimer » (F12).
-    try {
-      await VaultService().deleteDecoyVault();
-    } on StateError {
-      if (mounted) {
-        SnackUtils.showError(
-          context,
-          messenger,
-          t.settingsDeleteAllUnavailable,
-        );
-      }
+    // AUDIT 2026-08-03 — le refus opaque qui suivait est supprimé. Depuis une
+    // session leurre, le service verrouille puis écrase, exactement comme
+    // « Tout supprimer » depuis cette même session (SEC F12). On revient alors
+    // au déverrouillage, puisque plus rien n'est ouvert — y rester afficherait
+    // les Réglages d'un coffre fermé.
+    final outcome = await VaultService().deleteDecoyVault();
+    if (!mounted) return;
+    if (outcome == DecoyDeleteOutcome.sessionLocked) {
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const UnlockScreen()),
+        (_) => false,
+      );
       return;
     }
-    if (!mounted) return;
     setState(() {});
     SnackUtils.showInfo(messenger, t.decoyDeletedSnack);
   }
 
   Future<void> _triggerPanic() async {
     final t = AppLocalizations.of(context);
+    // SEC 2026-08-03 — avertissement AVANT la panique, ajouté après un incident
+    // réel : le mode panique a été activé pour un test, il a supprimé
+    // l'enrôlement biométrique (SEC F4, voulu), et le mot de passe maître ne
+    // revenait plus. Coffre définitivement perdu.
+    //
+    // SEC F4 justifiait la suppression par « le coût pour l'utilisateur
+    // légitime est faible, puisque le réenrôlement exige de toute façon le mot
+    // de passe maître ». Ce raisonnement suppose que l'utilisateur CONNAÎT ce
+    // mot de passe. Quelqu'un qui ouvre à l'empreinte tous les jours ne le tape
+    // parfois plus depuis des mois : pour lui, la panique est une porte à sens
+    // unique.
+    //
+    // On n'affiche cet écran que si la biométrie est réellement active — sinon
+    // il n'y a rien à perdre et l'avertissement ne serait que du bruit.
+    if (_biometricEnabled) {
+      final compris = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          final cs = Theme.of(ctx).colorScheme;
+          return AlertDialog(
+            icon: Icon(Icons.fingerprint, size: 36, color: cs.error),
+            title: Text(t.panicWarnBiometricTitle),
+            content: SingleChildScrollView(
+              child: Text(
+                t.panicWarnBiometricBody,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            actions: [
+              TextButton(
+                autofocus: true,
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(t.actionCancel),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: cs.error),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(t.actionContinue),
+              ),
+            ],
+          );
+        },
+      );
+      if (compris != true || !mounted) return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -680,6 +738,41 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _clipboardClear = v);
   }
 
+  /// SEC 2026-08-03 (Gemini PT-001/PT-003) — redemande le mot de passe maître
+  /// avant une opération irréversible ou exfiltrante.
+  ///
+  /// SEC F10 v2.5.2 avait ajouté cette ré-authentification au changement de mot
+  /// de passe, en désignant précisément la menace : « quiconque disposait d'un
+  /// accès momentané à une session déverrouillée ». Le raisonnement n'avait été
+  /// propagé ni à l'export en clair, ni à la suppression du coffre — alors que
+  /// l'export est PIRE que le changement de mot de passe : il emporte
+  /// l'intégralité des identifiants, en clair, hors de l'appareil.
+  ///
+  /// Le verrouillage automatique par défaut est à 300 s et n'est évalué qu'au
+  /// retour au premier plan : une application laissée ouverte devant quelqu'un
+  /// reste ouverte. C'est exactement la fenêtre que ce contrôle referme.
+  ///
+  /// Vérifie contre l'emplacement ACTIF : depuis une session leurre, c'est le
+  /// mot de passe du leurre qui est attendu — rien n'est révélé du principal.
+  Future<bool> _reauthenticate() async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final pwd = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ReauthDialog(),
+    );
+    if (pwd == null || pwd.isEmpty || !mounted) return false;
+    final ok = await VaultService().verifyCurrentPassword(pwd);
+    if (!ok && mounted) {
+      SnackUtils.showError(
+        context,
+        messenger,
+        t.changePasswordErrorWrongCurrent,
+      );
+    }
+    return ok;
+  }
+
   Future<void> _exportVault() async {
     final t = AppLocalizations.of(context);
     // H-5 : confirmation explicite avant tout export en clair, et suppression
@@ -736,9 +829,19 @@ class _SettingsScreenState extends State<SettingsScreen>
       },
     );
     if (confirmed != true || !mounted) return;
+    // Ré-authentification APRÈS l'avertissement : on ne demande le mot de passe
+    // qu'à quelqu'un qui a lu et accepté ce que l'export implique.
+    if (!await _reauthenticate() || !mounted) return;
 
     final json = VaultService().exportJson();
     final dir = await getTemporaryDirectory();
+    // AUDIT 2026-08-03 — purge AVANT, en plus de la purge après.
+    // C'est la seule façon de rattraper un partage précédent interrompu : si le
+    // processus est tué pendant l'affichage du sélecteur, le `finally` ci-dessous
+    // ne s'exécute jamais et la copie faite par share_plus survit indéfiniment.
+    // Le commentaire de SEC F8 affirmait que ce ménage avait aussi lieu « au
+    // verrouillage » — c'était faux, la fonction n'avait qu'un seul appelant.
+    _shredStaleExports(dir);
     final file = File('${dir.path}/pass_tech_export.json');
     await file.writeAsString(json);
     try {
@@ -758,32 +861,92 @@ class _SettingsScreenState extends State<SettingsScreen>
       // indéfiniment à côté — sans mot de passe, sans Keystore, sans Argon2id
       // pour le protéger. Le plugin accorde en outre une permission de lecture
       // sur cette copie à toute activité résolvant le sélecteur.
-      _shredShareCache(dir);
+      //
+      // SEC 2026-08-04 — cette purge est DÉPLACÉE vers l'export suivant.
+      //
+      // `Share.shareXFiles` rend la main dès que l'activité cible se termine,
+      // ce qui ne signifie pas qu'elle a fini de LIRE. Une cible qui téléverse
+      // en tâche de fond — Drive, messagerie — lit encore après notre retour.
+      // Écraser sa source d'octets aléatoires à cet instant produirait un
+      // export CORROMPU, que l'on ne découvrirait qu'au moment d'en avoir
+      // besoin. C'est le pire moment possible pour une sauvegarde.
+      //
+      // Le raisonnement de SEC F8 reste entièrement valable : cette copie ne
+      // doit pas survivre indéfiniment. Elle est donc purgée par l'appel à
+      // `_shredStaleExports` placé AVANT le partage, qui balaie les résidus de
+      // l'export précédent. Le résidu est borné dans le temps sans jamais
+      // couper une lecture en cours.
     }
   }
 
   /// Écrase un fichier par des octets aléatoires puis le supprime.
-  static void _shredFile(File file) {
-    try {
-      if (!file.existsSync()) return;
-      final len = file.lengthSync();
-      if (len > 0) {
-        file.writeAsBytesSync(SecretBytes.randomBytes(len), flush: true);
-      }
-      file.deleteSync();
-    } catch (_) {}
+  ///
+  /// AUDIT 2026-08-03 — délègue désormais à [VaultService.shredFileSync] au
+  /// lieu de refaire le travail. Cette copie locale n'avait pas le repli de
+  /// l'originale : quand l'écrasement échouait, elle abandonnait AUSSI la
+  /// suppression, laissant le fichier en clair intact. Deux traitements pour
+  /// un même besoin, dont un plus faible — le genre d'écart qui ne se voit
+  /// qu'à la relecture croisée.
+  static void _shredFile(File file) => VaultService.shredFileSync(file);
+
+  /// Vrai si [filePath] est bien une COPIE faite par le sélecteur de fichiers
+  /// dans notre propre cache, et non le document d'origine de l'utilisateur.
+  ///
+  /// Deux conditions, délibérément cumulatives :
+  ///  1. le chemin est sous le répertoire temporaire de l'application ;
+  ///  2. il traverse le sous-dossier `file_picker/`, que le plugin fabrique.
+  ///
+  /// Vérifié dans `file_picker` 11.0.2 (`FileUtils.kt`), qui écrit sous
+  /// `<cache>/file_picker/<horodatage>/<nom>`. Exiger les deux plutôt qu'une
+  /// seule est volontaire : au moindre écart — nouvelle version du plugin,
+  /// autre plateforme, chemin inattendu — on renonce à effacer. Le pire cas
+  /// devient « une copie survit jusqu'à `clearTemporaryFiles()` », au lieu de
+  /// « le fichier de l'utilisateur a disparu ».
+  static bool _isPickerCacheCopy(String cacheRoot, String filePath) {
+    final root = cacheRoot.replaceAll('\\', '/');
+    final path = filePath.replaceAll('\\', '/');
+    final prefix = root.endsWith('/') ? root : '$root/';
+    if (!path.startsWith(prefix)) return false;
+    if (path.contains('/../') || path.endsWith('/..')) return false;
+    return path.contains('/file_picker/');
   }
 
-  /// Purge le répertoire de cache de `share_plus`, où le plugin recopie tout
-  /// fichier partagé. Appelé après chaque partage et au verrouillage, pour
-  /// couvrir aussi le cas où le processus est tué pendant l'affichage du
-  /// sélecteur (le `finally` ne s'exécute alors jamais).
-  static void _shredShareCache(Directory cacheDir) {
+  /// Purge tout résidu d'un export précédent dans le répertoire temporaire.
+  ///
+  /// Couvre DEUX emplacements, et c'est le second qui manquait :
+  ///  1. `<cache>/share_plus/` — où le plugin recopie chaque fichier partagé,
+  ///     et où il ne fait le ménage qu'au DÉBUT du partage suivant ;
+  ///  2. **le répertoire temporaire lui-même**, où vivent NOS fichiers
+  ///     (`pass_tech_export.json`, `pass_tech_*.ptbak`).
+  ///
+  /// AUDIT 2026-08-03 (Gemini PT-001) — le point 2 est un trou du correctif
+  /// SEC F8 posé le matin même. Le `finally` de l'export déchiquette bien notre
+  /// fichier… quand il s'exécute. Si le processus est tué pendant que le
+  /// sélecteur de partage est à l'écran — l'utilisateur bascule d'application,
+  /// Android récupère la mémoire — ce `finally` ne tourne JAMAIS, et
+  /// `pass_tech_export.json`, qui contient l'intégralité des mots de passe **en
+  /// clair**, reste dans le cache indéfiniment. La purge d'ouverture ne
+  /// regardait que le sous-dossier du plugin, jamais notre propre fichier.
+  ///
+  /// Appelée AVANT et APRÈS chaque partage : c'est l'appel « avant » qui
+  /// rattrape l'export précédent interrompu.
+  static void _shredStaleExports(Directory cacheDir) {
     try {
       final shareDir = Directory('${cacheDir.path}/share_plus');
-      if (!shareDir.existsSync()) return;
-      for (final ent in shareDir.listSync(followLinks: false)) {
-        if (ent is File) _shredFile(ent);
+      if (shareDir.existsSync()) {
+        for (final ent in shareDir.listSync(followLinks: false)) {
+          if (ent is File) _shredFile(ent);
+        }
+      }
+    } catch (_) {}
+    try {
+      for (final ent in cacheDir.listSync(followLinks: false)) {
+        if (ent is! File) continue;
+        final name = ent.uri.pathSegments.last;
+        if (name == 'pass_tech_export.json' ||
+            (name.startsWith('pass_tech_') && name.endsWith('.ptbak'))) {
+          _shredFile(ent);
+        }
       }
     } catch (_) {}
   }
@@ -811,8 +974,21 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
       final date = DateTime.now().toIso8601String().substring(0, 10);
       final dir = await getTemporaryDirectory();
+      // AUDIT 2026-08-03 — même purge que l'export en clair, avant et après.
+      // Ce chemin ne nettoyait PAS le cache de share_plus : la copie du
+      // `.ptbak` faite par le plugin y restait jusqu'au partage suivant. Le
+      // fichier est chiffré, donc l'enjeu est moindre qu'en clair — mais c'est
+      // une copie complète du coffre, laissée dans un répertoire sur lequel le
+      // plugin accorde une permission de lecture à toute application capable
+      // de répondre au sélecteur.
+      _shredStaleExports(dir);
       final file = File('${dir.path}/pass_tech_$date.ptbak');
       await file.writeAsString(content);
+      // 2026-08-03 — trace de la sauvegarde. C'est ce qui fait disparaître le
+      // rappel de l'accueil. Enregistré dès que le fichier est écrit, sans
+      // attendre l'issue du partage : le fichier existe, l'utilisateur a fait
+      // sa part. Seule la DATE est conservée, jamais le chemin ni la phrase.
+      await BackupReminder.markBackupDone();
       if (!mounted) return;
       Navigator.of(context).pop(); // close progress
       try {
@@ -820,9 +996,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           XFile(file.path, mimeType: 'application/octet-stream'),
         ], subject: t.exportEncryptedShareSubject);
       } finally {
-        try {
-          if (file.existsSync()) file.deleteSync();
-        } catch (_) {}
+        // SEC 2026-08-04 — voir `_exportVault` : on déchiquette NOTRE fichier,
+        // jamais la copie de `share_plus` que la cible est peut-être encore en
+        // train de lire. Une sauvegarde `.ptbak` corrompue au moment du
+        // téléversement serait découverte le jour de la restauration, quand il
+        // est trop tard. La copie du plugin est purgée à l'export suivant.
+        _shredFile(file);
       }
     } catch (e) {
       if (!mounted) return;
@@ -867,6 +1046,37 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (!mounted) return;
       SnackUtils.showError(context, messenger, t.importReadError);
       return;
+    } finally {
+      // AUDIT 2026-08-03 (Gemini PT-002) — purge du cache de FilePicker.
+      //
+      // Pour rendre un `path` exploitable à partir d'un `content://`, le
+      // sélecteur RECOPIE le fichier choisi dans le cache de l'application.
+      // Cette copie n'était jamais supprimée. Or ce que l'on importe ici, c'est
+      // typiquement un export **en clair** d'un autre gestionnaire — un JSON
+      // Bitwarden, un CSV KeePass — c'est-à-dire l'intégralité des mots de
+      // passe de la personne, dans un fichier non chiffré qui s'installait à
+      // demeure dans le cache de Pass Tech.
+      //
+      // Placé en `finally` : une lecture qui échoue laisse la copie tout autant
+      // derrière elle. On déchiquette d'abord notre exemplaire, puis on demande
+      // au plugin de vider le sien.
+      //
+      // ⚠️ GARDE OBLIGATOIRE : on ne déchiquette QUE si le chemin est bien dans
+      // notre répertoire de cache. Vérifié dans `file_picker` 11.0.2, qui copie
+      // sous `<cache>/file_picker/<horodatage>/<nom>` — mais si une version
+      // future rendait le chemin RÉEL du fichier choisi, on effacerait le
+      // document de l'utilisateur lui-même. Un export que l'on vient de lui
+      // demander d'importer. Le contrôle coûte deux lignes ; l'erreur serait
+      // irréparable.
+      try {
+        final cacheRoot = (await getTemporaryDirectory()).path;
+        if (_isPickerCacheCopy(cacheRoot, filePath)) {
+          _shredFile(File(filePath));
+        }
+      } catch (_) {}
+      try {
+        await FilePicker.clearTemporaryFiles();
+      } catch (_) {}
     }
     final file = probeFile;
 
@@ -1021,6 +1231,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     // le save réussi, le mot de passe était changé mais l'UI le croyait échoué.
     // Aligné sur les autres opérations Réglages (export/héritage) déjà en
     // try/catch avec pop du progress en cas d'erreur.
+    // UX 2026-08-04 — relevé AVANT l'appel : `changeMasterPassword` supprime
+    // l'enrôlement biométrique en cours de route, on ne pourrait plus savoir
+    // après coup s'il existait.
+    final bioEtaitActive = _biometricEnabled;
     try {
       await VaultService().changeMasterPassword(
         result.fresh,
@@ -1028,7 +1242,28 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
       if (!mounted) return;
       nav.pop(); // close progress dialog
-      SnackUtils.showInfo(messenger, t.changePasswordDoneSnack);
+      // UX 2026-08-04 — on ANNONCE la désactivation de la biométrie.
+      //
+      // Le changement de mot de passe supprime l'enrôlement biométrique, et
+      // c'est nécessaire : l'enveloppe biométrique scelle l'ANCIENNE clé
+      // finale, elle est inutilisable après la rotation. Mais l'app ne le
+      // disait pas — elle affichait « mot de passe changé » et rien d'autre.
+      // L'utilisateur relançait l'application, ne trouvait plus le bouton
+      // empreinte, et n'avait aucun moyen de comprendre pourquoi.
+      //
+      // Même motif que le mode panique corrigé la veille : un effet de bord
+      // indispensable à la sécurité, mais silencieux. Le message n'apparaît
+      // que si la biométrie était réellement active — sinon il n'apprendrait
+      // rien à personne.
+      SnackUtils.showInfo(
+        messenger,
+        bioEtaitActive
+            ? t.changePasswordDoneBiometricReset
+            : t.changePasswordDoneSnack,
+        duration: bioEtaitActive
+            ? const Duration(seconds: 6)
+            : const Duration(seconds: 3),
+      );
       setState(() => _biometricEnabled = false);
     } on StateError catch (e) {
       // SEC F10 v2.5.2 — mot de passe actuel incorrect : message dédié plutôt
@@ -1074,6 +1309,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
     );
     if (ok != true) return;
+    // SEC 2026-08-03 — la suppression définitive exige le mot de passe maître.
+    // Sans ce contrôle, un accès momentané à une session ouverte suffisait à
+    // anéantir le coffre — irréversible, `allowBackup="false"` interdisant
+    // toute restauration système.
+    if (!await _reauthenticate() || !mounted) return;
     // U9 v2.4.4 — feedback haptique sur action destructive ultime.
     await HapticFeedback.heavyImpact();
     // v2.5.4 — plus de refus opaque depuis une session leurre. `deleteVault()`
@@ -1082,6 +1322,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     // de création après un `decoyOnly` laisserait créer un coffre par-dessus
     // le principal, qui existe toujours. On revient donc au déverrouillage.
     final outcome = await VaultService().deleteVault();
+    // Un coffre recréé après une suppression totale doit repartir avec le
+    // rappel actif : ses futures entrées ne seront couvertes par aucune des
+    // sauvegardes précédentes.
+    if (outcome == VaultDeleteOutcome.fullWipe) {
+      await BackupReminder.reset();
+    }
     if (!mounted) return;
     nav.pushAndRemoveUntil(
       MaterialPageRoute(
@@ -1107,8 +1353,26 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     return Scaffold(
       appBar: AppBar(title: Text(t.settingsTitle)),
+      // UI 2026-08-03 — Réglages aligné sur la présentation de « À propos ».
+      //
+      // Avant : une `ListView` de `ListTile` nus, bord à bord, où neuf sections
+      // se distinguaient uniquement par un petit titre coloré. Les réglages de
+      // sécurité, les actions destructrices et le choix du thème avaient
+      // exactement le même poids visuel.
+      //
+      // Désormais : mêmes marges (16/24/16/40), mêmes titres discrets et
+      // surtout chaque réglage posé sur sa propre carte — le vocabulaire déjà
+      // employé par « À propos ». Les cartes portent le rayon et la bordure
+      // définis par le thème, donc l'écran suit automatiquement le mode clair
+      // comme le mode sombre.
+      //
+      // La décoration est appliquée à la LISTE, pas à chaque élément : les
+      // tuiles restent inchangées, avec leurs `onTap` et leurs `FutureBuilder`.
+      // C'est le seul moyen de refondre la présentation sans risquer d'égarer
+      // un branchement au passage.
       body: ListView(
-        children: [
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+        children: _decorate([
           _section(t.settingsSectionAppearance),
           ListTile(
             leading: const Icon(Icons.brightness_6_outlined),
@@ -1397,21 +1661,29 @@ class _SettingsScreenState extends State<SettingsScreen>
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: _triggerPanic,
           ),
-          FutureBuilder<bool>(
-            future: PanicService.isDisguised(),
-            builder: (_, snap) {
-              if (snap.data != true) return const SizedBox.shrink();
-              return ListTile(
-                leading: Icon(Icons.visibility, color: cs.primary),
-                title: Text(t.panicRevealTitle),
-                subtitle: Text(
-                  t.panicRevealSubtitle,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: _revealApp,
-              );
-            },
+          // `_Undecorated` : ce bloc ne s'affiche QUE si le camouflage est
+          // actif. Sans cette marque, la décoration poserait une carte vide sur
+          // l'écran de tout le monde.
+          _Undecorated(
+            child: FutureBuilder<bool?>(
+              future: PanicService.isDisguised(),
+              builder: (_, snap) {
+                if (snap.data != true) return const SizedBox.shrink();
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: ListTile(
+                    leading: Icon(Icons.visibility, color: cs.primary),
+                    title: Text(t.panicRevealTitle),
+                    subtitle: Text(
+                      t.panicRevealSubtitle,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    onTap: _revealApp,
+                  ),
+                );
+              },
+            ),
           ),
 
           _section(t.heritageSection),
@@ -1495,24 +1767,76 @@ class _SettingsScreenState extends State<SettingsScreen>
             subtitle: Text(t.settingsDeleteAllSubtitle),
             onTap: _deleteAll,
           ),
-          const SizedBox(height: 20),
-        ],
+        ]),
       ),
     );
   }
 
-  Widget _section(String title) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+  /// Pose chaque réglage sur sa propre carte, en laissant passer les titres de
+  /// section et les éléments qui gèrent déjà leur propre encadrement.
+  ///
+  /// Volontairement appliqué à la liste entière plutôt qu'écrit sur chaque
+  /// tuile : la centaine de lignes de `onTap`, de dialogues et de
+  /// `FutureBuilder` de cet écran n'est pas touchée, donc aucune régression de
+  /// comportement n'est possible — seule la présentation change.
+  List<Widget> _decorate(List<Widget> items) => [
+    for (final w in items)
+      if (w is _SectionTitle || w is _Undecorated)
+        w
+      else
+        Card(margin: const EdgeInsets.only(bottom: 6), child: w),
+  ];
+
+  Widget _section(String title) => _SectionTitle(title);
+}
+
+/// Titre de section, repris tel quel de « À propos » : discret, en
+/// `onSurfaceVariant`, il structure sans capter le regard. L'espacement fait
+/// partie du widget pour que la liste reste lisible à la lecture du code.
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 20, 2, 8),
     child: Text(
       title,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
+      // UI 2026-08-03 — titres agrandis à la demande. `titleMedium` (16 sp)
+      // plutôt que le `titleSmall` (14 sp) de « À propos » : les Réglages
+      // comptent neuf sections, on y navigue en cherchant un titre du regard,
+      // alors qu'« À propos » se lit d'un trait.
+      //
+      // Couleur : `cs.primary`, c'est-à-dire le bleu de la marque — celui du
+      // damier du logo (#0B5FC7) en thème clair.
+      //
+      // ⚠️ Ce bleu n'est PAS codé en dur, et il ne faut pas le faire : sur le
+      // fond sombre (#0D1117) il ne donne qu'environ 3,4:1 de contraste, sous
+      // l'exigence AA de 4,5:1. `cs.primary` rend le bleu du damier en clair et
+      // bascule sur #58A6FF en sombre, où le contraste repasse au-dessus du
+      // seuil. C'est la même erreur que celle corrigée en v2.4.4 sur les
+      // `Colors.grey` codés en dur (U5).
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
         color: Theme.of(context).colorScheme.primary,
-        letterSpacing: 0.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.3,
       ),
     ),
   );
+}
+
+/// Marque un élément qui décide lui-même de son encadrement.
+///
+/// Nécessaire pour les blocs dont le contenu peut être VIDE : les envelopper
+/// systématiquement dans une carte laisserait une carte vide à l'écran. C'est
+/// le cas du bouton « Révéler l'application », affiché seulement quand le mode
+/// panique est actif.
+class _Undecorated extends StatelessWidget {
+  final Widget child;
+  const _Undecorated({required this.child});
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 class _PassphraseDialog extends StatefulWidget {
@@ -1549,6 +1873,25 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
     final t = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(widget.title),
+      // UI 2026-08-04 — signalé en usage réel : le message « Mot de passe trop
+      // devinable… » chevauchait les boutons Annuler / Chiffrer.
+      //
+      // Ce n'est pas un manque de marge, c'est un DÉBORDEMENT. Le contenu d'un
+      // `AlertDialog` est enveloppé dans un `Flexible` ; quand le clavier est
+      // ouvert — il l'est toujours ici, le premier champ prend le focus — la
+      // hauteur disponible tombe de plusieurs centaines de pixels. Le message
+      // d'erreur fait alors passer la colonne au-delà de sa boîte, et une
+      // `Column` ne rogne pas : elle peint par-dessus les actions.
+      //
+      // Ajouter de la marge sous le texte AGGRAVERAIT le débordement. La parade
+      // est de rendre le contenu défilable : la colonne reçoit alors la hauteur
+      // qui reste et défile au lieu de déborder. La marge ci-dessous vient en
+      // plus, pour que le message ne colle pas aux boutons quand tout tient.
+      //
+      // Le seuil dépend de la taille de police du système et de la longueur du
+      // message traduit : ce qui tient en français sur un grand écran peut
+      // déborder ailleurs. D'où une correction structurelle, pas un réglage.
+      scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1578,6 +1921,9 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+            // Marge sous le message : sans elle, un texte de trois lignes
+            // arrive au ras des boutons.
+            const SizedBox(height: 8),
           ],
         ],
       ),
@@ -1590,9 +1936,25 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
               return;
             }
             if (widget.confirm) {
-              if (_ctrl1.text.length < 12) {
-                setState(() => _error = t.passphraseErrorMin);
-                return;
+              // SEC 2026-08-04 — ce dialogue sert la phrase secrète d'une
+              // sauvegarde `.ptbak`, le mot de passe du coffre leurre ET celui
+              // de l'héritier. Il ne vérifiait que la longueur : `aaaaaaaaaaaa`
+              // passait. Le cas du `.ptbak` est le plus grave — c'est le seul
+              // fichier NON lié au matériel, donc le seul attaquable hors ligne
+              // depuis une simple copie.
+              //
+              // `confirm: false` (restauration d'une sauvegarde) ne passe pas
+              // par ici : on y SAISIT une phrase existante, il n'y a rien à
+              // valider.
+              switch (PasswordPolicy.check(_ctrl1.text)) {
+                case PasswordRejection.tooShort:
+                  setState(() => _error = t.passphraseErrorMin);
+                  return;
+                case PasswordRejection.tooWeak:
+                  setState(() => _error = t.passwordTooWeak);
+                  return;
+                case null:
+                  break;
               }
               if (_ctrl1.text != _ctrl2.text) {
                 setState(() => _error = t.passphraseErrorMismatch);
@@ -1605,6 +1967,65 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
             widget.confirm ? t.passphraseEncryptCta : t.passphraseDecryptCta,
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Demande le mot de passe maître avant une opération sensible.
+/// `StatefulWidget` pour disposer proprement le contrôleur et vider son tampon.
+class _ReauthDialog extends StatefulWidget {
+  const _ReauthDialog();
+
+  @override
+  State<_ReauthDialog> createState() => _ReauthDialogState();
+}
+
+class _ReauthDialogState extends State<_ReauthDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.clear();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _ctrl.text;
+    _ctrl.clear();
+    Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return AlertDialog(
+      icon: const Icon(Icons.lock_outline, size: 32),
+      title: Text(t.reauthTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(t.reauthBody, style: const TextStyle(fontSize: 13)),
+          const SizedBox(height: 12),
+          PasswordTextField(
+            controller: _ctrl,
+            labelText: t.changePasswordCurrentLabel,
+            autofocus: true,
+            onSubmitted: (_) => _submit(),
+            showPrefixIcon: false,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            _ctrl.clear();
+            Navigator.pop(context);
+          },
+          child: Text(t.actionCancel),
+        ),
+        FilledButton(onPressed: _submit, child: Text(t.actionContinue)),
       ],
     );
   }
@@ -1645,6 +2066,14 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final t = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(t.changePasswordDialogTitle),
+      // UI 2026-08-04 — JUMEAU du dialogue de phrase secrète, corrigé avec lui.
+      //
+      // Le débordement n'a été signalé que sur le coffre leurre, mais ce
+      // dialogue-ci porte le MÊME message `passwordTooWeak` avec UN CHAMP DE
+      // PLUS : il déborde donc plus tôt, pas plus tard. Ne corriger que celui
+      // qui a été vu, c'est laisser le défaut à l'endroit le plus exposé — le
+      // changement de mot de passe maître.
+      scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1668,6 +2097,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+            const SizedBox(height: 8),
           ],
         ],
       ),
@@ -1679,9 +2109,23 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               setState(() => _error = t.changePasswordErrorCurrentRequired);
               return;
             }
-            if (_ctrl1.text.length < 12) {
-              setState(() => _error = t.changePasswordErrorMin);
-              return;
+            // SEC 2026-08-04 — ce chemin ne contrôlait QUE la longueur.
+            //
+            // On pouvait donc créer un coffre avec un mot de passe solide —
+            // l'écran de création, lui, vérifiait l'entropie — puis le
+            // remplacer ici par `aaaaaaaaaaaa` : douze caractères, accepté sans
+            // broncher. La garde protégeait la porte d'entrée pendant que la
+            // porte de service restait ouverte, et c'est celle-ci qui permet de
+            // DÉGRADER un coffre existant.
+            switch (PasswordPolicy.check(_ctrl1.text)) {
+              case PasswordRejection.tooShort:
+                setState(() => _error = t.changePasswordErrorMin);
+                return;
+              case PasswordRejection.tooWeak:
+                setState(() => _error = t.passwordTooWeak);
+                return;
+              case null:
+                break;
             }
             if (_ctrl1.text != _ctrl2.text) {
               setState(() => _error = t.changePasswordErrorMismatch);

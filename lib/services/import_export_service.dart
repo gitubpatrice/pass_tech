@@ -368,11 +368,22 @@ class ImportExportService {
   static const _backupVersionV3 = 3;
 
   /// Construit l'AAD canonique v3 (anti-downgrade).
-  static List<int> _aadV3(String saltB64) => utf8.encode(
+  ///
+  /// AUDIT 2026-08-03 — [params] est devenu un ARGUMENT. Cette fonction était
+  /// le cas le plus net du défaut : `importEncrypted` lisait bien `m`/`t`/`p`
+  /// dans le fichier pour dériver la clé, puis appelait `_aadV3` qui les
+  /// reconstruisait à partir des CONSTANTES. Deux sources de vérité
+  /// contradictoires dans une seule fonction.
+  ///
+  /// Tant que les deux coïncidaient, personne ne pouvait s'en apercevoir. Le
+  /// jour où [KdfParams.owaspMobile2024] est relevé, toutes les sauvegardes
+  /// déjà exportées cessent de s'ouvrir — sans message utile, puisque l'échec
+  /// d'étiquette AES-GCM est indistinguable d'une mauvaise phrase secrète.
+  static List<int> _aadV3(String saltB64, KdfParams params) => utf8.encode(
     'ptbak:v=$_backupVersionV3|kdf=argon2id'
-    '|m=${KdfParams.owaspMobile2024.memoryKiB}'
-    '|t=${KdfParams.owaspMobile2024.iterations}'
-    '|p=${KdfParams.owaspMobile2024.parallelism}'
+    '|m=${params.memoryKiB}'
+    '|t=${params.iterations}'
+    '|p=${params.parallelism}'
     '|salt=$saltB64',
   );
 
@@ -391,15 +402,36 @@ class ImportExportService {
     try {
       key = await KdfService.argon2id(password: passphrase, salt: salt);
       final saltB64 = base64Encode(salt);
-      final aad = Uint8List.fromList(_aadV3(saltB64));
-      final plain = Uint8List.fromList(
-        utf8.encode(jsonEncode(entries.map((e) => e.toJson()).toList())),
+      // Export : on emploie la recommandation courante et on l'inscrit dans le
+      // fichier ET dans l'AAD. Les deux resteront cohérents à la relecture,
+      // quelle que soit la valeur recommandée à ce moment-là.
+      final aad = Uint8List.fromList(
+        _aadV3(saltB64, KdfParams.owaspMobile2024),
       );
-      final res = await AeadService.encryptGcm(
-        key: key,
-        plaintext: plain,
-        aad: aad,
+      // SEC 2026-08-03 — `utf8.encode` rend déjà un `Uint8List` ; l'envelopper
+      // créait une seconde copie du coffre EN CLAIR que l'effacement ci-dessous
+      // ne couvrait pas. Voir `KdfService.argon2id` pour le même motif.
+      final plain = utf8.encode(
+        jsonEncode(entries.map((e) => e.toJson()).toList()),
       );
+      final AeadResult res;
+      try {
+        res = await AeadService.encryptGcm(
+          key: key,
+          plaintext: plain,
+          aad: aad,
+        );
+      } finally {
+        // AUDIT 2026-08-03 — `plain` (toutes les entrées en clair) n'était
+        // jamais effacé, alors que la clé l'était juste en dessous. Même
+        // omission que dans `HeritageService._writeSnapshotV2` ; le chemin
+        // coffre (`_saveVaultV4`) le fait correctement depuis la v2.4.0.
+        try {
+          plain.fillRange(0, plain.length, 0);
+        } catch (_) {
+          /* vue non modifiable possible */
+        }
+      }
       return jsonEncode({
         'magic': 'PTBAK',
         'version': _backupVersionV3,
@@ -415,8 +447,18 @@ class ImportExportService {
           // ciphertext || tag concaténés (compat AeadResult.cipherAndTag).
           'data': base64Encode(res.cipherAndTag),
         },
-        'count': entries.length,
-        'exportedAt': DateTime.now().toIso8601String(),
+        // AUDIT 2026-08-03 — `count` et `exportedAt` RETIRÉS.
+        //
+        // Ces deux champs étaient écrits EN CLAIR, hors du chiffrement et hors
+        // de l'AAD, dans le seul fichier de l'application destiné à quitter
+        // l'appareil (cloud, messagerie, clé USB). Ils annonçaient à quiconque
+        // met la main dessus combien d'identifiants la personne détient et
+        // quand elle a fait sa sauvegarde — sans rien apporter en échange :
+        // `importEncrypted` ne les a jamais relus, et la date figure déjà dans
+        // le nom du fichier (`pass_tech_AAAA-MM-JJ.ptbak`).
+        //
+        // Leur absence ne casse aucune sauvegarde existante, précisément parce
+        // qu'aucun code de lecture ne s'y réfère.
       });
     } finally {
       if (key != null) SecretBytes.wipe(key);
@@ -445,15 +487,15 @@ class ImportExportService {
         final cipher = json['cipher'];
         if (kdf is! Map || cipher is! Map) return null;
         if (kdf['algo'] != 'argon2id') return null;
-        final m = kdf['m'] as int? ?? 0;
-        final t = kdf['t'] as int? ?? 0;
-        final p = kdf['p'] as int? ?? 0;
-        // F1 v2.4.3 — bornes strictes anti-DoS sur params Argon2 forgés
-        // (un fichier malicieux pourrait spécifier m=1Go t=64 pour épuiser
-        // la RAM/CPU au déchiffrement).
-        if (m < 4096 || m > 1024 * 1024) return null;
-        if (t < 1 || t > 16) return null;
-        if (p < 1 || p > 4) return null;
+        // F1 v2.4.3 — bornes strictes anti-DoS sur params Argon2 forgés (un
+        // fichier malicieux pourrait spécifier m=1Go t=64 pour épuiser la
+        // RAM/CPU au déchiffrement).
+        // AUDIT 2026-08-03 — bornes déplacées dans `KdfParams.fromFileOrNull`,
+        // partagées avec le coffre et l'instantané héritier. Elles étaient
+        // recopiées ici seulement, alors que les deux autres formats relisaient
+        // leurs paramètres sans les vérifier du tout.
+        final params = KdfParams.fromFileOrNull(kdf);
+        if (params == null) return null;
         final saltB64 = kdf['salt'] as String? ?? '';
         final salt = base64Decode(saltB64);
         if (salt.length < 16) return null;
@@ -466,14 +508,13 @@ class ImportExportService {
           key = await KdfService.argon2id(
             password: passphrase,
             salt: salt,
-            params: KdfParams(
-              memoryKiB: m,
-              iterations: t,
-              parallelism: p,
-              outLen: 32,
-            ),
+            params: params,
           );
-          final aad = Uint8List.fromList(_aadV3(saltB64));
+          // AUDIT 2026-08-03 — l'AAD est construite avec LES MÊMES paramètres
+          // que la dérivation ci-dessus. C'est le correctif central : les deux
+          // lignes étaient auparavant en désaccord dès que le fichier ne
+          // portait pas exactement les constantes de compilation.
+          final aad = Uint8List.fromList(_aadV3(saltB64, params));
           final plain = await AeadService.decryptGcm(
             key: key,
             nonce: nonce,
@@ -482,16 +523,23 @@ class ImportExportService {
             aad: aad,
           );
           if (plain == null) return null;
-          final list = jsonDecode(utf8.decode(plain)) as List;
-          final entries = <Entry>[];
-          for (final item in list) {
-            try {
-              entries.add(Entry.fromJson(item as Map<String, dynamic>));
-            } catch (_) {}
+          // AUDIT 2026-08-03 — effacement déplacé dans un `finally`.
+          // Il était placé APRÈS le `jsonDecode` : sur un fichier corrompu (ou
+          // forgé), le décodage lève, le `catch` extérieur rend `null`, et le
+          // tampon en clair survivait intact en mémoire. Le cas d'erreur est
+          // justement celui où l'on veut être sûr d'avoir nettoyé.
+          try {
+            final list = jsonDecode(utf8.decode(plain)) as List;
+            final entries = <Entry>[];
+            for (final item in list) {
+              try {
+                entries.add(Entry.fromJson(item as Map<String, dynamic>));
+              } catch (_) {}
+            }
+            return entries;
+          } finally {
+            SecretBytes.wipe(plain);
           }
-          // Wipe plaintext bytes après parsing JSON.
-          SecretBytes.wipe(plain);
-          return entries;
         } finally {
           if (key != null) SecretBytes.wipe(key);
         }
@@ -517,12 +565,17 @@ class ImportExportService {
       // côté API (un futur appelant pourrait s'y fier).
       if (mac.length != 32) return null;
 
-      final key = await compute(pbkdf2Worker, [
-        utf8.encode(passphrase),
-        salt,
-        iterations,
-        64,
-      ]);
+      // SEC 2026-08-03 (Gemini PT-004) — la copie UTF-8 de la phrase secrète
+      // est effacée après l'appel. `compute` en transfère un exemplaire à
+      // l'isolat, que `pbkdf2Worker` efface bien ; celui de ce côté-ci restait
+      // en mémoire jusqu'au ramasse-miettes.
+      final pw = utf8.encode(passphrase);
+      final Uint8List key;
+      try {
+        key = await compute(pbkdf2Worker, [pw, salt, iterations, 64]);
+      } finally {
+        SecretBytes.wipe(pw);
+      }
       // M-3 : zéroïser key + sublists après usage.
       final macKey = key.sublist(32);
       Uint8List? encKeyBytes;
@@ -543,10 +596,32 @@ class ImportExportService {
         encKeyBytes = key.sublist(0, 32);
         final encKey = enc.Key(encKeyBytes);
         final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-        final plain = encrypter.decrypt(
+        // SEC 2026-08-04 — `decryptBytes` au lieu de `decrypt`.
+        //
+        // `decrypt()` rend une `String` Dart, immuable donc impossible à
+        // écraser : la sauvegarde entière en clair restait en mémoire jusqu'au
+        // ramasse-miettes. Même correctif que dans `HeritageService`.
+        //
+        // ⚠️ `allowMalformed: true` reproduit EXACTEMENT ce que fait
+        // `Encrypter.decrypt` en interne (encrypt 5.0.3, `encrypter.dart:49`).
+        // L'omettre ferait lever une exception là où l'ancien code tolérait un
+        // octet malformé — régression silencieuse sur les `.ptbak` hérités.
+        final plainBytes = encrypter.decryptBytes(
           enc.Encrypted(Uint8List.fromList(cipher)),
           iv: enc.IV(Uint8List.fromList(iv)),
         );
+        final String plain;
+        try {
+          plain = utf8.decode(plainBytes, allowMalformed: true);
+        } finally {
+          try {
+            for (var i = 0; i < plainBytes.length; i++) {
+              plainBytes[i] = 0;
+            }
+          } catch (_) {
+            /* vue non modifiable */
+          }
+        }
 
         final list = jsonDecode(plain) as List;
         final entries = <Entry>[];

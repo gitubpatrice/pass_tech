@@ -16,9 +16,18 @@ part of 'vault_service.dart';
 extension VaultCrypto on VaultService {
   /// Build the AAD string bound to a v4 vault. The exact bytes are part of
   /// the GCM tag — encrypt and decrypt MUST agree byte-for-byte.
-  Uint8List _aadV4(String alias) => Uint8List.fromList(
+  ///
+  /// AUDIT 2026-08-03 — les paramètres sont désormais un ARGUMENT et non plus
+  /// les constantes de compilation. Le chiffrement passe ceux qu'il écrit dans
+  /// le fichier, le déchiffrement ceux qu'il y a lus : les deux côtés restent
+  /// donc d'accord même si la valeur recommandée par le projet change un jour.
+  /// Auparavant, relever [KdfParams.owaspMobile2024] aurait changé l'AAD de
+  /// TOUS les coffres déjà écrits, et leur étiquette GCM ne se serait plus
+  /// jamais vérifiée.
+  Uint8List _aadV4(String alias, KdfParams params) => Uint8List.fromList(
     utf8.encode(
-      'pt:v=4|alias=$alias|kdf=argon2id|m=${VaultService._argon2M}|t=${VaultService._argon2T}|p=${VaultService._argon2P}',
+      'pt:v=4|alias=$alias|kdf=argon2id'
+      '|m=${params.memoryKiB}|t=${params.iterations}|p=${params.parallelism}',
     ),
   );
 
@@ -151,6 +160,7 @@ extension VaultCrypto on VaultService {
   Future<List<Entry>?> _decryptVaultV4(
     Map<String, dynamic> raw,
     Uint8List finalKey,
+    KdfParams params,
   ) async {
     try {
       if (raw['magic'] != VaultService._vaultMagic) return null;
@@ -170,7 +180,7 @@ extension VaultCrypto on VaultService {
       final dataBlob = base64Decode(cipher['data'] as String);
       final split = AeadService.splitCipherAndTag(dataBlob);
 
-      final aad = _aadV4(alias);
+      final aad = _aadV4(alias, params);
       final pt = await AeadService.decryptGcm(
         key: finalKey,
         nonce: nonce,

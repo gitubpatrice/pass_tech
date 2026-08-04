@@ -1,0 +1,161 @@
+name: Promesses
+
+# AUDIT 2026-08-03 — vérifie sur l'ARTEFACT ce que l'application promet dans sa
+# politique de confidentialité. Aucun autre mécanisme du dépôt ne couvre ça :
+# `ci.yml` analyse le source, `security.yml` scanne les CVE des dépendances.
+# Ni l'un ni l'autre ne regarde ce que le binaire contient RÉELLEMENT.
+#
+# Ce workflow existe parce que le manifeste FUSIONNÉ de la release contenait une
+# permission (`ACCESS_NETWORK_STATE`) absente du dépôt, plus les composants de
+# télémétrie de Google, sans que personne le sache. Une promesse publique se
+# vérifie à chaque commit — pas au moment de couper la release, quand la
+# dépendance fautive a déjà trois semaines.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artefact:
+    name: Permissions + trackers sur l'APK release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      # Le build release REFUSE de signer avec la clé de debug depuis SEC F15
+      # v2.5.2 — c'est volontaire, et il ne faut surtout pas l'assouplir. On
+      # fabrique donc une clé JETABLE, valable un jour, qui ne quitte jamais le
+      # runner.
+      #
+      # ⚠️ L'APK produit ici n'est PAS publiable : il ne porte pas le certificat
+      # de Files Tech, donc il ne peut pas mettre à jour une installation
+      # existante. Il n'existe que pour être analysé, et n'est jamais téléversé.
+      - name: Clé de signature jetable (analyse uniquement)
+        run: |
+          keytool -genkeypair -v -keystore android/ci-throwaway.jks \
+            -storepass ci-only -keypass ci-only -alias ci \
+            -keyalg RSA -keysize 2048 -validity 1 -dname "CN=CI,O=throwaway"
+          cat > android/key.properties <<'EOF'
+          storeFile=ci-throwaway.jks
+          storePassword=ci-only
+          keyPassword=ci-only
+          keyAlias=ci
+          EOF
+
+      # Release et non debug : c'est R8 qui décide de ce qui reste réellement
+      # dans le binaire distribué. Analyser un APK de debug sur-détecterait,
+      # puisque rien n'y est élagué.
+      - name: Build APK release (arm64)
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Localiser aapt
+        id: sdk
+        run: |
+          AAPT=$(find "$ANDROID_SDK_ROOT/build-tools" -name aapt -type f | sort -V | tail -1)
+          echo "aapt=$AAPT" >> "$GITHUB_OUTPUT"
+          "$AAPT" version
+
+      # ── Contrôle 1 : la surface de permissions n'a pas grandi ──────────────
+      - name: Permissions conformes à expected-permissions.txt
+        run: |
+          APK=$(find build -name '*release*.apk' | head -1)
+          echo "APK analysé : $APK"
+
+          "${{ steps.sdk.outputs.aapt }}" dump permissions "$APK" \
+            | grep -oP "(?<=uses-permission: name=')[^']+" \
+            | sort -u > /tmp/actual.txt
+
+          # La permission de réception dynamique est générée par Flutter à
+          # partir de l'applicationId : elle est propre à l'app, de niveau
+          # signature, et n'élargit aucune surface externe.
+          grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' /tmp/actual.txt \
+            > /tmp/actual-filtre.txt
+
+          grep -v '^\s*#' android/expected-permissions.txt \
+            | grep -v '^\s*$' | sort -u > /tmp/expected.txt
+
+          echo "── Attendues ──"; cat /tmp/expected.txt
+          echo "── Réelles ──";   cat /tmp/actual-filtre.txt
+
+          if ! diff -u /tmp/expected.txt /tmp/actual-filtre.txt; then
+            echo ""
+            echo "ECHEC : la liste des permissions de l'APK ne correspond plus."
+            echo "  '+' = permission apparue et non déclarée. Trouver la"
+            echo "        dépendance responsable avant toute chose :"
+            echo "        grep -rn <PERMISSION> build/app/intermediates/manifest_merge_blame_file/"
+            echo "  '-' = permission disparue : mettre à jour le fichier de"
+            echo "        référence ET PRIVACY.md §10."
+            exit 1
+          fi
+          echo "OK : surface de permissions inchangée."
+
+      # ── Contrôle 2 : aucun tracker connu ──────────────────────────────────
+      # Le site annonce « aucun tracker » pour les huit applications, et
+      # App Manager Tech revendique une détection de trackers du même type.
+      # Un tracker signalé dans un binaire Files Tech par l'outil que les
+      # utilisateurs méfiants emploient eux-mêmes serait sans commune mesure
+      # avec le coût de ce contrôle.
+      - name: Aucun tracker connu (Exodus Privacy)
+        run: |
+          APK=$(find build -name '*release*.apk' | head -1)
+          # CI 2026-08-04 — syntaxe corrigée. `-j` est un DRAPEAU (sortie JSON),
+          # il ne prend pas de nom de fichier ; c'est `-o` qui reçoit la
+          # destination. Écrit `-j <fichier> <apk>`, l'outil prenait le fichier
+          # pour l'APK et refusait le vrai chemin en argument surnuméraire :
+          #   exodus_analyze.py: error: unrecognized arguments: /w/…/app-release.apk
+          # La forme erronée vient de `ci-et-chaine-de-publication.md` §6, à
+          # corriger là-bas aussi.
+          docker run --rm -v "$PWD:/w" exodusprivacy/exodus-standalone \
+            -j -o /w/exodus.json "/w/$APK" || true
+          if [ ! -f exodus.json ]; then
+            echo "ECHEC : Exodus n'a produit aucun rapport."
+            exit 1
+          fi
+          COUNT=$(jq '.trackers | length' exodus.json)
+          echo "Trackers détectés : $COUNT"
+          jq -r '.trackers[]?.name' exodus.json || true
+          if [ "$COUNT" -ne 0 ]; then
+            echo "ECHEC : $COUNT tracker(s) dans l'APK release."
+            exit 1
+          fi
+          echo "OK : aucun tracker."
+
+      - name: Rapport Exodus
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: exodus-${{ github.sha }}
+          path: exodus.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # La clé jetable et le key.properties généré ne doivent jamais survivre à
+      # l'exécution, même si une étape précédente a échoué.
+      - name: Purge de la clé jetable
+        if: always()
+        run: rm -f android/ci-throwaway.jks android/key.properties

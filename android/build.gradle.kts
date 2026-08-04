@@ -17,10 +17,14 @@ subprojects {
 }
 
 // Force consistent JVM toolchain across all third-party Flutter plugins.
-// biometric_storage pins Kotlin jvmToolchain(17) ; mobile_scanner pins
-// Java/Kotlin 1.8 ; the inconsistency makes Gradle 8 fail. We bump
-// everyone to 17 (sourceCompat, targetCompat, kotlinJvmTarget) and force
-// Java toolchain to JDK 21 since that's what's installed locally.
+// Plugins disagree on their Java/Kotlin target (biometric_storage pins
+// jvmToolchain(17), others still declare 1.8) and the inconsistency makes
+// Gradle 8 fail. We bump everyone to 17 (sourceCompat, targetCompat,
+// kotlinJvmTarget) and force the Java toolchain to JDK 21.
+//
+// AUDIT 2026-08-03 — ce bloc citait `mobile_scanner`, retiré depuis. Il est
+// CONSERVÉ : la divergence ne venait pas de lui seul, et le build a été
+// revalidé avec. Ne pas le supprimer sans reconstruire l'ensemble des plugins.
 subprojects {
     afterEvaluate {
         plugins.withId("org.jetbrains.kotlin.android") {

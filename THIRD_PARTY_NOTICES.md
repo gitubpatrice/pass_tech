@@ -23,7 +23,6 @@ Versions are those declared in `pubspec.yaml` for Pass Tech v2.0.2.
 | 11 | `intl`                   | ^0.20.2    | BSD-3-Clause      | https://github.com/dart-lang/i18n                                   |
 | 12 | `http`                   | ^1.2.0     | BSD-3-Clause      | https://github.com/dart-lang/http                                   |
 | 13 | `path_provider`          | ^2.1.4     | BSD-3-Clause      | https://github.com/flutter/packages                                 |
-| 14 | `mobile_scanner`         | ^5.2.3     | BSD-3-Clause      | https://github.com/juliansteenbakker/mobile_scanner                 |
 | 15 | `file_picker`            | ^11.0.0    | MIT               | https://github.com/miguelpruivo/flutter_file_picker                 |
 | 16 | `flutter_slidable`       | ^4.0.3     | MIT               | https://github.com/letsar/flutter_slidable                          |
 | 17 | `biometric_storage`      | ^5.0.1     | MIT               | https://github.com/authpass/biometric_storage                       |
@@ -50,6 +49,31 @@ Pass Tech uses standard, well-reviewed cryptographic primitives via the `cryptog
 - **SHA-1 (5-char prefix)** — only for the k-anonymity HIBP query.
 
 No custom cryptography is implemented in this application.
+
+## Transitive Android dependencies (not declared in `pubspec.yaml`)
+
+Audited 2026-08-03 against the **merged release manifest**. Some Flutter plugins
+pull in native Android artifacts that never appear in `pubspec.yaml`.
+
+**As of 2026-08-03 the app contains no Google artifacts at all.** The previous
+entry documented Google ML Kit, Play Services and `datatransport`, all pulled in
+by `mobile_scanner` for QR code scanning; that dependency was removed. See
+[`THREAT_MODEL.md`](./THREAT_MODEL.md) §5.2.
+
+The only remaining transitive manifest contribution:
+
+| Pulled in by | Contribution | Note |
+| ------------ | ------------ | ---- |
+| `biometric_storage` | re-declares `android.permission.USE_FINGERPRINT` (no `maxSdkVersion`) | Required by `androidx.biometric` on API 24-27 |
+
+The permission set is pinned in `android/expected-permissions.txt` and verified
+against the built APK on every commit by `.github/workflows/promesses.yml`.
+
+To re-check after any dependency bump:
+
+```bash
+grep -E "gms|mlkit|datatransport|firebase"   build/app/intermediates/manifest_merge_blame_file/release/processReleaseMainManifest/manifest-merger-blame-release-report.txt
+```
 
 ## External services queried by the user
 

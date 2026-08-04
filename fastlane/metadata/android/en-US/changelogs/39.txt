@@ -1,0 +1,7 @@
+Major privacy and reliability release.
+
+• Google removed from the app: no Google library or service is bundled any more.
+• Security audit fixed: the score was misleading on small vaults and ignored detected breaches.
+• Master password: 12 characters, no mandatory symbol or digit.
+• Panic mode: warning before enabling, biometrics will be turned off.
+• Cancelling the fingerprint prompt no longer traps you on the unlock screen.

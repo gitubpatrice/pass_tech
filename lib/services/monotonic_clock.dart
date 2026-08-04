@@ -69,11 +69,22 @@ class MonotonicClock {
   /// anti-force-brute, là où [nowMs] échouait en ouverture.
   ///
   /// Retourne `null` si la plateforme ne répond pas (hors Android, canal
-  /// indisponible en test) : l'appelant doit alors se rabattir sur [nowMs] et
-  /// accepter la limite documentée.
+  /// indisponible en test).
+  ///
+  /// ⚠️ SEC 2026-08-04 (relecture Codex) — cette ligne disait « l'appelant doit
+  /// alors se rabattre sur [nowMs] ». C'était FAUX, et dangereux à suivre :
+  /// [nowMs] est une horloge MURALE, insensible aux reculs mais pas aux
+  /// avances. S'en servir pour mesurer un temps passé en arrière-plan
+  /// laisserait un attaquant raccourcir ce temps en avançant l'horloge —
+  /// exactement ce que cette méthode existe pour empêcher.
+  ///
+  /// Le seul repli correct est de traiter la durée comme INCONNUE et d'en tirer
+  /// la conclusion la plus prudente. Le verrouillage automatique
+  /// (`main.dart`) considère alors le temps écoulé comme infini et verrouille.
   ///
   /// ⚠️ Se remet à ZÉRO au redémarrage de l'appareil. Un appelant qui persiste
-  /// une valeur doit détecter le recul et le traiter de façon conservatrice.
+  /// une valeur doit détecter le recul et le traiter de la même façon — comme
+  /// une durée inconnue, jamais comme un « rien ne s'est passé ».
   static const _rasp = MethodChannel('com.passtech.pass_tech/rasp');
 
   static Future<int?> elapsedRealtimeMs() async {

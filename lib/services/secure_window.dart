@@ -58,6 +58,19 @@ class SecureWindow {
   /// déjà posé.
   static Future<void> applyUserPreference({required bool enabled}) async {
     _userDisabled = !enabled;
+    // SEC 2026-08-04 — informe le natif de la préférence GLOBALE, pour qu'il
+    // puisse réarmer FLAG_SECURE lui-même dans `onPause`, avant qu'Android ne
+    // prenne la vignette des applications récentes.
+    //
+    // `suspendRelaxForBackground()` fait déjà ce travail, mais depuis Dart :
+    // l'appel de canal ne revient qu'APRÈS le retour de `onPause`, donc
+    // potentiellement après la photo. Le natif, lui, agit dans le cycle de vie
+    // lui-même — il n'y a plus de course.
+    //
+    // On transmet la préférence et NON l'état courant du flag : l'éditeur de
+    // notes relâche volontairement FLAG_SECURE, et c'est précisément dans cet
+    // état qu'il faut sécuriser au passage en arrière-plan.
+    await _setSecureOnBackground(enabled);
     if (_userDisabled) {
       // Retire le flag s'il avait été posé par un init() précédent
       // (cas où l'utilisateur toggle off à chaud).
@@ -94,6 +107,19 @@ class SecureWindow {
   /// composants → copier/coller restent bloqués. Poser FLAG_SECURE
   /// APRÈS la création (depuis Dart, post-runApp) évite ce piège tout
   /// en préservant la protection screenshots / aperçu Recent Apps.
+  /// Transmet au natif s'il doit réarmer FLAG_SECURE dans `onPause`.
+  /// Best-effort : un échec ne doit jamais bloquer l'appelant, le repli étant
+  /// le comportement Dart existant (`suspendRelaxForBackground`).
+  static Future<void> _setSecureOnBackground(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setSecureOnBackground', {
+        'enabled': enabled,
+      });
+    } catch (_) {
+      /* ancienne version native ou plateforme non Android */
+    }
+  }
+
   static Future<void> init() async {
     if (_initialized) return;
     if (_userDisabled) return;

@@ -99,13 +99,57 @@ extension VaultBruteForce on VaultService {
     return ((until - now) / 1000).ceil();
   }
 
-  Future<void> _onUnlockFail() async {
+  /// SEC 2026-08-03 (Gemini PT-002) — provisionne l'échec AVANT de tenter.
+  ///
+  /// `_onUnlockFail` n'est appelé qu'APRÈS la vérification, donc après une à
+  /// deux secondes d'Argon2id. Il suffit de tuer l'application pendant ce
+  /// calcul — depuis le sélecteur d'applications récentes, ou par script — pour
+  /// que l'essai ne soit **jamais comptabilisé**. Répété, cela supprime
+  /// purement et simplement le verrouillage progressif : il ne reste que le
+  /// coût d'Argon2id, alors que tout l'intérêt du verrouillage est justement
+  /// d'ajouter une barrière que le calcul seul n'offre pas.
+  ///
+  /// La parade est classique : on écrit l'échec AVANT, et on l'annule
+  /// seulement si la vérification réussit ([_onUnlockSuccess] efface déjà le
+  /// compteur). Une interruption laisse donc l'essai compté — fail-closed.
+  ///
+  /// ⚠️ Ne déclenche PAS le verrouillage lui-même : seul `_onUnlockFail`,
+  /// appelé après un échec avéré, arme le compte à rebours. Un utilisateur
+  /// légitime dont le déverrouillage aboutit ne voit jamais ce compteur.
+  Future<void> _reserveUnlockAttempt() async {
+    try {
+      final s = await VaultService._storage.read(
+        key: VaultService._failCountKey,
+      );
+      final count = ((int.tryParse(s ?? '0') ?? 0) + 1).clamp(0, 1000);
+      await VaultService._storage.write(
+        key: VaultService._failCountKey,
+        value: count.toString(),
+      );
+    } catch (_) {
+      /* best-effort : ne doit jamais empêcher une tentative légitime */
+    }
+  }
+
+  /// [alreadyReserved] : l'essai a déjà été provisionné par
+  /// [_reserveUnlockAttempt] avant la vérification. On se contente alors de
+  /// lire le compteur pour armer le verrouillage, sans le réincrémenter — sinon
+  /// chaque échec compterait double.
+  Future<void> _onUnlockFail({bool alreadyReserved = false}) async {
     final s = await VaultService._storage.read(key: VaultService._failCountKey);
     // F6 v2.4.4 — clamp à 1000 max. Avant : un attaquant qui spam `unlock()`
     // pendant des heures montait le compteur à des dizaines de milliers ;
     // aucun impact crypto (lockout step toujours plafonné à 30 min via
     // `_lockoutSteps.length - 1`) mais usure NAND et pollution storage.
-    final count = ((int.tryParse(s ?? '0') ?? 0) + 1).clamp(0, 1000);
+    final previous = int.tryParse(s ?? '0') ?? 0;
+    // Si la réservation a échoué (stockage momentanément indisponible), on lit
+    // 0 alors qu'un essai vient bel et bien d'échouer. Compter au moins 1 :
+    // sans ce plancher, une erreur d'écriture désarmerait le verrouillage —
+    // un repli du mauvais côté, exactement le défaut que SEC F5/F17 a corrigé
+    // sur le compte à rebours.
+    final count = alreadyReserved
+        ? (previous < 1 ? 1 : previous).clamp(0, 1000)
+        : (previous + 1).clamp(0, 1000);
     await VaultService._storage.write(
       key: VaultService._failCountKey,
       value: count.toString(),

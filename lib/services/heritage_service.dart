@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import 'aead_service.dart';
 import 'kdf_service.dart';
+import 'password_policy.dart';
 import 'monotonic_clock.dart';
 import 'vault_service.dart';
 
@@ -56,10 +57,11 @@ class HeritageService {
   static const _defaultThresholdDays = 90;
   static const _gracePeriodDays = 7;
 
-  // Argon2id baseline — source unique : KdfParams.owaspMobile2024.
-  static final _argon2M = KdfParams.owaspMobile2024.memoryKiB;
-  static final _argon2T = KdfParams.owaspMobile2024.iterations;
-  static final _argon2P = KdfParams.owaspMobile2024.parallelism;
+  // AUDIT 2026-08-03 — alias `_argon2M/T/P` supprimés : ils servaient à la
+  // fois à l'écriture du fichier et à la construction de l'AAD, ce qui figeait
+  // la LECTURE sur une constante de compilation. Écriture =
+  // `KdfParams.owaspMobile2024`, citée là où l'on dérive ; lecture =
+  // `KdfParams.fromFileOrNull`, depuis l'instantané lui-même.
 
   /// True si un snapshot héritage a déjà été configuré.
   Future<bool> get isEnabled async {
@@ -194,8 +196,16 @@ class HeritageService {
     // COMPLÈTE du coffre dérivée du SEUL heir_password (pas de liaison TEE,
     // l'héritier déchiffre ailleurs) : un mot de passe faible = brute-force
     // offline du `pt_heir.enc` depuis une simple copie de fichier.
-    if (heirPassword.length < 12) {
-      throw ArgumentError('Heir password : 12 caractères minimum');
+    // SEC 2026-08-04 — la règle passe par `PasswordPolicy`, partagée avec les
+    // écrans. Elle ajoute au contrôle de longueur le rejet des répétitions,
+    // des suites et des mots de passe courants : `aaaaaaaaaaaa` était accepté.
+    // Enjeu particulier ici — `pt_heir.enc` n'est PAS lié au matériel, il se
+    // déchiffre ailleurs à partir de ce seul mot de passe.
+    if (PasswordPolicy.check(heirPassword) != null) {
+      throw ArgumentError(
+        'Heir password : ${PasswordPolicy.minLength} caractères minimum, '
+        'et pas de suite ni de répétition triviale',
+      );
     }
     final entries = VaultService().entries;
     if (entries.isEmpty) {
@@ -205,7 +215,16 @@ class HeritageService {
     // dérivation Argon2id ET à l'AAD (anti-downgrade). v1 reste lisible pour
     // les snapshots historiques (pas de break compat).
     final salt = SecretBytes.randomBytes(32);
-    final key = await KdfService.argon2id(password: heirPassword, salt: salt);
+    // Instantané neuf : on emploie la recommandation courante et on l'inscrit
+    // dans le fichier, qui la portera pour toute sa vie. C'est ce qui permettra
+    // à une version future de l'application, dotée d'autres réglages, de
+    // continuer à ouvrir cet instantané-ci.
+    const params = KdfParams.owaspMobile2024;
+    final key = await KdfService.argon2id(
+      password: heirPassword,
+      salt: salt,
+      params: params,
+    );
     // v2.5.0 (F6) : ordre revu — fichier AVANT salt + rollback explicite si
     // l'écriture du salt échoue. Ancien ordre (salt → fichier) créait une
     // fenêtre de désync sur les updates : si l'écriture du fichier échouait
@@ -219,7 +238,7 @@ class HeritageService {
     try {
       // 1) Fichier nouveau (atomic tmp+rename dans _writeSnapshotV2). Si
       //    échec ici, ancien fichier + ancien salt intacts.
-      await _writeSnapshotV2(entries, key, salt);
+      await _writeSnapshotV2(entries, key, salt, params);
       try {
         // 2) Salt cohérent avec le nouveau fichier.
         await _storage.write(key: _saltKey, value: base64Encode(salt));
@@ -253,9 +272,26 @@ class HeritageService {
   }
 
   /// Supprime le snapshot et désactive l'héritage.
+  ///
+  /// AUDIT 2026-08-03 — le fichier est désormais DÉCHIQUETÉ, pas simplement
+  /// dissocié du répertoire.
+  ///
+  /// `pt_heir.enc` est une copie complète du coffre, chiffrée à partir du SEUL
+  /// mot de passe héritier : pas de liaison au Keystore, pas de `hwSecret`,
+  /// puisque l'héritier doit pouvoir la déchiffrer ailleurs. C'est donc le
+  /// fichier le plus attaquable hors ligne de toute l'application — et c'est
+  /// exactement pour cette raison que `deleteVault` le déchiquette
+  /// explicitement depuis SEC F1. Ce chemin-ci, celui que l'utilisateur
+  /// emprunte quand il désactive volontairement l'héritage, se contentait d'un
+  /// `deleteSync()` : les blocs restaient lisibles tels quels.
+  ///
+  /// Le seuil (`pt_heir_threshold_days`) et l'horodatage d'activité
+  /// (`pt_last_active_ts`) sont volontairement CONSERVÉS : le premier est un
+  /// réglage que l'utilisateur a choisi et qu'il retrouvera s'il réactive
+  /// l'héritage, le second est réécrit à chaque déverrouillage de toute façon.
+  /// Les effacer n'apporterait rien et ferait perdre un réglage.
   Future<void> disable() async {
-    final f = await _heirFile();
-    if (f.existsSync()) f.deleteSync();
+    VaultService.shredFileSync(await _heirFile());
     await _storage.delete(key: _saltKey);
     await _storage.delete(key: _enabledKey);
     await _storage.delete(key: _graceStartKey);
@@ -281,12 +317,19 @@ class HeritageService {
 
       if (version == _heirVersionV2) {
         // v2 : Argon2id 32B → AES-GCM-256
+        // AUDIT 2026-08-03 — paramètres relus dans l'instantané, avec les
+        // mêmes bornes que les deux autres formats. `null` = hors bornes,
+        // on refuse plutôt que de lancer un Argon2id sur des valeurs forgées.
+        final kdf = raw['kdf'];
+        final params = kdf is Map ? KdfParams.fromFileOrNull(kdf) : null;
+        if (params == null) return null;
         final key = await KdfService.argon2id(
           password: heirPassword,
           salt: salt,
+          params: params,
         );
         try {
-          return await _readSnapshotV2(raw, key);
+          return await _readSnapshotV2(raw, key, params);
         } finally {
           SecretBytes.wipe(key);
         }
@@ -320,14 +363,61 @@ class HeritageService {
   // Inoffensif ici (HMAC-SHA256 32 octets fixes). Ne pas réutiliser pour
   // des secrets de longueur variable.
 
-  Future<Uint8List> _deriveKeyV1(String password, Uint8List salt, int iter) {
-    return compute(pbkdf2Worker, [utf8.encode(password), salt, iter, 64]);
+  /// SEC 2026-08-03 (Gemini PT-005) — la copie UTF-8 du mot de passe héritier
+  /// est effacée après l'appel.
+  ///
+  /// `compute` transfère une copie à l'isolat de travail, que `pbkdf2Worker`
+  /// efface bien de son côté — mais l'exemplaire de CE côté-ci restait en
+  /// mémoire jusqu'au ramasse-miettes. Chemin hérité (instantanés v1), donc
+  /// rare, mais c'est du matériel de mot de passe.
+  Future<Uint8List> _deriveKeyV1(
+    String password,
+    Uint8List salt,
+    int iter,
+  ) async {
+    final pw = utf8.encode(password);
+    try {
+      return await compute(pbkdf2Worker, [pw, salt, iter, 64]);
+    } finally {
+      SecretBytes.wipe(pw);
+    }
+  }
+
+  /// Écrase une `List<int>` en place.
+  ///
+  /// `Encrypter.decryptBytes` déclare rendre une `List<int>`, pas une
+  /// `Uint8List` — `SecretBytes.wipe`, qui attend le type concret, ne peut donc
+  /// pas être appelé directement. On écrase élément par élément, et on avale
+  /// l'exception si la liste s'avère non modifiable : mieux vaut un effacement
+  /// qui échoue qu'un déchiffrement qui plante.
+  static void _wipeIntList(List<int> buf) {
+    try {
+      for (var i = 0; i < buf.length; i++) {
+        buf[i] = 0;
+      }
+    } catch (_) {
+      /* vue non modifiable — le ramasse-miettes reprendra la main */
+    }
   }
 
   /// AAD bound to a v2 heir snapshot (anti-downgrade).
-  Uint8List _aadV2(String saltB64) => Uint8List.fromList(
+  ///
+  /// AUDIT 2026-08-03 — [params] est un argument, et non plus les constantes
+  /// de compilation. Même défaut que dans le coffre et dans le `.ptbak` :
+  /// `kdf.m/t/p` étaient écrits dans l'instantané mais jamais relus, si bien
+  /// qu'un relèvement de [KdfParams.owaspMobile2024] aurait rendu illisibles
+  /// tous les instantanés existants.
+  ///
+  /// L'enjeu est ici particulier : cet instantané est ce que l'héritier
+  /// ouvrira, potentiellement des années après son écriture, avec une version
+  /// de l'application bien plus récente. C'est précisément le format sur
+  /// lequel la compatibilité en lecture ne doit jamais dépendre d'une
+  /// constante du moment.
+  Uint8List _aadV2(String saltB64, KdfParams params) => Uint8List.fromList(
     utf8.encode(
-      'pt-heir:v=$_heirVersionV2|kdf=argon2id|m=$_argon2M|t=$_argon2T|p=$_argon2P|salt=$saltB64',
+      'pt-heir:v=$_heirVersionV2|kdf=argon2id'
+      '|m=${params.memoryKiB}|t=${params.iterations}|p=${params.parallelism}'
+      '|salt=$saltB64',
     ),
   );
 
@@ -337,26 +427,45 @@ class HeritageService {
     List<Entry> entries,
     Uint8List key,
     Uint8List salt,
+    KdfParams params,
   ) async {
     final saltB64 = base64Encode(salt);
-    final aad = _aadV2(saltB64);
-    final plain = Uint8List.fromList(
-      utf8.encode(jsonEncode(entries.map((e) => e.toJson()).toList())),
+    final aad = _aadV2(saltB64, params);
+    // SEC 2026-08-03 — `utf8.encode` rend déjà un `Uint8List` ; l'envelopper
+    // créait une seconde copie du coffre EN CLAIR que l'effacement du `finally`
+    // ne couvrait pas. Voir `KdfService.argon2id` pour le même motif.
+    final plain = utf8.encode(
+      jsonEncode(entries.map((e) => e.toJson()).toList()),
     );
-    final res = await AeadService.encryptGcm(
-      key: key,
-      plaintext: plain,
-      aad: aad,
-    );
+    final AeadResult res;
+    try {
+      res = await AeadService.encryptGcm(key: key, plaintext: plain, aad: aad);
+    } finally {
+      // AUDIT 2026-08-03 — `plain` contient le coffre ENTIER sérialisé en
+      // clair, mots de passe compris. Il n'était jamais effacé et restait donc
+      // en mémoire jusqu'au passage du ramasse-miettes.
+      // Toutes les fonctions jumelles le font pourtant : `_saveVaultV4` efface
+      // `ptBytes` ET `plainText`, `_decryptVaultV4` efface `pt`. Le chemin
+      // Héritage était le seul à ne pas suivre la règle de la maison.
+      try {
+        plain.fillRange(0, plain.length, 0);
+      } catch (_) {
+        /* vue non modifiable possible — cf. SecretBytes.wipe */
+      }
+    }
 
     final out = {
       'magic': 'PTHEIR',
       'version': _heirVersionV2,
       'kdf': {
         'algo': 'argon2id',
-        'm': _argon2M,
-        't': _argon2T,
-        'p': _argon2P,
+        // AUDIT 2026-08-03 — on écrit les paramètres RÉELLEMENT employés pour
+        // dériver `key`, et non les constantes lues séparément. Les deux
+        // coïncident aujourd'hui ; ce qui compte est qu'ils ne PUISSENT plus
+        // diverger, puisque `unlockAsHeir` relit désormais ces champs.
+        'm': params.memoryKiB,
+        't': params.iterations,
+        'p': params.parallelism,
         'salt': saltB64,
       },
       'cipher': {
@@ -379,6 +488,7 @@ class HeritageService {
   Future<List<Entry>?> _readSnapshotV2(
     Map<String, dynamic> raw,
     Uint8List key,
+    KdfParams params,
   ) async {
     try {
       if (raw['magic'] != 'PTHEIR') return null;
@@ -389,7 +499,8 @@ class HeritageService {
       final nonce = base64Decode(cipher['nonce'] as String);
       final dataBlob = base64Decode(cipher['data'] as String);
       final split = AeadService.splitCipherAndTag(dataBlob);
-      final aad = _aadV2(saltB64);
+      // Mêmes paramètres que ceux ayant servi à dériver `key` (cf. appelant).
+      final aad = _aadV2(saltB64, params);
       final pt = await AeadService.decryptGcm(
         key: key,
         nonce: nonce,
@@ -398,10 +509,24 @@ class HeritageService {
         aad: aad,
       );
       if (pt == null) return null;
-      final list = jsonDecode(utf8.decode(pt)) as List;
-      return list
-          .map((e) => Entry.fromJson(e as Map<String, dynamic>))
-          .toList();
+      try {
+        final list = jsonDecode(utf8.decode(pt)) as List;
+        return list
+            .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } finally {
+        // AUDIT 2026-08-03 — symétrie avec `_decryptVaultV4`, qui efface son
+        // tampon déchiffré depuis la v2.4.0. Ici il ne l'était pas, alors que
+        // son contenu est identique : toutes les entrées en clair.
+        // En `finally` et non après le `jsonDecode` : un instantané corrompu
+        // fait lever le décodage, et c'est précisément le cas où le tampon
+        // serait resté intact en mémoire.
+        try {
+          pt.fillRange(0, pt.length, 0);
+        } catch (_) {
+          /* vue non modifiable possible */
+        }
+      }
     } catch (_) {
       return null;
     }
@@ -439,14 +564,35 @@ class HeritageService {
       final encKey = enc.Key(encKeyBytes);
       final iv = enc.IV(Uint8List.fromList(ivBytes));
       final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-      final plain = encrypter.decrypt(
+      // SEC 2026-08-04 — `decryptBytes` au lieu de `decrypt`.
+      //
+      // `decrypt()` rend une `String` Dart : immuable, donc IMPOSSIBLE à
+      // écraser. Le coffre entier — tous les identifiants en clair — restait
+      // en mémoire jusqu'au passage du ramasse-miettes, à une date non
+      // déterministe. Toute la stratégie d'effacement de l'application était
+      // contournée sur ce chemin.
+      //
+      // ⚠️ `allowMalformed: true` est OBLIGATOIRE : c'est exactement ce que
+      // fait `Encrypter.decrypt` en interne (encrypt 5.0.3,
+      // `encrypter.dart:49`). Sans lui, un octet malformé lèverait une
+      // exception là où l'ancien code produisait un caractère de remplacement
+      // — un changement de comportement silencieux sur les instantanés hérités.
+      final plainBytes = encrypter.decryptBytes(
         enc.Encrypted(Uint8List.fromList(cipherBytes)),
         iv: iv,
       );
-      final list = jsonDecode(plain) as List;
-      return list
-          .map((e) => Entry.fromJson(e as Map<String, dynamic>))
-          .toList();
+      try {
+        final plain = utf8.decode(plainBytes, allowMalformed: true);
+        final list = jsonDecode(plain) as List;
+        return list
+            .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } finally {
+        // En `finally` et non après le décodage : un instantané corrompu fait
+        // lever `jsonDecode`, et c'est justement le cas où le tampon en clair
+        // resterait intact en mémoire.
+        _wipeIntList(plainBytes);
+      }
     } catch (_) {
       return null;
     } finally {

@@ -67,7 +67,10 @@ abstract final class SnackUtils {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle, color: cs.primary, size: 18),
+            // UI 2026-08-04 — `cs.onPrimary` et non `cs.primary` : depuis que
+            // le fond du bandeau EST `cs.primary`, une icône de cette même
+            // couleur serait invisible.
+            Icon(Icons.check_circle, color: cs.onPrimary, size: 18),
             const SizedBox(width: 8),
             Expanded(child: Text(text)),
           ],

@@ -7,32 +7,32 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:image/image.dart' as img;
 
-const _size   = 1024;
-const _half   = _size ~/ 2;
+const _size = 1024;
+const _half = _size ~/ 2;
 const _corner = 180;
 
 // Quadrant colors (style PDF Tech)
-final _blue  = img.ColorRgb8(21, 101, 192);
-final _red   = img.ColorRgb8(198, 40, 40);
+final _blue = img.ColorRgb8(21, 101, 192);
+final _red = img.ColorRgb8(198, 40, 40);
 
 // Gold palette
-final _gold     = img.ColorRgb8(249, 168, 37);
-final _goldHi   = img.ColorRgb8(255, 213, 79);
+final _gold = img.ColorRgb8(249, 168, 37);
+final _goldHi = img.ColorRgb8(255, 213, 79);
 final _goldDark = img.ColorRgb8(176, 109, 0);
 
 // Lock palette (white lock with dark keyhole)
-final _white     = img.ColorRgb8(255, 255, 255);
+final _white = img.ColorRgb8(255, 255, 255);
 final _whiteShad = img.ColorRgb8(220, 220, 220);
-final _khDark    = img.ColorRgb8(40, 30, 0);
+final _khDark = img.ColorRgb8(40, 30, 0);
 
-final _outline   = img.ColorRgb8(35, 35, 35);
+final _outline = img.ColorRgb8(35, 35, 35);
 
 // Shield bounding box
-const _shTop      = 180;
-const _shBottom   = 900;
-const _shHalfW    = 290;
+const _shTop = 180;
+const _shBottom = 900;
+const _shHalfW = 290;
 const _shStraight = 540;
-const _shTopRad   = 56;
+const _shTopRad = 56;
 
 // Lock geometry (centré visuellement dans le bouclier — partie haute, le
 // bouclier ayant son "poids visuel" dans la moitié supérieure à cause du
@@ -53,18 +53,23 @@ img.Color _quadrantAt(int x, int y) {
 }
 
 void _fillQuadrants(img.Image image) {
-  img.fillRect(image, x1: 0,     y1: 0,     x2: _half, y2: _half, color: _blue);
-  img.fillRect(image, x1: _half, y1: 0,     x2: _size, y2: _half, color: _red);
-  img.fillRect(image, x1: 0,     y1: _half, x2: _half, y2: _size, color: _red);
+  img.fillRect(image, x1: 0, y1: 0, x2: _half, y2: _half, color: _blue);
+  img.fillRect(image, x1: _half, y1: 0, x2: _size, y2: _half, color: _red);
+  img.fillRect(image, x1: 0, y1: _half, x2: _half, y2: _size, color: _red);
   img.fillRect(image, x1: _half, y1: _half, x2: _size, y2: _size, color: _blue);
 }
 
 void _roundCorners(img.Image image) {
   final corners = [
-    (cx: _corner,         cy: _corner,         x0: 0,             y0: 0),
-    (cx: _size - _corner, cy: _corner,         x0: _size - _corner, y0: 0),
-    (cx: _corner,         cy: _size - _corner, x0: 0,             y0: _size - _corner),
-    (cx: _size - _corner, cy: _size - _corner, x0: _size - _corner, y0: _size - _corner),
+    (cx: _corner, cy: _corner, x0: 0, y0: 0),
+    (cx: _size - _corner, cy: _corner, x0: _size - _corner, y0: 0),
+    (cx: _corner, cy: _size - _corner, x0: 0, y0: _size - _corner),
+    (
+      cx: _size - _corner,
+      cy: _size - _corner,
+      x0: _size - _corner,
+      y0: _size - _corner,
+    ),
   ];
   for (final c in corners) {
     for (int dy = 0; dy < _corner; dy++) {
@@ -99,12 +104,28 @@ int _shieldHalfWidthAt(int y, [int extra = 0]) {
   return w < 0 ? 0 : w;
 }
 
-void _fillShield(img.Image image, img.Color color, {int extra = 0, int yStart = 0, int yEnd = _size}) {
-  for (int y = math.max(yStart, _shTop - extra); y < math.min(yEnd, _shBottom + extra + 1); y++) {
+void _fillShield(
+  img.Image image,
+  img.Color color, {
+  int extra = 0,
+  int yStart = 0,
+  int yEnd = _size,
+}) {
+  for (
+    int y = math.max(yStart, _shTop - extra);
+    y < math.min(yEnd, _shBottom + extra + 1);
+    y++
+  ) {
     final hw = _shieldHalfWidthAt(y, extra);
     if (hw <= 0) continue;
-    img.fillRect(image,
-        x1: _half - hw, y1: y, x2: _half + hw, y2: y + 1, color: color);
+    img.fillRect(
+      image,
+      x1: _half - hw,
+      y1: y,
+      x2: _half + hw,
+      y2: y + 1,
+      color: color,
+    );
   }
 }
 
@@ -119,10 +140,14 @@ void _drawShield(img.Image image) {
     final hw = _shieldHalfWidthAt(y);
     if (hw <= 0) continue;
     final hiW = (hw * 0.10).round();
-    img.fillRect(image,
-        x1: _half - hw + 12, y1: y,
-        x2: _half - hw + 12 + hiW, y2: y + 1,
-        color: img.ColorRgb8(245, 245, 250));
+    img.fillRect(
+      image,
+      x1: _half - hw + 12,
+      y1: y,
+      x2: _half - hw + 12 + hiW,
+      y2: y + 1,
+      color: img.ColorRgb8(245, 245, 250),
+    );
   }
 
   // Bande d'ombre à droite (gris léger pour donner du volume)
@@ -130,14 +155,26 @@ void _drawShield(img.Image image) {
     final hw = _shieldHalfWidthAt(y);
     if (hw <= 0) continue;
     final shW = (hw * 0.16).round();
-    img.fillRect(image,
-        x1: _half + hw - shW - 14, y1: y,
-        x2: _half + hw - 14, y2: y + 1,
-        color: _whiteShad);
+    img.fillRect(
+      image,
+      x1: _half + hw - shW - 14,
+      y1: y,
+      x2: _half + hw - 14,
+      y2: y + 1,
+      color: _whiteShad,
+    );
   }
 }
 
-void _roundRect(img.Image image, int x1, int y1, int x2, int y2, int r, img.Color c) {
+void _roundRect(
+  img.Image image,
+  int x1,
+  int y1,
+  int x2,
+  int y2,
+  int r,
+  img.Color c,
+) {
   img.fillRect(image, x1: x1 + r, y1: y1, x2: x2 - r, y2: y2, color: c);
   img.fillRect(image, x1: x1, y1: y1 + r, x2: x2, y2: y2 - r, color: c);
   img.fillCircle(image, x: x1 + r, y: y1 + r, radius: r, color: c);
@@ -169,26 +206,49 @@ void _restoreShieldRect(img.Image image, int x1, int y1, int x2, int y2) {
 
 void _drawLock(img.Image image) {
   // Contour cadenas
-  img.fillCircle(image, x: _shackleCx, y: _shackleCy,
-      radius: _shackleOuter + 6, color: _outline);
-  _roundRect(image,
-      _lockBodyX1 - 6, _lockBodyY1 - 6,
-      _lockBodyX2 + 6, _lockBodyY2 + 6,
-      _lockBodyRadius + 4, _outline);
+  img.fillCircle(
+    image,
+    x: _shackleCx,
+    y: _shackleCy,
+    radius: _shackleOuter + 6,
+    color: _outline,
+  );
+  _roundRect(
+    image,
+    _lockBodyX1 - 6,
+    _lockBodyY1 - 6,
+    _lockBodyX2 + 6,
+    _lockBodyY2 + 6,
+    _lockBodyRadius + 4,
+    _outline,
+  );
 
   // Shackle doré (anneau)
-  img.fillCircle(image, x: _shackleCx, y: _shackleCy,
-      radius: _shackleOuter, color: _gold);
+  img.fillCircle(
+    image,
+    x: _shackleCx,
+    y: _shackleCy,
+    radius: _shackleOuter,
+    color: _gold,
+  );
   _restoreShieldCircle(image, _shackleCx, _shackleCy, _shackleInner);
 
   // Cover bottom of shackle → U-shape
-  _restoreShieldRect(image,
-      _shackleCx - _shackleOuter - 4, _shackleCy + 28,
-      _shackleCx + _shackleOuter + 4, _lockBodyY1 - 6);
+  _restoreShieldRect(
+    image,
+    _shackleCx - _shackleOuter - 4,
+    _shackleCy + 28,
+    _shackleCx + _shackleOuter + 4,
+    _lockBodyY1 - 6,
+  );
 
   // Highlight clair sur le shackle (côté gauche)
   for (int y = _shackleCy - _shackleOuter + 10; y < _shackleCy; y++) {
-    for (int x = _shackleCx - _shackleOuter + 6; x < _shackleCx - _shackleInner - 8; x++) {
+    for (
+      int x = _shackleCx - _shackleOuter + 6;
+      x < _shackleCx - _shackleInner - 8;
+      x++
+    ) {
       final dx = x - _shackleCx;
       final dy = y - _shackleCy;
       final d2 = dx * dx + dy * dy;
@@ -200,33 +260,62 @@ void _drawLock(img.Image image) {
   }
 
   // Body cadenas doré
-  _roundRect(image, _lockBodyX1, _lockBodyY1, _lockBodyX2, _lockBodyY2,
-      _lockBodyRadius, _gold);
+  _roundRect(
+    image,
+    _lockBodyX1,
+    _lockBodyY1,
+    _lockBodyX2,
+    _lockBodyY2,
+    _lockBodyRadius,
+    _gold,
+  );
 
   // Highlight gauche du body (bande verticale claire)
-  img.fillRect(image,
-      x1: _lockBodyX1 + 14, y1: _lockBodyY1 + 18,
-      x2: _lockBodyX1 + 38, y2: _lockBodyY2 - 18,
-      color: _goldHi);
+  img.fillRect(
+    image,
+    x1: _lockBodyX1 + 14,
+    y1: _lockBodyY1 + 18,
+    x2: _lockBodyX1 + 38,
+    y2: _lockBodyY2 - 18,
+    color: _goldHi,
+  );
 
   // Ombre droite du body (bronze)
-  img.fillRect(image,
-      x1: _lockBodyX2 - 32, y1: _lockBodyY1 + 18,
-      x2: _lockBodyX2 - 12, y2: _lockBodyY2 - 18,
-      color: _goldDark);
+  img.fillRect(
+    image,
+    x1: _lockBodyX2 - 32,
+    y1: _lockBodyY1 + 18,
+    x2: _lockBodyX2 - 12,
+    y2: _lockBodyY2 - 18,
+    color: _goldDark,
+  );
 
   // Keyhole (cercle + tige) en sombre — contraste sur l'or
-  img.fillCircle(image, x: _khCx, y: _khCy, radius: _khRadius + 3, color: _outline);
-  img.fillRect(image,
-      x1: _khStemX1 - 3, y1: _khCy,
-      x2: _khStemX2 + 3, y2: _khStemY2 + 3,
-      color: _outline);
+  img.fillCircle(
+    image,
+    x: _khCx,
+    y: _khCy,
+    radius: _khRadius + 3,
+    color: _outline,
+  );
+  img.fillRect(
+    image,
+    x1: _khStemX1 - 3,
+    y1: _khCy,
+    x2: _khStemX2 + 3,
+    y2: _khStemY2 + 3,
+    color: _outline,
+  );
 
   img.fillCircle(image, x: _khCx, y: _khCy, radius: _khRadius, color: _khDark);
-  img.fillRect(image,
-      x1: _khStemX1, y1: _khCy,
-      x2: _khStemX2, y2: _khStemY2,
-      color: _khDark);
+  img.fillRect(
+    image,
+    x1: _khStemX1,
+    y1: _khCy,
+    x2: _khStemX2,
+    y2: _khStemY2,
+    color: _khDark,
+  );
 }
 
 void main() {
@@ -242,17 +331,19 @@ void main() {
   print('Wrote assets/icon.png ($_size x $_size)');
 
   const sizes = {
-    'mdpi':    48,
-    'hdpi':    72,
-    'xhdpi':   96,
-    'xxhdpi':  144,
+    'mdpi': 48,
+    'hdpi': 72,
+    'xhdpi': 96,
+    'xxhdpi': 144,
     'xxxhdpi': 192,
   };
   for (final entry in sizes.entries) {
-    final resized = img.copyResize(image,
-        width: entry.value,
-        height: entry.value,
-        interpolation: img.Interpolation.cubic);
+    final resized = img.copyResize(
+      image,
+      width: entry.value,
+      height: entry.value,
+      interpolation: img.Interpolation.cubic,
+    );
     final path = 'android/app/src/main/res/mipmap-${entry.key}/ic_launcher.png';
     File(path).writeAsBytesSync(img.encodePng(resized));
     print('Wrote $path (${entry.value}x${entry.value})');

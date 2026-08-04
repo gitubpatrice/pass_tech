@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
+import '../services/backup_reminder.dart';
 import '../services/vault_service.dart';
 import '../utils/snack_utils.dart';
 import 'entry_detail_screen.dart';
@@ -467,13 +468,67 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          // 2026-08-03 — rappel de sauvegarde. N'apparaît que si le coffre
+          // contient au moins une entrée ET qu'aucune sauvegarde chiffrée n'a
+          // JAMAIS été faite. Disparaît définitivement à la première.
+          //
+          // Placé ici plutôt qu'à la création du coffre : à la création il n'y
+          // a rien à sauvegarder, donc l'invitation serait creuse. Elle n'a de
+          // sens qu'à partir du moment où il y a quelque chose à perdre.
+          //
+          // Non masquable volontairement : il n'y a ni cloud, ni compte, ni
+          // récupération. Un bandeau qu'on écarte d'un geste serait écarté le
+          // premier jour et jamais revu — c'est exactement ce qui a coûté un
+          // coffre le 2026-08-03.
+          if (VaultService().entries.isNotEmpty)
+            FutureBuilder<bool>(
+              future: BackupReminder.neverBackedUp,
+              builder: (context, snap) {
+                if (snap.data != true) return const SizedBox.shrink();
+                return _BackupBanner(onDone: () => setState(() {}));
+              },
+            ),
           SizedBox(
             height: 46,
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               scrollDirection: Axis.horizontal,
               itemCount: _chips.length,
-              separatorBuilder: (_, i) => const SizedBox(width: 6),
+              // UI 2026-08-04 — séparateurs aux FRONTIÈRES DE GROUPE.
+              //
+              // Cette rangée empile trois familles de filtres qui ne se
+              // comparent pas : la portée (Tous, Favoris), le TYPE d'entrée
+              // (Mot de passe, Note, Carte bancaire — il décide des champs du
+              // formulaire) et la CATÉGORIE (Web, Email, Banque… — un simple
+              // rangement). Toutes s'affichaient à l'identique, si bien qu'on
+              // lisait « Cartes bancaires » et « Cartes » comme deux variantes
+              // de la même chose, alors que la première filtre un type et la
+              // seconde une catégorie.
+              //
+              // Un trait fin plutôt que deux rangées ou des en-têtes : la
+              // rangée reste unique, donc aucun appui supplémentaire et aucune
+              // hauteur prise sur la liste des entrées, qui est ce que
+              // l'utilisateur vient voir.
+              //
+              // Les frontières sont CALCULÉES et non écrites en dur : ajouter
+              // un type ou une catégorie les déplace toute seule.
+              separatorBuilder: (_, i) {
+                final finPortee = 1; // ...Tous, Favoris | types...
+                final finTypes = 1 + _typeChips.length; // ...types | catégories
+                if (i == finPortee || i == finTypes) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      indent: 8,
+                      endIndent: 8,
+                      color: cs.outlineVariant,
+                    ),
+                  );
+                }
+                return const SizedBox(width: 6);
+              },
               itemBuilder: (context, i) {
                 final chip = _chips[i];
                 final selected = _filter == chip;
@@ -809,6 +864,61 @@ class _EntryCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Rappel de sauvegarde affiché sur l'accueil tant qu'aucune sauvegarde
+/// chiffrée n'a jamais été créée et que le coffre contient des entrées.
+///
+/// Ajouté le 2026-08-03, après la perte définitive d'un coffre faute de
+/// sauvegarde. Le texte dit ce qui est vrai, sans dramatiser : il n'existe
+/// aucun autre moyen de récupération.
+///
+/// Le bouton mène aux Réglages, où vit l'export — plutôt que de dupliquer le
+/// flux d'export ici. Au retour, l'accueil se reconstruit et le bandeau
+/// disparaît si la sauvegarde a été faite.
+class _BackupBanner extends StatelessWidget {
+  final VoidCallback onDone;
+  const _BackupBanner({required this.onDone});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: cs.errorContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.error.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.backup_outlined, size: 20, color: cs.error),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              t.backupBannerText,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 4),
+          TextButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(onChanged: onDone),
+                ),
+              );
+              onDone();
+            },
+            child: Text(t.backupBannerCta),
+          ),
+        ],
       ),
     );
   }

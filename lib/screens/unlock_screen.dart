@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
 import '../services/integrity_service.dart';
+import '../services/panic_service.dart';
+import '../utils/snack_utils.dart';
 import '../services/vault_service.dart';
 import '../widgets/password_text_field.dart';
 import 'heir_view_screen.dart';
@@ -16,10 +18,42 @@ class UnlockScreen extends StatefulWidget {
   const UnlockScreen({super.key});
 
   @override
-  State<UnlockScreen> createState() => _UnlockScreenState();
+  State<UnlockScreen> createState() => UnlockScreenState();
 }
 
-class _UnlockScreenState extends State<UnlockScreen> {
+/// Rendu public (et non `_UnlockScreenState`) pour que `main.dart` puisse
+/// interroger [estAffiche] avant de pousser un nouvel écran de déverrouillage.
+class UnlockScreenState extends State<UnlockScreen> {
+  /// UX 2026-08-03 — nombre d'écrans de déverrouillage vivants.
+  ///
+  /// Lu par `main.dart` avant de pousser un écran de déverrouillage au retour
+  /// au premier plan : sans ce compteur, il en empilait un NOUVEAU alors qu'un
+  /// autre était déjà affiché, en écrasant la pile au passage.
+  static int _instancesVivantes = 0;
+
+  /// Vrai si un écran de déverrouillage est déjà à l'écran.
+  static bool get estAffiche => _instancesVivantes > 0;
+
+  /// UX 2026-08-03 — l'invite biométrique automatique n'est tentée qu'UNE fois
+  /// par cycle de verrouillage.
+  ///
+  /// Défaut signalé en usage réel : au lancement, annuler l'invite biométrique
+  /// la faisait revenir aussitôt, en boucle, sans jamais laisser saisir le mot
+  /// de passe maître — et le bouton Retour n'y changeait rien.
+  ///
+  /// Enchaînement : l'invite est un dialogue système, elle met l'application en
+  /// arrière-plan. À l'annulation, l'application revient au premier plan, le
+  /// cycle de vie constate que le coffre est fermé et POUSSE un nouvel écran de
+  /// déverrouillage en vidant la pile. Ce nouvel écran relance l'invite dans
+  /// son `initState`, et ainsi de suite.
+  ///
+  /// Annuler l'invite est une intention claire : « je veux taper mon mot de
+  /// passe ». On la respecte. Le bouton empreinte reste disponible pour la
+  /// relancer volontairement, et le drapeau est remis à zéro par un
+  /// déverrouillage réussi, pour que le cycle suivant reproposeà nouveau la
+  /// biométrie.
+  static bool _inviteBioDejaTentee = false;
+
   final _passCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
@@ -27,9 +61,46 @@ class _UnlockScreenState extends State<UnlockScreen> {
   int? _lockoutRemaining;
   Timer? _lockoutTimer;
 
+  /// AUDIT 2026-08-03 — `Future` évalué UNE fois, à la création de l'écran.
+  ///
+  /// Il était auparavant construit directement dans `build()`
+  /// (`future: HeritageService().shouldShowHeirOption()`), donc relancé à
+  /// chaque reconstruction — et il y en a à chaque frappe d'erreur, chaque
+  /// bascule de chargement, chaque retour de biométrie. Chaque relance
+  /// enchaînait quatre lectures de stockage sécurisé **et un effet de bord
+  /// d'écriture** : `shouldShowHeirOption` appelle `startGraceIfNeeded`, qui
+  /// persiste le début du délai de grâce. Déclencher une écriture depuis une
+  /// méthode de rendu est une faute de conception en soi ; ici elle portait sur
+  /// l'horloge du dispositif d'héritage.
+  late final Future<bool> _heirOptionFuture;
+
+  /// SEC 2026-08-03 — le camouflage doit pouvoir être défait SANS ouvrir le
+  /// coffre.
+  ///
+  /// Défaut constaté en usage réel, pas en audit : « Révéler l'application »
+  /// n'existait que dans les Réglages, donc derrière le déverrouillage. Un
+  /// propriétaire qui active la panique puis ne retrouve plus son mot de passe
+  /// maître se retrouve avec une application **définitivement déguisée en
+  /// calculatrice** sur son lanceur, sans aucun moyen de revenir en arrière —
+  /// alors que le camouflage est réversible par conception.
+  ///
+  /// `CalculatorActivity` documentait déjà ce piège pour un code numérique
+  /// oublié (« le bouton Révéler vit dans les Réglages, devenus
+  /// inatteignables ») ; il n'avait pas été vu qu'il vaut à l'identique pour un
+  /// mot de passe oublié, cas autrement plus fréquent.
+  ///
+  /// Aucune fuite pour le déni plausible : pour lire cet écran il faut déjà
+  /// être sorti de la calculatrice, donc le camouflage est de toute façon
+  /// tombé. Et l'action ne touche QUE l'icône du lanceur — elle n'ouvre rien,
+  /// ne déchiffre rien, ne révèle aucune donnée.
+  late final Future<bool?> _disguisedFuture;
+
   @override
   void initState() {
     super.initState();
+    _instancesVivantes++;
+    _heirOptionFuture = HeritageService().shouldShowHeirOption();
+    _disguisedFuture = PanicService.isDisguised();
     _checkLockout();
     _checkBiometric();
     _checkIntegrity();
@@ -167,8 +238,18 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   @override
   void dispose() {
+    // SEC 2026-08-03 — effacement du tampon AVANT libération.
+    //
+    // Tous les autres champs sensibles de l'app le font depuis B8/B9 v2.3.8
+    // (`_PassphraseDialog`, `_ChangePasswordDialog`, `_HeirPasswordDialog`,
+    // l'écran d'édition d'entrée). Le champ du MOT DE PASSE MAÎTRE — le seul
+    // secret dont dépendent tous les autres — était le seul à ne pas le faire.
+    // Une saisie en cours au moment où l'écran est détruit restait dans le
+    // tampon du contrôleur jusqu'au passage du ramasse-miettes.
+    _passCtrl.clear();
     _passCtrl.dispose();
     _lockoutTimer?.cancel();
+    _instancesVivantes--;
     super.dispose();
   }
 
@@ -198,7 +279,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
     // `mounted` requis : `_tryBiometric` démarre par un setState inconditionnel.
     // Si l'écran est disposé pendant les await de _checkBiometric, l'appel
     // provoquerait « setState after dispose ».
-    if (enabled && _lockoutRemaining == null && mounted) _tryBiometric();
+    //
+    // UX 2026-08-03 — `_inviteBioDejaTentee` casse la boucle d'invite décrite
+    // sur ce drapeau. Une annulation ne doit plus jamais relancer l'invite
+    // toute seule ; c'est au bouton empreinte de le faire, sur geste explicite.
+    if (enabled &&
+        _lockoutRemaining == null &&
+        mounted &&
+        !_inviteBioDejaTentee) {
+      _inviteBioDejaTentee = true;
+      _tryBiometric();
+    }
   }
 
   Future<void> _tryBiometric() async {
@@ -210,10 +301,26 @@ class _UnlockScreenState extends State<UnlockScreen> {
     // unlockWithBiometric() triggers BiometricPrompt via biometric_storage —
     // the Keystore key is gated by setUserAuthenticationRequired(true), so a
     // successful read implies a successful biometric authentication.
-    final result = await VaultService().unlockWithBiometric();
+    final UnlockResult result;
+    try {
+      result = await VaultService().unlockWithBiometric();
+    } catch (e) {
+      // AUDIT 2026-08-03 — même filet que `_unlock()` : jamais d'indicateur de
+      // progression bloqué sur l'écran de déverrouillage.
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      setState(() {
+        _loading = false;
+        _error = t.genericError('$e');
+      });
+      return;
+    }
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
+        // UX 2026-08-03 — le coffre s'ouvre : le prochain cycle de
+        // verrouillage aura de nouveau droit à l'invite automatique.
+        _inviteBioDejaTentee = false;
         // Bio = forcément primary (cf. saveBiometricKey), markActive OK
         await HeritageService().markActive();
         if (!mounted) return;
@@ -250,6 +357,34 @@ class _UnlockScreenState extends State<UnlockScreen> {
           _error = t.unlockBiometricEnrollmentChanged;
         });
         break;
+      case UnlockResult.busy:
+        // AUDIT 2026-08-03 — une autre ouverture est déjà en cours (typiquement
+        // l'utilisateur a validé son mot de passe puis posé son doigt). Rien
+        // n'a été tenté, donc aucun essai n'est consommé : on invite juste à
+        // recommencer, sans laisser entendre que la biométrie a échoué.
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _loading = false;
+          _error = t.vaultBusyRetry;
+        });
+        break;
+      case UnlockResult.biometricCanceled:
+        // UX 2026-08-04 — repli SILENCIEUX, sans message.
+        //
+        // L'utilisateur a annulé l'invite, ou l'OS l'a fermée. Rien n'a échoué,
+        // il n'y a donc rien à signaler : on lui rend simplement le champ de
+        // saisie, qui est exactement ce qu'il demandait. Auparavant il lisait
+        // « Échec biométrique » et pouvait croire son empreinte défaillante.
+        //
+        // `_error` est remis à `null` et non laissé tel quel : un message issu
+        // d'une tentative précédente resterait affiché sans rapport.
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+        break;
     }
   }
 
@@ -260,11 +395,35 @@ class _UnlockScreenState extends State<UnlockScreen> {
       _loading = true;
       _error = null;
     });
-    final result = await VaultService().unlock(pass);
+    final UnlockResult result;
+    try {
+      result = await VaultService().unlock(pass);
+    } catch (e) {
+      // AUDIT 2026-08-03 — filet de dernier recours.
+      //
+      // `VaultService.unlock()` est désormais fail-closed en interne, mais rien
+      // ne protégeait CET appel : la moindre exception qui remontait laissait
+      // `_loading` à `true`, donc un indicateur de progression PERMANENT, sans
+      // message, sans bouton, sans issue — et le même écran au relancement.
+      // La règle vaut au-delà de ce cas précis : sur l'écran de déverrouillage,
+      // aucun chemin ne doit pouvoir laisser l'utilisateur devant un coffre
+      // qu'il ne peut ni ouvrir ni comprendre.
+      _passCtrl.clear();
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      setState(() {
+        _loading = false;
+        _error = t.genericError('$e');
+      });
+      return;
+    }
     _passCtrl.clear();
     if (!mounted) return;
     switch (result) {
       case UnlockResult.success:
+        // UX 2026-08-03 — idem : ouverture réussie par mot de passe, on
+        // réarme l'invite biométrique pour le cycle suivant.
+        _inviteBioDejaTentee = false;
         // Marque l'utilisateur comme actif uniquement si on est sur PRIMARY.
         // Le decoy ne reset pas le timer héritage (sinon un attaquant qui
         // force l'ouverture du leurre prolongerait la vie du dead-man).
@@ -304,6 +463,30 @@ class _UnlockScreenState extends State<UnlockScreen> {
           _error = t.unlockWrongPassword;
         });
         break;
+      case UnlockResult.busy:
+        // AUDIT 2026-08-03 — double-appui sur « Déverrouiller ». Avant, ce cas
+        // empruntait `wrongPassword` : la saisie était pourtant bonne et aucun
+        // essai n'avait été consommé, mais l'écran annonçait « mot de passe
+        // incorrect ». Sur l'écran le plus sensible de l'app, c'est une
+        // fausse alerte que l'utilisateur ne peut pas distinguer d'une vraie.
+        if (!mounted) return;
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _loading = false;
+          _error = t.vaultBusyRetry;
+        });
+        break;
+      case UnlockResult.biometricCanceled:
+        // Inatteignable depuis l'ouverture par mot de passe — ce chemin ne
+        // sollicite jamais l'invite biométrique. Présent pour l'exhaustivité
+        // de l'énumération, et traité comme un non-événement plutôt que comme
+        // une erreur, au cas où un refactor futur le ferait remonter ici.
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+        break;
     }
   }
 
@@ -326,19 +509,26 @@ class _UnlockScreenState extends State<UnlockScreen> {
       await Future.delayed(Duration(milliseconds: delay.clamp(1000, 16000)));
       if (!mounted) return;
     }
+    // SEC 2026-08-03 (Gemini PT-002) — l'essai est persisté AVANT la
+    // vérification, et non après.
+    //
+    // P3-3 v2.2.0 avait bien vu qu'un compteur en RAM se remettait à zéro en
+    // relançant l'app, et l'avait donc persisté. Mais l'écriture restait
+    // APRÈS `unlockAsHeir`, c'est-à-dire après une seconde d'Argon2id : fermer
+    // l'application pendant ce calcul suffisait à annuler l'essai, et le délai
+    // progressif redevenait contournable exactement comme avant P3-3. Le
+    // stockage avait été durci, pas le moment de l'écriture.
+    _heirFailCount++;
+    try {
+      await _secureStorage.write(
+        key: _heirFailCountKey,
+        value: _heirFailCount.toString(),
+      );
+    } catch (_) {}
+
     final entries = await HeritageService().unlockAsHeir(pwd);
     if (!mounted) return;
     if (entries == null) {
-      _heirFailCount++;
-      // P3-3 : persiste pour résister à un force-close (sinon l'attaquant
-      // peut reset le délai progressif en relançant l'app).
-      // v2.5.0 (F1) : FlutterSecureStorage au lieu de SharedPreferences clair.
-      try {
-        await _secureStorage.write(
-          key: _heirFailCountKey,
-          value: _heirFailCount.toString(),
-        );
-      } catch (_) {}
       if (!mounted) return;
       final t = AppLocalizations.of(context);
       setState(() {
@@ -354,6 +544,25 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => HeirViewScreen(entries: entries)),
+    );
+  }
+
+  /// Rétablit l'icône et le nom Pass Tech sur le lanceur, sans déverrouiller.
+  ///
+  /// Volontairement SANS confirmation : quand on arrive ici, on a déjà traversé
+  /// la calculatrice, donc le camouflage ne protège plus rien. Un dialogue de
+  /// plus ne ferait qu'ajouter un obstacle à quelqu'un qui cherche justement à
+  /// sortir d'une situation bloquée.
+  Future<void> _revealFromLockScreen() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final t = AppLocalizations.of(context);
+    await PanicService.revealApp();
+    if (!mounted) return;
+    setState(() {}); // masque le bouton, le camouflage n'est plus actif
+    SnackUtils.showInfo(
+      messenger,
+      t.panicRevealSnack,
+      duration: const Duration(seconds: 5),
     );
   }
 
@@ -478,12 +687,33 @@ class _UnlockScreenState extends State<UnlockScreen> {
                   else
                     Column(
                       children: [
-                        FilledButton.icon(
-                          onPressed: _unlock,
-                          icon: const Icon(Icons.lock_open, size: 18),
-                          label: Text(t.unlockCta),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
+                        // UX 2026-08-04 — le bouton est DÉSACTIVÉ tant que le
+                        // champ est vide.
+                        //
+                        // Signalé en usage réel : appuyer sur « Déverrouiller »
+                        // sans rien avoir saisi ne produisait rien du tout.
+                        // `_unlock()` sort en silence sur `pass.isEmpty`, donc
+                        // l'appui était avalé — aucun message, aucun indice.
+                        // Sur l'écran d'entrée de l'application, un bouton qui
+                        // ne réagit pas laisse penser qu'elle est figée.
+                        //
+                        // Un bouton grisé vaut mieux qu'un message d'erreur :
+                        // il dit AVANT l'appui qu'il n'y a rien à valider,
+                        // au lieu de le reprocher après.
+                        //
+                        // `ValueListenableBuilder` plutôt qu'un `onChanged` qui
+                        // appellerait `setState` : le contrôleur EST déjà un
+                        // `ValueNotifier`, et seul le bouton se reconstruit —
+                        // pas tout l'écran à chaque frappe.
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _passCtrl,
+                          builder: (_, value, _) => FilledButton.icon(
+                            onPressed: value.text.isEmpty ? null : _unlock,
+                            icon: const Icon(Icons.lock_open, size: 18),
+                            label: Text(t.unlockCta),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                            ),
                           ),
                         ),
                         if (_hasBiometric) ...[
@@ -501,8 +731,28 @@ class _UnlockScreenState extends State<UnlockScreen> {
                         // propriétaire dépasse le seuil + grâce expirée. Le
                         // FutureBuilder ne renvoie l'option qu'après le check
                         // crypto, pas de leak temporel.
+                        // SEC 2026-08-03 — sortie de secours du camouflage,
+                        // accessible SANS ouvrir le coffre. Voir
+                        // `_disguisedFuture`. N'apparaît que si le camouflage
+                        // est effectivement actif.
+                        FutureBuilder<bool?>(
+                          future: _disguisedFuture,
+                          builder: (_, snap) {
+                            if (snap.data != true) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: TextButton.icon(
+                                onPressed: _revealFromLockScreen,
+                                icon: const Icon(Icons.visibility, size: 18),
+                                label: Text(t.panicRevealTitle),
+                              ),
+                            );
+                          },
+                        ),
                         FutureBuilder<bool>(
-                          future: HeritageService().shouldShowHeirOption(),
+                          future: _heirOptionFuture,
                           builder: (_, snap) {
                             if (snap.data != true) {
                               return const SizedBox.shrink();

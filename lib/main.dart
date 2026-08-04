@@ -5,6 +5,7 @@ import 'l10n/app_localizations.dart';
 import 'services/app_update.dart';
 import 'services/clipboard_service.dart';
 import 'services/first_launch_flag.dart';
+import 'services/monotonic_clock.dart';
 import 'services/panic_service.dart';
 import 'services/secure_window.dart';
 import 'services/vault_service.dart';
@@ -146,7 +147,36 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   /// `DateTime.now()` suit l'horloge système : un attaquant root qui
   /// recule la date après pause empêche l'auto-lock de déclencher.
   /// `Stopwatch.elapsedMilliseconds` ne se laisse pas tromper.
+  ///
+  /// ⚠️ AUDIT 2026-08-03 (Gemini PT-001) — mais il se laisse ENDORMIR.
+  ///
+  /// Le `Stopwatch` de Dart s'appuie sur `CLOCK_MONOTONIC`, qui **cesse
+  /// d'avancer pendant la veille profonde** de l'appareil. Or c'est le cas
+  /// nominal : on repose son téléphone, l'écran s'éteint, Android entre en
+  /// Doze au bout de quelques minutes. Au retour, deux heures plus tard, le
+  /// chronomètre n'a compté que le temps d'éveil — souvent moins que le délai
+  /// de verrouillage automatique, réglé à 300 s par défaut. **Le coffre
+  /// restait donc ouvert.** Le correctif de la v2.3.8 protégeait du décalage
+  /// d'horloge et ouvrait cette brèche-là sans que personne le voie.
+  ///
+  /// La bonne source est `SystemClock.elapsedRealtime()`, qui compte le
+  /// sommeil profond — déjà exposée par `MonotonicClock.elapsedRealtimeMs()`,
+  /// introduite en v2.5.2 pour le verrouillage anti-force-brute.
+  ///
+  /// On conserve le `Stopwatch` en second témoin, pour deux raisons : il est
+  /// SYNCHRONE, donc capturable à l'instant exact du passage en arrière-plan
+  /// (l'appel de canal, lui, impose un `await` — c'est précisément le piège
+  /// qui avait affaibli SEC F3), et il reste disponible si la plateforme ne
+  /// répond pas. Au retour, on retient le **plus grand** des deux temps
+  /// écoulés : `elapsedRealtime` domine toujours, et en cas de réponse
+  /// aberrante du canal on verrouille plus tôt plutôt que plus tard.
   int? _pausedAtMonoMs;
+  int? _pausedAtBootMs;
+
+  /// Temps écoulé retenu quand aucune horloge fiable n'est disponible.
+  /// Dépasse tous les délais de verrouillage proposés (le plus long est
+  /// 30 min), donc force le verrouillage sans cas particulier à écrire.
+  static const int _dureeInfinieMs = 1 << 40;
   static final Stopwatch _stopwatch = Stopwatch()..start();
 
   /// v2.5.0 (F9) — guard cache session sur `_checkForUpdate`.
@@ -191,7 +221,11 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
     // une divulgation du nom de l'app — c'est l'existence même du trafic qui
     // contredit le camouflage.
     try {
-      if (await PanicService.isDisguised()) return;
+      // SEC 2026-08-04 (audit GPT F8) — on s'abstient dès que ce n'est
+      // pas explicitement `false`. `null` = état indéterminé : ne pas
+      // savoir si le camouflage est actif doit conduire au silence
+      // réseau, pas à une requête qui le trahirait.
+      if (await PanicService.isDisguised() != false) return;
     } catch (_) {
       // Canal indisponible : on s'abstient. Fail-CLOSED — mieux vaut sauter
       // une vérification de mise à jour que trahir un camouflage actif.
@@ -227,6 +261,12 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // passage en arrière-plan, donc chaque `await` qui précède est une
       // fenêtre de capture.
       await SecureWindow.suspendRelaxForBackground();
+      // AUDIT 2026-08-03 — ancre qui compte la veille profonde. Prise APRÈS
+      // l'horodatage synchrone et APRÈS le réarmement de FLAG_SECURE : c'est un
+      // aller-retour de canal, il ne doit précéder ni l'un ni l'autre. Le léger
+      // décalage est sans effet, puisque les deux ancres sont comparées à
+      // elles-mêmes au retour.
+      _pausedAtBootMs ??= await MonotonicClock.elapsedRealtimeMs();
       // Wipe clipboard immediately on background : don't risk leaving secrets
       // in the clipboard if the OS kills the process before the timer fires.
       await ClipboardService.cancelAndClear();
@@ -238,7 +278,9 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       // SEC F3 v2.5.2 — rétablit la relaxation si un écran la demande encore.
       await SecureWindow.resumeRelaxAfterBackground();
       final pausedMs = _pausedAtMonoMs;
+      final pausedBootMs = _pausedAtBootMs;
       _pausedAtMonoMs = null;
+      _pausedAtBootMs = null;
 
       // If vault was locked while paused (immediate option) → go to unlock
       if (!VaultService().isOpen) {
@@ -255,6 +297,45 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
         // affiché est le bon, et le pousser de nouveau effacerait une saisie
         // en cours.
         if (!await VaultService().vaultExists) return;
+        // UX 2026-08-03 — ne pas empiler un écran de déverrouillage sur un
+        // écran de déverrouillage.
+        //
+        // Défaut signalé en usage réel : au lancement, annuler l'invite
+        // biométrique la faisait revenir en boucle, sans jamais laisser saisir
+        // le mot de passe maître, et le bouton Retour n'y changeait rien.
+        //
+        // L'invite est un dialogue système : elle met l'application en
+        // arrière-plan. À l'annulation, on repasse ici, le coffre est fermé, et
+        // ce bloc poussait un NOUVEL écran en VIDANT la pile — d'où le Retour
+        // sans effet. Le nouvel écran relançait l'invite depuis son `initState`,
+        // et la boucle se refermait.
+        //
+        // Ce bloc n'a de sens que pour RAMENER vers le déverrouillage depuis un
+        // autre écran (accueil, réglages) après un verrouillage automatique. Si
+        // l'écran est déjà là, il n'y a rien à faire — et surtout pas le
+        // reconstruire, ce qui effacerait une saisie en cours.
+        if (UnlockScreenState.estAffiche) {
+          // SEC 2026-08-04 — on REVIENT à l'écran de déverrouillage au lieu de
+          // le reconstruire.
+          //
+          // Un simple `return` ici — première version du correctif — était une
+          // régression : l'écran de déverrouillage existe encore SOUS la vue
+          // héritier, qui affiche les entrées déchiffrées de l'instantané. Le
+          // garde voyait « écran présent, rien à faire » et laissait donc cette
+          // vue ouverte au retour au premier plan, alors que le comportement
+          // d'avant la refermait.
+          //
+          // `popUntil(isFirst)` traite les deux cas d'un coup : s'il y a une
+          // route au-dessus (vue héritier, ou toute autre à venir), elle est
+          // fermée ; s'il n'y en a pas, l'appel ne fait rien — donc ni boucle
+          // d'invite biométrique, ni saisie effacée.
+          //
+          // `isFirst` désigne bien l'écran voulu : `SplashGate` RENVOIE
+          // l'écran de déverrouillage comme widget enfant plutôt que de le
+          // pousser, il n'y a donc qu'une route à la racine.
+          _navigatorKey.currentState?.popUntil((r) => r.isFirst);
+          return;
+        }
         _navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const UnlockScreen()),
           (_) => false,
@@ -265,8 +346,76 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final lockSec = prefs.getInt('auto_lock_seconds') ?? 300;
       if (lockSec < 0) return; // never
+
+      // AUDIT 2026-08-03 — temps réellement écoulé en arrière-plan.
+      //
+      // `elapsedRealtime` compte le sommeil profond, le `Stopwatch` non. Quand
+      // les deux ancres sont exploitables, on retient le PLUS GRAND ; en
+      // fonctionnement normal c'est toujours la première.
+      //
+      // ⚠️ Le `Stopwatch` ci-dessous n'est PAS un repli : il ne mesure que le
+      // temps où l'appareil était éveillé, donc s'y rabattre seul RALLONGE le
+      // délai avant verrouillage. Les trois cas où l'ancre système est
+      // inexploitable — absente au départ, absente au retour, ou en recul —
+      // sont traités juste en dessous, et tous les trois verrouillent. La
+      // version d'origine de ce commentaire affirmait l'inverse ; le
+      // raisonnement complet est en SEC 2026-08-04 (audit GPT F7).
+      var elapsedMs = pausedMs == null
+          ? 0
+          : _stopwatch.elapsedMilliseconds - pausedMs;
+      // SEC 2026-08-04 (audit GPT F7) — l'ABSENCE de l'ancre système verrouille.
+      //
+      // Mon commentaire affirmait « si le canal rend une valeur aberrante ou
+      // indisponible, on retombe sur le second — donc on verrouille trop tôt,
+      // jamais trop tard ». C'était FAUX dans le cas prévu par le code
+      // lui-même : quand `elapsedRealtimeMs()` rend `null` au passage en
+      // arrière-plan, `pausedBootMs` est nul, ce bloc est entièrement sauté, et
+      // il ne reste que le `Stopwatch` — celui dont ce fichier explique trois
+      // paragraphes plus haut qu'il NE COMPTE PAS la veille profonde.
+      //
+      // L'appareil pouvait donc dormir deux heures et revenir avec un temps
+      // écoulé de quelques minutes : le coffre restait ouvert. La source forte
+      // manquante donnait MOINS de sécurité, alors qu'elle doit en donner plus.
+      //
+      // Repli fail-closed : sans ancre fiable, on considère le temps écoulé
+      // comme infini et on verrouille. Le coût pour l'utilisateur légitime est
+      // une saisie de mot de passe ; le coût inverse est un coffre ouvert.
+      if (pausedMs != null && pausedBootMs == null) {
+        elapsedMs = _dureeInfinieMs;
+      } else if (pausedBootMs != null) {
+        final nowBootMs = await MonotonicClock.elapsedRealtimeMs();
+        if (nowBootMs == null) {
+          // L'ancre existait au départ mais le canal ne répond plus : même
+          // raisonnement, on ne sait pas combien de temps s'est écoulé.
+          elapsedMs = _dureeInfinieMs;
+        } else if (nowBootMs >= pausedBootMs) {
+          final bootElapsed = nowBootMs - pausedBootMs;
+          if (bootElapsed > elapsedMs) elapsedMs = bootElapsed;
+        } else {
+          // SEC 2026-08-04 (relecture Codex) — un RECUL de l'ancre système
+          // verrouille, au lieu d'être ignoré.
+          //
+          // La version précédente écrivait « on l'ignore », et ignorer revenait
+          // à ne garder que le `Stopwatch` — celui qui NE COMPTE PAS la veille
+          // profonde. C'est le troisième repli de ce bloc, et c'était le seul à
+          // pencher du mauvais côté, alors que les deux autres, dix lignes plus
+          // haut, verrouillent précisément parce que l'ancre est inexploitable.
+          //
+          // La documentation de `MonotonicClock.elapsedRealtimeMs` demande
+          // d'ailleurs qu'un appelant qui persiste une valeur « détecte le
+          // recul et le traite de façon conservatrice ». Ce code le détectait
+          // sans le traiter.
+          //
+          // Le cas devrait être hors d'atteinte — `elapsedRealtime` ne recule
+          // qu'au redémarrage de l'appareil, auquel le processus ne survit pas.
+          // Mais un repli n'a de valeur que par le sens dans lequel il échoue,
+          // et celui-ci laissait un coffre ouvert.
+          elapsedMs = _dureeInfinieMs;
+        }
+      }
+
       if (pausedMs != null &&
-          _stopwatch.elapsedMilliseconds - pausedMs >= lockSec * 1000 &&
+          elapsedMs >= lockSec * 1000 &&
           VaultService().isOpen) {
         VaultService().lock();
         _navigatorKey.currentState?.pushAndRemoveUntil(
@@ -307,15 +456,35 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   }
 }
 
-ThemeData _lightTheme() => ThemeData(
-  useMaterial3: true,
-  colorSchemeSeed: const Color(0xFF1F6FEB),
-  brightness: Brightness.light,
-  // U11 v2.4.4 — snack flottant par défaut (cohérent avec SnackUtils +
-  // les ScaffoldMessenger inline qui n'avaient pas `behavior:floating`).
-  // Aligné PDF Tech v1.12.4 U2.
-  snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
-);
+ThemeData _lightTheme() {
+  // Le schéma est construit ICI plutôt que via `colorSchemeSeed`, pour pouvoir
+  // en réutiliser les couleurs dans les thèmes de composants ci-dessous.
+  // Strictement équivalent : `colorSchemeSeed` fait exactement cet appel.
+  final cs = ColorScheme.fromSeed(seedColor: const Color(0xFF1F6FEB));
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: cs,
+    brightness: Brightness.light,
+    // U11 v2.4.4 — snack flottant par défaut (cohérent avec SnackUtils +
+    // les ScaffoldMessenger inline qui n'avaient pas `behavior:floating`).
+    // Aligné PDF Tech v1.12.4 U2.
+    //
+    // UI 2026-08-04 — fond BLEU de la marque au lieu du gris très sombre que
+    // Material pose par défaut (`inverseSurface`), qui jurait avec le reste de
+    // l'application en thème clair.
+    //
+    // Les couleurs viennent du schéma, jamais codées en dur : c'est ce qui
+    // garantit le contraste dans les deux thèmes. `onPrimary` est calculé par
+    // Material pour être lisible sur `primary` — l'écrire à la main
+    // reproduirait l'erreur des `Colors.grey` corrigée en v2.4.4.
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: cs.primary,
+      contentTextStyle: TextStyle(color: cs.onPrimary),
+      actionTextColor: cs.onPrimary,
+    ),
+  );
+}
 
 ThemeData _darkTheme() {
   const bg = Color(0xFF0D1117);
@@ -375,6 +544,14 @@ ThemeData _darkTheme() {
     listTileTheme: const ListTileThemeData(tileColor: surface),
     dividerColor: border,
     // U11 v2.4.4 — snack flottant sur dark theme.
-    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+    // UI 2026-08-04 — même fond bleu qu'en thème clair. Ici `blue` (#58A6FF)
+    // est clair et le texte sombre (#0D1117), l'inverse du thème clair : c'est
+    // exactement ce que le passage par le schéma de couleurs garantit.
+    snackBarTheme: const SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: blue,
+      contentTextStyle: TextStyle(color: Color(0xFF0D1117)),
+      actionTextColor: Color(0xFF0D1117),
+    ),
   );
 }

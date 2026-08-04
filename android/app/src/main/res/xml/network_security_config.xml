@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Refus du clair + ancres SYSTÈME uniquement : les autorités installées
+         par l'utilisateur (et donc un proxy d'interception posé sur l'appareil)
+         ne sont pas acceptées. C'est la seule règle utile ici, et elle
+         s'applique à TOUT le trafic. -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <domain-config>
-        <domain includeSubdomains="false">api.pwnedpasswords.com</domain>
-        <domain includeSubdomains="false">api.github.com</domain>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
+    <!-- AUDIT 2026-08-03 — le <domain-config> qui listait api.pwnedpasswords.com
+         et api.github.com a été RETIRÉ : il ne faisait que redéclarer les ancres
+         système déjà héritées de <base-config>, donc zéro effet. Pire, il
+         donnait à la lecture l'impression qu'un épinglage de certificat était
+         en place pour ces deux hôtes — il n'y en a aucun.
+
+         Ne pas le réintroduire en croyant restreindre les destinations : un
+         network-security-config ne sait pas interdire un domaine, il ne fait
+         qu'ASSOUPLIR ou DURCIR les règles d'un domaine déjà joignable. Pour
+         réellement épingler, il faudrait un bloc <pin-set> avec les empreintes
+         SPKI — et assumer la rupture du jour où l'un des deux services fait
+         tourner sa chaîne. Décision : non, on s'en tient aux ancres système. -->
 </network-security-config>

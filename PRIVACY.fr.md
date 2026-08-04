@@ -59,11 +59,29 @@ La présente Politique de confidentialité explique comment l'application **Pass
 
 ## 6. Réseau
 
-- L'app utilise le réseau pour **deux fonctions strictement à impact local** :
-  1. **Vérification de mises à jour** : interroge `api.github.com/repos/gitubpatrice/pass_tech/releases/latest` (HTTPS, sans auth, sans cookie).
+- **Pass Tech elle-même** n'utilise le réseau que pour **deux fonctions strictement à impact local** :
+  1. **Vérification de mises à jour** : interroge `api.github.com/repos/gitubpatrice/pass_tech/releases/latest` (HTTPS, sans auth, sans cookie). Suspendue tant que le mode panique est actif.
   2. **Vérification HIBP** (Have I Been Pwned, opt-in) : envoie uniquement les **5 premiers caractères du SHA-1** d'un mot de passe (modèle k-anonymity). Le mot de passe ne quitte jamais l'appareil.
 - Network Security Config refuse le HTTP en clair et les autorités utilisateur en release.
-- Aucune télémétrie, rapport de crash ou analytics.
+- **Nous n'opérons aucun serveur.** Aucune donnée n'est envoyée au développeur, aucun analytics maison, aucun rapport de crash.
+
+### Aucune bibliothèque Google
+
+L'application ne contient **aucun composant Google** : ni Play Services, ni
+ML Kit, ni Firebase, ni transport de télémétrie.
+
+Ce n'était pas le cas jusqu'au 2026-08-03. Le scan de QR code reposait alors sur
+`mobile_scanner`, bâti sur **Google ML Kit**, qui entraînait à sa suite
+`play-services-base`, `play-services-basement` et le composant de transport
+`com.google.android.datatransport`. Cette dépendance ajoutait au passage une
+permission `ACCESS_NETWORK_STATE` **que le dépôt ne déclarait nulle part**.
+
+Le scan par caméra a donc été retiré, et avec lui les permissions `CAMERA` et
+`ACCESS_NETWORK_STATE`. Pour ajouter un secret d'authentification à deux
+facteurs, **collez l'URI `otpauth://…`** dans le champ prévu : l'application en
+extrait le secret automatiquement. La plupart des services affichent cette URI
+en toutes lettres sous le QR code, derrière un lien du type « impossible de
+scanner ? ». Le secret peut aussi être saisi à la main.
 
 ## 7. Partage et transmission de données
 
@@ -107,7 +125,9 @@ Voir [SECURITY.md](./SECURITY.md).
 | ------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Déverrouillage biométrique optionnel via Android BiometricPrompt.                                 |
 | `INTERNET`                           | Vérification de mises à jour (GitHub Releases) et HIBP (k-anonymity, opt-in).                     |
-| `CAMERA`                             | Scanner un QR code 2FA pour ajouter un secret TOTP. Flux caméra traité localement, jamais enregistré. |
+
+`CAMERA` et `ACCESS_NETWORK_STATE` ont été **retirées le 2026-08-03** avec le
+scan de QR code — voir §6.
 
 ## 11. Enfants
 

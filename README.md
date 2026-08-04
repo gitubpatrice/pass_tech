@@ -5,8 +5,8 @@
 <h1 align="center">Pass Tech</h1>
 
 <p align="center">
-  <strong>Gestionnaire de mots de passe Android 100 % local.</strong><br>
-  Aucun cloud. Aucun tracker. Aucun compte.
+  <strong>100% offline Android password manager.</strong><br>
+  No cloud. No tracker. No account.
 </p>
 
 <p align="center">
@@ -17,113 +17,113 @@
   <img src="https://img.shields.io/badge/platform-Android%207%2B-3DDC84.svg" alt="Android 7+">
 </p>
 
-> Vos secrets ne quittent jamais votre téléphone.
+<p align="center">
+  <strong>English</strong> · <a href="README.fr.md">Français</a>
+</p>
+
+> Your secrets never leave your phone.
 
 ---
 
-## Pourquoi Pass Tech
+## Why Pass Tech
 
-La majorité des gestionnaires de mots de passe synchronisent vos données via leur cloud — ce qui implique une confiance totale dans le fournisseur. Pass Tech prend le parti opposé : **aucun serveur**, aucun compte, aucune fuite possible côté backend, parce qu'il n'y a pas de backend.
+Most password managers sync your data through their cloud — which means trusting the provider completely. Pass Tech takes the opposite stance: **no server**, no account, no possible backend breach, because there is no backend.
 
-- **100 % local** — coffre chiffré stocké uniquement dans la mémoire interne de l'app
-- **Open source** — Apache License 2.0, code auditable
-- **Crypto v4 hardened** — Argon2id + AES-GCM-256 + KEK liée au matériel (StrongBox/TEE)
-- **Pack confidentialité radicale 5/5** — coffre leurre, mode panique, héritage, anti-phishing
-- **Aucune permission inutile** — `INTERNET` uniquement pour l'update GitHub et le HIBP opt-in
+- **100% local** — encrypted vault stored only in the app's internal storage
+- **Open source** — Apache License 2.0, auditable code
+- **Hardened v4 crypto** — Argon2id + AES-GCM-256 + hardware-bound KEK (StrongBox/TEE)
+- **No Google libraries** — no Play Services, no ML Kit, no Firebase, no telemetry
+- **Radical privacy pack** — decoy vault, panic mode, inheritance, anti-phishing
+- **No pointless permissions** — `INTERNET` only for the GitHub update check and the opt-in HIBP lookup
 
-## Fonctionnalités
+## Features
 
-- Mots de passe avec générateur configurable (caractères 8–64 ou phrases Diceware FR)
-- TOTP 2FA (RFC 6238) avec scanner QR
-- Cartes bancaires (numéro, CVV, expiration, PIN — affichage 3D)
-- Notes sécurisées
-- Recherche locale par titre, identifiant, URL ou contenu
-- Audit de sécurité (faibles, doublons, anciens, sans 2FA)
-- Vérification de fuites HIBP (k-anonymity, opt-in)
-- Export / import du coffre chiffré (`.ptbak`)
-- Mises à jour vérifiables via GitHub Releases (SHA-256 publié)
+- Passwords with a configurable generator (8–64 characters, or French Diceware passphrases)
+- TOTP 2FA (RFC 6238) — paste the `otpauth://` URI, the secret is extracted automatically
+- Bank cards (number, CVV, expiry, PIN — 3D display)
+- Secure notes
+- Local search by title, username, URL or content
+- Security audit (weak, duplicate, old, missing 2FA)
+- HIBP breach check (k-anonymity, opt-in)
+- Encrypted vault export / import (`.ptbak`)
+- Verifiable updates via GitHub Releases (published SHA-256)
 
-### Pack confidentialité radicale
+### Radical privacy pack
 
-- **Coffre leurre** — un 2ᵉ mot de passe ouvre un faux coffre crédible (déni plausible, timing aligné).
-- **Mode panique** — verrouille tout, efface le presse-papiers et camoufle l'icône en « Calculatrice ».
-- **Héritage post-inactivité** — un proche peut accéder au coffre après une période d'inactivité prolongée, sans cloud.
-- **Anti-phishing par domaine** — vérifie le domaine du navigateur avant copie ; alerte sur typosquatting.
-- **Biométrie hardware-bound** (optionnelle) — clé liée à Android Keystore, biométrie obligatoire pour lire.
+- **Decoy vault** — a second master password opens a credible fake vault (plausible deniability, timing-aligned).
+- **Panic mode** — locks everything, wipes the clipboard and disguises the icon as a working calculator.
+- **Inheritance after inactivity** — a relative can reach the vault after a prolonged period of inactivity, without any cloud.
+- **Domain anti-phishing** — checks the browser's domain before copying; warns on typosquatting.
+- **Hardware-bound biometrics** (optional) — key tied to the Android Keystore, biometric authentication required to read it.
 
-## Sécurité
+## Security
 
-| Composant | Choix (vault v4) |
+| Component | Choice (vault v4) |
 |---|---|
-| Dérivation de clé | **Argon2id** (RFC 9106) — m = 19 MiB, t = 2, p = 1, L = 32 (OWASP 2024) |
-| Chiffrement | **AES-256-GCM** (NIST SP 800-38D), nonce 96 bits, tag 128 bits |
-| Anti-downgrade | AAD GCM lie `version | alias KEK | paramètres KDF` |
-| Clé liée matériel | **KEK AES/GCM/NoPadding 256** dans Android Keystore (StrongBox si dispo, fallback TEE) |
-| Dérivation finale | `HKDF-SHA256(salt, pwHash || hwSecret, "pt:v4", 32)` |
-| Déni plausible | 2 alias KEK créés systématiquement à l'install (timing aligné, salt dummy 32 o) |
-| Biométrie | Android Keystore + BiometricPrompt CryptoObject (`setUserAuthenticationRequired(true)`) |
-| Anti-brute-force | Verrouillage progressif après 5 échecs (30 s → 30 min) |
-| Captures écran | `FLAG_SECURE` actif |
-| Clipboard | Effacement auto + flag `IS_SENSITIVE` (Android 13+) |
-| RASP | Détection root + émulateur + debugger |
-| Wipe RAM | Clé maîtresse effacée après usage et au verrouillage |
-| Signature APK | v2+ uniquement (anti-CVE-2017-13156 / Janus) |
-| Updates | SHA-256 publié dans chaque release GitHub |
+| Key derivation | **Argon2id** (RFC 9106) — m = 19 MiB, t = 2, p = 1, L = 32 (OWASP 2024) |
+| Encryption | **AES-256-GCM** (NIST SP 800-38D), 96-bit nonce, 128-bit tag |
+| Anti-downgrade | GCM AAD binds `version \| KEK alias \| KDF parameters` |
+| Hardware-bound key | **AES/GCM/NoPadding 256 KEK** in the Android Keystore (StrongBox when available, TEE fallback) |
+| Final derivation | `HKDF-SHA256(salt, pwHash \|\| hwSecret, "pt:v4", 32)` |
+| Plausible deniability | Two KEK aliases always created at install; both vault files kept the same size |
+| Biometrics | Android Keystore + BiometricPrompt CryptoObject (`setUserAuthenticationRequired(true)`) |
+| Anti-brute-force | Progressive lockout after 5 failures (30 s → 30 min), anchored on `elapsedRealtime` |
+| Screenshots | `FLAG_SECURE`, re-armed natively before the system takes its recents thumbnail |
+| Clipboard | Auto-wipe + `IS_SENSITIVE` flag (Android 13+) |
+| RASP | Root, emulator and debugger detection |
+| RAM wipe | Master key wiped after use and on lock |
+| APK signature | v2+ only (mitigates CVE-2017-13156 / Janus) |
+| Updates | SHA-256 published in every GitHub release |
 
-Voir [SECURITY.md](SECURITY.md) pour le modèle de menace complet et le signalement de vulnérabilités.
+The permission set is pinned in [`android/expected-permissions.txt`](android/expected-permissions.txt) and verified **against the built APK on every commit**, together with an Exodus Privacy tracker check.
 
-## Captures d'écran
+See [THREAT_MODEL.md](THREAT_MODEL.md) for what is protected, against whom, **and what is not** — including the acknowledged limits. See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
-<!-- Placez les captures dans `docs/screenshots/` et décommentez ci-dessous -->
-<!--
-<p align="center">
-  <img src="docs/screenshots/01-unlock.png"  width="220" alt="Écran de déverrouillage">
-  <img src="docs/screenshots/02-vault.png"   width="220" alt="Coffre">
-  <img src="docs/screenshots/03-entry.png"   width="220" alt="Détail d'une entrée">
-</p>
--->
+## Screenshots
 
-*Captures à venir.*
+*Coming soon.*
 
-## Installation
+## Install
 
-### Option 1 — Obtainium (recommandé, mises à jour auto)
+### Option 1 — Obtainium (recommended, automatic updates)
 
-1. Installer [Obtainium](https://github.com/ImranR98/Obtainium/releases/latest)
-2. Ajouter cette URL : `https://github.com/gitubpatrice/pass_tech`
+1. Install [Obtainium](https://github.com/ImranR98/Obtainium/releases/latest)
+2. Add this URL: `https://github.com/gitubpatrice/pass_tech`
 
-### Option 2 — APK direct
+### Option 2 — Direct APK
 
-Télécharger `app-arm64-v8a-release.apk` depuis [la dernière release](https://github.com/gitubpatrice/pass_tech/releases/latest) (ABI **arm64-v8a**, Android 7.0+).
+Download `app-arm64-v8a-release.apk` from [the latest release](https://github.com/gitubpatrice/pass_tech/releases/latest) (**arm64-v8a** ABI, Android 7.0+).
 
-**Vérifier l'intégrité** :
+**Verify integrity**:
 ```bash
 sha256sum app-arm64-v8a-release.apk
 ```
-Le hash doit correspondre à celui publié dans les notes de release.
+The hash must match the one published in the release notes.
 
-> **Samsung One UI 6.1+** : si l'install est bloquée, désactivez temporairement *Réglages → Sécurité et confidentialité → Auto Blocker*.
+> **Samsung One UI 6.1+**: if the install is blocked, temporarily disable *Settings → Security and privacy → Auto Blocker*.
 
 ## Permissions
 
-| Permission | Pourquoi |
+| Permission | Why |
 |---|---|
-| `INTERNET` | Vérification de mise à jour (GitHub Releases) et HIBP (k-anonymity, opt-in). Aucune autre requête réseau. |
-| `USE_BIOMETRIC` / `USE_FINGERPRINT` | Déverrouillage biométrique optionnel via BiometricPrompt. |
-| `CAMERA` | Scanner un QR code TOTP pour ajouter un 2FA. Flux caméra traité localement, jamais enregistré. |
+| `INTERNET` | Update check (GitHub Releases) and HIBP breach check (k-anonymity, opt-in). No other network request. |
+| `USE_BIOMETRIC` | Optional biometric unlock via BiometricPrompt. |
+| `USE_FINGERPRINT` | Not declared by Pass Tech: re-added by the `biometric_storage` plugin. Required by `androidx.biometric` on API 24-27. |
 
-Pas de localisation, pas d'accès aux contacts, pas d'accès aux médias, pas de stockage externe (hors export volontaire).
+No location, no contacts, no media access, no external storage (beyond a deliberate export), **no camera**.
 
-## Compiler depuis les sources
+`CAMERA` and `ACCESS_NETWORK_STATE` were removed on 2026-08-03 along with QR code scanning, which relied on Google ML Kit. A 2FA secret is now added by pasting the `otpauth://` URI that services display below their QR code.
 
-Pré-requis : Flutter 3.x, SDK Dart `^3.11.5`, JDK 17, Android SDK avec `minSdk = 24`.
+## Build from source
+
+Requirements: Flutter 3.x, Dart SDK `^3.11.5`, JDK 17, Android SDK with `minSdk = 24`.
 
 ```bash
 flutter pub get
 flutter build apk --release --split-per-abi
 ```
 
-Build Android exigeant un keystore release configuré dans `android/key.properties` (non versionné) :
+The Android release build requires a signing keystore configured in `android/key.properties` (not versioned):
 
 ```properties
 storePassword=...
@@ -135,22 +135,23 @@ storeFile=../keystore.jks
 ## Documentation
 
 - [LICENSE](LICENSE) — Apache License 2.0
-- [PRIVACY.md](PRIVACY.md) / [PRIVACY.fr.md](PRIVACY.fr.md) — politique de confidentialité
-- [TERMS.md](TERMS.md) / [TERMS.fr.md](TERMS.fr.md) — conditions d'utilisation
-- [SECURITY.md](SECURITY.md) — modèle de menace et politique de signalement
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — dépendances tierces
-- [NOTICE](NOTICE) — mentions Apache 2.0
+- [THREAT_MODEL.md](THREAT_MODEL.md) — what is protected, against whom, and what is not
+- [PRIVACY.md](PRIVACY.md) / [PRIVACY.fr.md](PRIVACY.fr.md) — privacy policy
+- [TERMS.md](TERMS.md) / [TERMS.fr.md](TERMS.fr.md) — terms of use
+- [SECURITY.md](SECURITY.md) — vulnerability reporting policy
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — third-party dependencies
+- [NOTICE](NOTICE) — Apache 2.0 attribution notices
 
-## Liens
+## Links
 
-- [files-tech.com/pass-tech.php](https://www.files-tech.com/pass-tech.php) — page produit
-- [Releases](https://github.com/gitubpatrice/pass_tech/releases) — APK signés
-- [contact@files-tech.com](mailto:contact@files-tech.com) — support et signalement de vulnérabilités
+- [files-tech.com/pass-tech.php](https://www.files-tech.com/pass-tech.php) — product page
+- [Releases](https://github.com/gitubpatrice/pass_tech/releases) — signed APKs
+- [contact@files-tech.com](mailto:contact@files-tech.com) — support and vulnerability reports
 
-## Licence
+## License
 
 Copyright 2026 Files Tech / Patrice Haltaya
 
-Distribué sous Apache License, Version 2.0. Voir [LICENSE](LICENSE) pour le texte complet.
+Distributed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
 
-Pass Tech est fourni « tel quel », sans garantie d'aucune sorte. Les données stockées sont chiffrées avec votre mot de passe maître et liées à la KEK matérielle de votre appareil — **si vous perdez le mot de passe maître ou si l'appareil est réinitialisé/wipe Keystore, le coffre est irrécupérable**. Pensez à exporter régulièrement votre coffre chiffré (`.ptbak`).
+Pass Tech is provided "as is", without warranty of any kind. Stored data is encrypted with your master password and bound to your device's hardware KEK — **if you lose the master password, or if the device is reset or its Keystore wiped, the vault is unrecoverable**. Export an encrypted backup (`.ptbak`) regularly.

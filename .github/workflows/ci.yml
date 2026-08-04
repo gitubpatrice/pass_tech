@@ -51,13 +51,36 @@ jobs:
         working-directory: pass_tech
         run: flutter pub get
 
+      # AUDIT 2026-08-03 — `--no-fatal-infos` remplacé par le durcissement de la
+      # doctrine (`ci-et-chaine-de-publication.md` §4.1). Vérifié en local avant
+      # d'être posé ici : l'analyse rend « No issues found » sur ce dépôt, donc
+      # le durcissement ne coûte RIEN aujourd'hui et empêche la dérive demain.
       - name: Analyze
         working-directory: pass_tech
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --fatal-infos --fatal-warnings
 
+      # AUDIT 2026-08-03 — nouveau contrôle. `tool/generate_icon.dart` n'était
+      # pas formaté au moment de l'ajout : sans cette barrière, le dépôt dérive
+      # fichier par fichier et les diffs de revue se noient dans du reformatage.
+      - name: Format
+        working-directory: pass_tech
+        run: dart format --output=none --set-exit-if-changed .
+
+      # ⚠️ AUDIT 2026-08-03 — le `|| echo "No tests yet"` a été RETIRÉ.
+      #
+      # Il faisait passer le job au vert QUOI QU'IL ARRIVE : un test en échec
+      # produisait exactement la même pastille verte qu'une suite intacte. Sur
+      # un gestionnaire de mots de passe dont la suite couvre le round-trip
+      # AES-GCM, la migration v3→v4 et le rembourrage anti-corrélation, c'est
+      # la garantie la plus coûteuse du dépôt qui était neutralisée — et
+      # l'écriture même du garde-fou (« pas encore de tests ») avait cessé
+      # d'être vraie : il y en a 139.
+      #
+      # Une CI qui ne peut pas échouer ne teste rien ; elle rassure, ce qui est
+      # pire que pas de CI du tout.
       - name: Run tests
         working-directory: pass_tech
-        run: flutter test || echo "No tests yet"
+        run: flutter test
 
       # Build debug APK pour valider que la compilation passe end-to-end
       # (pas besoin de keystore release en CI).
