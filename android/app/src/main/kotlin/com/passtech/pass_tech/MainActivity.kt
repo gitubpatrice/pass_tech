@@ -46,6 +46,51 @@ class MainActivity : FlutterFragmentActivity() {
         // (relax/restore depuis n'importe quel écran).
     }
 
+    /// SEC 2026-08-04 — faut-il forcer FLAG_SECURE au passage en arrière-plan ?
+    ///
+    /// Reflète UNIQUEMENT la préférence globale de l'utilisateur
+    /// (`SecureWindow._userDisabled` côté Dart), jamais le relâchement
+    /// transitoire de l'éditeur de notes. C'est toute la subtilité : une note
+    /// en cours d'édition a volontairement FLAG_SECURE relâché, et c'est
+    /// précisément à ce moment-là qu'il faut le remettre avant l'instantané.
+    private var secureOnBackground = true
+
+    /// SEC 2026-08-04 — réarme FLAG_SECURE de façon SYNCHRONE avant
+    /// l'instantané système.
+    ///
+    /// `SecureWindow.suspendRelaxForBackground()` fait déjà ce travail depuis
+    /// SEC F3 v2.5.2, mais depuis Dart, à travers un canal de méthode — donc
+    /// APRÈS le retour de `onPause`. Android, lui, capture sa vignette pour le
+    /// sélecteur d'applications récentes au moment du passage en arrière-plan.
+    /// Le flag arrivait donc potentiellement après la photo : une note ouverte
+    /// pouvait se retrouver lisible dans les récentes.
+    ///
+    /// Ici on est sur le thread UI, dans le cycle de vie natif, avant que la
+    /// vignette soit prise. Il n'y a plus de course.
+    ///
+    /// ⚠️ Ne PAS déplacer cet appel vers `onCreate` : c'est exactement ce que
+    /// la v2.3.9 a retiré. Sur One UI + Knox, FLAG_SECURE posé à la CRÉATION
+    /// de la fenêtre rend tout `clearFlags` ultérieur sans effet sur le
+    /// presse-papier et la barre de sélection. Ici la fenêtre existe déjà
+    /// depuis longtemps, le piège ne s'applique pas.
+    ///
+    /// La restauration reste à la charge de Dart
+    /// (`resumeRelaxAfterBackground`) : au retour, mieux vaut un bref instant
+    /// de trop sécurisé qu'un instant de trop exposé.
+    override fun onPause() {
+        if (secureOnBackground) {
+            try {
+                window.setFlags(
+                    WindowManager.LayoutParams.FLAG_SECURE,
+                    WindowManager.LayoutParams.FLAG_SECURE,
+                )
+            } catch (_: Throwable) {
+                // best-effort : ne jamais empêcher la mise en arrière-plan
+            }
+        }
+        super.onPause()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -78,6 +123,20 @@ class MainActivity : FlutterFragmentActivity() {
                                 result.error("SECURE_WINDOW_ERROR", e.message, null)
                             }
                         }
+                    }
+                    // SEC 2026-08-04 — la préférence GLOBALE de l'utilisateur,
+                    // transmise une fois pour toutes plutôt que déduite du
+                    // dernier `setSecure`.
+                    //
+                    // Il fallait bien deux informations distinctes : le
+                    // relâchement de l'éditeur de notes passe aussi par
+                    // `setSecure(false)`, et c'est justement dans cet état
+                    // qu'il faut sécuriser au passage en arrière-plan. Se fier
+                    // au dernier `setSecure` aurait laissé la note exposée —
+                    // exactement le défaut à corriger.
+                    "setSecureOnBackground" -> {
+                        secureOnBackground = call.argument<Boolean>("enabled") ?: true
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }

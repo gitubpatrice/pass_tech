@@ -383,6 +383,23 @@ class HeritageService {
     }
   }
 
+  /// Écrase une `List<int>` en place.
+  ///
+  /// `Encrypter.decryptBytes` déclare rendre une `List<int>`, pas une
+  /// `Uint8List` — `SecretBytes.wipe`, qui attend le type concret, ne peut donc
+  /// pas être appelé directement. On écrase élément par élément, et on avale
+  /// l'exception si la liste s'avère non modifiable : mieux vaut un effacement
+  /// qui échoue qu'un déchiffrement qui plante.
+  static void _wipeIntList(List<int> buf) {
+    try {
+      for (var i = 0; i < buf.length; i++) {
+        buf[i] = 0;
+      }
+    } catch (_) {
+      /* vue non modifiable — le ramasse-miettes reprendra la main */
+    }
+  }
+
   /// AAD bound to a v2 heir snapshot (anti-downgrade).
   ///
   /// AUDIT 2026-08-03 — [params] est un argument, et non plus les constantes
@@ -547,14 +564,35 @@ class HeritageService {
       final encKey = enc.Key(encKeyBytes);
       final iv = enc.IV(Uint8List.fromList(ivBytes));
       final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-      final plain = encrypter.decrypt(
+      // SEC 2026-08-04 — `decryptBytes` au lieu de `decrypt`.
+      //
+      // `decrypt()` rend une `String` Dart : immuable, donc IMPOSSIBLE à
+      // écraser. Le coffre entier — tous les identifiants en clair — restait
+      // en mémoire jusqu'au passage du ramasse-miettes, à une date non
+      // déterministe. Toute la stratégie d'effacement de l'application était
+      // contournée sur ce chemin.
+      //
+      // ⚠️ `allowMalformed: true` est OBLIGATOIRE : c'est exactement ce que
+      // fait `Encrypter.decrypt` en interne (encrypt 5.0.3,
+      // `encrypter.dart:49`). Sans lui, un octet malformé lèverait une
+      // exception là où l'ancien code produisait un caractère de remplacement
+      // — un changement de comportement silencieux sur les instantanés hérités.
+      final plainBytes = encrypter.decryptBytes(
         enc.Encrypted(Uint8List.fromList(cipherBytes)),
         iv: iv,
       );
-      final list = jsonDecode(plain) as List;
-      return list
-          .map((e) => Entry.fromJson(e as Map<String, dynamic>))
-          .toList();
+      try {
+        final plain = utf8.decode(plainBytes, allowMalformed: true);
+        final list = jsonDecode(plain) as List;
+        return list
+            .map((e) => Entry.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } finally {
+        // En `finally` et non après le décodage : un instantané corrompu fait
+        // lever `jsonDecode`, et c'est justement le cas où le tampon en clair
+        // resterait intact en mémoire.
+        _wipeIntList(plainBytes);
+      }
     } catch (_) {
       return null;
     } finally {

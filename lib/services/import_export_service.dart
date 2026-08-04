@@ -596,10 +596,32 @@ class ImportExportService {
         encKeyBytes = key.sublist(0, 32);
         final encKey = enc.Key(encKeyBytes);
         final encrypter = enc.Encrypter(enc.AES(encKey, mode: enc.AESMode.cbc));
-        final plain = encrypter.decrypt(
+        // SEC 2026-08-04 — `decryptBytes` au lieu de `decrypt`.
+        //
+        // `decrypt()` rend une `String` Dart, immuable donc impossible à
+        // écraser : la sauvegarde entière en clair restait en mémoire jusqu'au
+        // ramasse-miettes. Même correctif que dans `HeritageService`.
+        //
+        // ⚠️ `allowMalformed: true` reproduit EXACTEMENT ce que fait
+        // `Encrypter.decrypt` en interne (encrypt 5.0.3, `encrypter.dart:49`).
+        // L'omettre ferait lever une exception là où l'ancien code tolérait un
+        // octet malformé — régression silencieuse sur les `.ptbak` hérités.
+        final plainBytes = encrypter.decryptBytes(
           enc.Encrypted(Uint8List.fromList(cipher)),
           iv: enc.IV(Uint8List.fromList(iv)),
         );
+        final String plain;
+        try {
+          plain = utf8.decode(plainBytes, allowMalformed: true);
+        } finally {
+          try {
+            for (var i = 0; i < plainBytes.length; i++) {
+              plainBytes[i] = 0;
+            }
+          } catch (_) {
+            /* vue non modifiable */
+          }
+        }
 
         final list = jsonDecode(plain) as List;
         final entries = <Entry>[];
