@@ -265,6 +265,18 @@ extension VaultUnlock on VaultService {
 
       if (version > VaultService._v3Version || version < 1) {
         // Forged version (e.g. 99999) or invalid : refuse.
+        //
+        // SEC 2026-08-04 (audit GPT, point douteux) — précision sur la portée
+        // réelle de cette garde, qui prêtait à confusion.
+        //
+        // Une version SUPÉRIEURE à 4 n'arrive jamais ici : la branche
+        // `version >= _currentVersion` ci-dessus l'a déjà captée. Le rejet
+        // effectif se fait alors dans `_decryptVaultV4`, qui teste l'égalité
+        // STRICTE (`raw['version'] != _currentVersion`) et rend `null`.
+        //
+        // Ce test-ci ne couvre donc en pratique que `version < 1`. La
+        // protection existe bien — à un autre endroit que ne le laissait
+        // croire ce commentaire.
         return UnlockResult.wrongPassword;
       }
 
@@ -319,7 +331,26 @@ extension VaultUnlock on VaultService {
       }
       return UnlockResult.success;
     } catch (_) {
+      // SEC 2026-08-04 (audit GPT F5) — nettoyage COMPLET, pas seulement la
+      // cle.
+      //
+      // Ce chemin publie `_entries` et `_isOpen = true` AVANT d'avoir fini
+      // toutes les operations susceptibles de lever : decodage des metadonnees
+      // en cache, `_onUnlockSuccess()` qui ecrit en stockage securise. Si l'une
+      // echoue, ce `catch` n'effacait que `_key` et rendait `wrongPassword`.
+      //
+      // Le singleton restait alors dans un etat qui se contredit lui-meme :
+      // resultat « mot de passe incorrect », `_isOpen` a vrai, les entrees
+      // DECHIFFREES toujours en memoire, et plus aucune cle. Le coffre etait
+      // ferme du point de vue de l'appelant et ouvert du point de vue de
+      // l'application.
+      //
+      // Le chemin principal (`_unlockInternal`) possedait deja cette parade
+      // complete ; elle n'avait pas ete propagee a ses deux jumeaux.
       _wipeKey();
+      _entries = [];
+      _isOpen = false;
+      _activeSlot = null;
       return UnlockResult.wrongPassword;
     }
   }
@@ -687,7 +718,26 @@ extension VaultUnlock on VaultService {
           return UnlockResult.biometricInvalidated;
       }
     } catch (_) {
+      // SEC 2026-08-04 (audit GPT F5) — nettoyage COMPLET, pas seulement la
+      // cle.
+      //
+      // Ce chemin publie `_entries` et `_isOpen = true` AVANT d'avoir fini
+      // toutes les operations susceptibles de lever : decodage des metadonnees
+      // en cache, `_onUnlockSuccess()` qui ecrit en stockage securise. Si l'une
+      // echoue, ce `catch` n'effacait que `_key` et rendait `wrongPassword`.
+      //
+      // Le singleton restait alors dans un etat qui se contredit lui-meme :
+      // resultat « mot de passe incorrect », `_isOpen` a vrai, les entrees
+      // DECHIFFREES toujours en memoire, et plus aucune cle. Le coffre etait
+      // ferme du point de vue de l'appelant et ouvert du point de vue de
+      // l'application.
+      //
+      // Le chemin principal (`_unlockInternal`) possedait deja cette parade
+      // complete ; elle n'avait pas ete propagee a ses deux jumeaux.
       _wipeKey();
+      _entries = [];
+      _isOpen = false;
+      _activeSlot = null;
       return UnlockResult.wrongPassword;
     }
   }

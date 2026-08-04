@@ -1654,7 +1654,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           // actif. Sans cette marque, la décoration poserait une carte vide sur
           // l'écran de tout le monde.
           _Undecorated(
-            child: FutureBuilder<bool>(
+            child: FutureBuilder<bool?>(
               future: PanicService.isDisguised(),
               builder: (_, snap) {
                 if (snap.data != true) return const SizedBox.shrink();

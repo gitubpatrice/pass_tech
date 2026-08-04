@@ -172,6 +172,11 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   /// aberrante du canal on verrouille plus tôt plutôt que plus tard.
   int? _pausedAtMonoMs;
   int? _pausedAtBootMs;
+
+  /// Temps écoulé retenu quand aucune horloge fiable n'est disponible.
+  /// Dépasse tous les délais de verrouillage proposés (le plus long est
+  /// 30 min), donc force le verrouillage sans cas particulier à écrire.
+  static const int _dureeInfinieMs = 1 << 40;
   static final Stopwatch _stopwatch = Stopwatch()..start();
 
   /// v2.5.0 (F9) — guard cache session sur `_checkForUpdate`.
@@ -216,7 +221,11 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
     // une divulgation du nom de l'app — c'est l'existence même du trafic qui
     // contredit le camouflage.
     try {
-      if (await PanicService.isDisguised()) return;
+      // SEC 2026-08-04 (audit GPT F8) — on s'abstient dès que ce n'est
+      // pas explicitement `false`. `null` = état indéterminé : ne pas
+      // savoir si le camouflage est actif doit conduire au silence
+      // réseau, pas à une requête qui le trahirait.
+      if (await PanicService.isDisguised() != false) return;
     } catch (_) {
       // Canal indisponible : on s'abstient. Fail-CLOSED — mieux vaut sauter
       // une vérification de mise à jour que trahir un camouflage actif.
@@ -348,11 +357,34 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
       var elapsedMs = pausedMs == null
           ? 0
           : _stopwatch.elapsedMilliseconds - pausedMs;
-      if (pausedBootMs != null) {
+      // SEC 2026-08-04 (audit GPT F7) — l'ABSENCE de l'ancre système verrouille.
+      //
+      // Mon commentaire affirmait « si le canal rend une valeur aberrante ou
+      // indisponible, on retombe sur le second — donc on verrouille trop tôt,
+      // jamais trop tard ». C'était FAUX dans le cas prévu par le code
+      // lui-même : quand `elapsedRealtimeMs()` rend `null` au passage en
+      // arrière-plan, `pausedBootMs` est nul, ce bloc est entièrement sauté, et
+      // il ne reste que le `Stopwatch` — celui dont ce fichier explique trois
+      // paragraphes plus haut qu'il NE COMPTE PAS la veille profonde.
+      //
+      // L'appareil pouvait donc dormir deux heures et revenir avec un temps
+      // écoulé de quelques minutes : le coffre restait ouvert. La source forte
+      // manquante donnait MOINS de sécurité, alors qu'elle doit en donner plus.
+      //
+      // Repli fail-closed : sans ancre fiable, on considère le temps écoulé
+      // comme infini et on verrouille. Le coût pour l'utilisateur légitime est
+      // une saisie de mot de passe ; le coût inverse est un coffre ouvert.
+      if (pausedMs != null && pausedBootMs == null) {
+        elapsedMs = _dureeInfinieMs;
+      } else if (pausedBootMs != null) {
         final nowBootMs = await MonotonicClock.elapsedRealtimeMs();
-        // Un recul signalerait un redémarrage — impossible ici, le processus
-        // n'y survit pas — ou une réponse incohérente : on l'ignore.
-        if (nowBootMs != null && nowBootMs >= pausedBootMs) {
+        if (nowBootMs == null) {
+          // L'ancre existait au départ mais le canal ne répond plus : même
+          // raisonnement, on ne sait pas combien de temps s'est écoulé.
+          elapsedMs = _dureeInfinieMs;
+        } else if (nowBootMs >= pausedBootMs) {
+          // Un recul signalerait un redémarrage — impossible ici, le processus
+          // n'y survit pas — ou une réponse incohérente : on l'ignore.
           final bootElapsed = nowBootMs - pausedBootMs;
           if (bootElapsed > elapsedMs) elapsedMs = bootElapsed;
         }

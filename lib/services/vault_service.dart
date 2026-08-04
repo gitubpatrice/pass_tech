@@ -418,6 +418,31 @@ class VaultService {
         'et pas de suite ni de répétition triviale',
       );
     }
+    // SEC 2026-08-04 (audit GPT F6) — l'invariant que cette fonction DOCUMENTE
+    // est désormais VÉRIFIÉ par elle.
+    //
+    // Sa propre doc dit « le decoyPassword DOIT être différent du master
+    // password [...] l'appelant doit valider en amont ». L'écran le fait ; le
+    // service, non. Une garantie confiée à une couche plus étroite que celle
+    // qui la promet est une garantie qui tombera : écran refait, test,
+    // automatisation, et l'invariant saute sans bruit.
+    //
+    // Conséquence si les deux mots de passe coïncident : la boucle
+    // d'ouverture parcourt les emplacements dans l'ordre et garde le PREMIER
+    // qui déchiffre — toujours le principal. Le coffre leurre et tout ce que
+    // l'utilisateur y aurait rangé deviennent alors inatteignables par le flux
+    // normal de l'application.
+    //
+    // ⚠️ `passwordMatchesPrimary` exige d'être appelé depuis le slot principal
+    // et respecte le verrouillage : il ne rend `true` que sur une vraie
+    // correspondance. Un `false` peut donc signifier « verrouillé » ; dans ce
+    // cas on laisse passer, l'écran ayant déjà fait le contrôle en amont.
+    if (await passwordMatchesPrimary(decoyPassword)) {
+      throw ArgumentError(
+        'Decoy password : doit differer du mot de passe principal, '
+        'sinon le coffre leurre devient inatteignable',
+      );
+    }
     // SEC 2026-08-04 (audit GPT F2) — le drapeau est écrit AVANT la création.
     //
     // L'ordre inverse ouvrait une fenêtre de PERTE DE DONNÉES : `_createSlot`

@@ -27,6 +27,25 @@ extension VaultSetup on VaultService {
     // Generate hwSecret (32 random bytes), wrap with KEK.
     final hwSecret = SecretBytes.randomBytes(32);
     Uint8List? finalKey;
+    // SEC 2026-08-04 (audit GPT F3) — instantané de la session AVANT mutation.
+    //
+    // Jumeau exact du défaut corrigé la veille dans `changeMasterPassword` : la
+    // parade avait été posée là-bas et pas ici. Cette fonction remplaçait
+    // l'état global — clé, entrées, emplacement actif — AVANT l'écriture, et
+    // son `finally` n'effaçait que des tampons.
+    //
+    // Scénario : on configure un coffre leurre depuis une session PRINCIPALE
+    // ouverte. `_createSlot` bascule aussitôt la session sur un leurre vide,
+    // puis `_saveVaultV4` échoue — disque plein, erreur d'E/S. L'utilisateur
+    // lit « échec », mais le service prétend désormais qu'un AUTRE coffre est
+    // ouvert, vide, avec une clé qui ne correspond pas au disque, tandis que
+    // les caches décrivent encore le principal. La session principale a été
+    // écrasée en mémoire par une opération qui a échoué.
+    final sessionKey = _key == null ? null : Uint8List.fromList(_key!);
+    final sessionEntries = List<Entry>.from(_entries);
+    final sessionOpen = _isOpen;
+    final sessionSlot = _activeSlot;
+    var creationCommitted = false;
     try {
       final alias = _aliasFor(slot);
       final wrap = await _keystore.wrap(alias, hwSecret);
@@ -59,7 +78,23 @@ extension VaultSetup on VaultService {
         value: base64Encode(salt),
       );
       await _onUnlockSuccess();
+      // Le coffre est écrit ET son sel persisté : la session en mémoire décrit
+      // désormais fidèlement le disque. Plus rien à annuler.
+      creationCommitted = true;
     } finally {
+      if (!creationCommitted) {
+        // Échec en cours de route : on remet la session dans l'état d'avant
+        // l'appel, au lieu de laisser un emplacement à demi ouvert.
+        _wipeKey();
+        _key = sessionKey;
+        _entries = sessionEntries;
+        _isOpen = sessionOpen;
+        _activeSlot = sessionSlot;
+      } else if (sessionKey != null) {
+        // Création réussie : l'instantané est du matériel de clé, il ne doit
+        // pas attendre le ramasse-miettes.
+        SecretBytes.wipe(sessionKey);
+      }
       SecretBytes.wipe(pwHash);
       SecretBytes.wipe(hwSecret);
       if (finalKey != null) SecretBytes.wipe(finalKey);
@@ -217,10 +252,29 @@ extension VaultSetup on VaultService {
       // V1 v2.4.0 — salt en storage écrit APRÈS save vault réussi : si le
       // process est tué entre les deux, on garde l'ancien salt cohérent
       // avec l'ancien vault au lieu d'un salt orphelin.
-      await VaultService._storage.write(
-        key: _saltKeyFor(slot),
-        value: base64Encode(salt),
-      );
+      //
+      // SEC 2026-08-04 (audit GPT F9) — cette écriture ne peut plus faire
+      // échouer une rotation DÉJÀ ACQUISE.
+      //
+      // Elle n'est pas porteuse en v4 : le déverrouillage lit `kdf.salt` DANS
+      // LE FICHIER. Mais si elle levait, l'exception remontait jusqu'à l'écran,
+      // qui annonçait un échec — alors que le coffre était bel et bien passé
+      // sous le nouveau mot de passe. Pire, elle court-circuitait les deux
+      // nettoyages qui suivent la sortie du `try` : l'invalidation de
+      // l'enveloppe biométrique, et la suppression du `.bak` v3.
+      //
+      // Ce dernier point est le plus gênant : si l'on change de mot de passe
+      // PARCE QUE l'ancien est compromis, laisser derrière soi une sauvegarde
+      // v3 déchiffrable avec cet ancien mot de passe annule tout le bénéfice
+      // de la rotation.
+      try {
+        await VaultService._storage.write(
+          key: _saltKeyFor(slot),
+          value: base64Encode(salt),
+        );
+      } catch (_) {
+        // Vestige v3 uniquement : son absence n'empêche aucun déverrouillage.
+      }
     } finally {
       if (!rotationCommitted) {
         // Échec en cours de route : on remet la session dans l'état EXACT

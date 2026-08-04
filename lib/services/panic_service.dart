@@ -98,12 +98,28 @@ class PanicService {
   }
 
   /// Indique si l'app est actuellement camouflée.
-  static Future<bool> isDisguised() async {
+  /// État du camouflage : `true` camouflé, `false` non camouflé,
+  /// **`null` = indéterminé**.
+  ///
+  /// SEC 2026-08-04 (audit GPT F8) — rend `bool?` et non plus `bool`.
+  ///
+  /// Cette méthode avalait toute erreur en rendant `false`, c'est-à-dire « non
+  /// camouflé » — la réponse la moins sûre. Et le natif faisait déjà la même
+  /// chose de son côté : le `catch` de l'appelant, qui prétendait s'abstenir
+  /// « plutôt que de trahir un camouflage actif », ne pouvait donc JAMAIS
+  /// s'exécuter. Deux replis du mauvais côté, empilés, qui se masquaient l'un
+  /// l'autre.
+  ///
+  /// L'incertitude est désormais représentable, et chaque appelant doit la
+  /// traiter explicitement :
+  ///  - vérification de mise à jour : s'abstient dès que ce n'est pas `false` ;
+  ///  - éléments d'interface : n'affichent que sur `true`, l'incertitude ne
+  ///    coûtant rien de plus qu'un bouton masqué.
+  static Future<bool?> isDisguised() async {
     try {
-      final r = await _channel.invokeMethod<bool>('isDisguised');
-      return r ?? false;
+      return await _channel.invokeMethod<bool>('isDisguised');
     } catch (_) {
-      return false;
+      return null;
     }
   }
 }

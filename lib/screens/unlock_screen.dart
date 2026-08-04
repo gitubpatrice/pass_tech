@@ -93,7 +93,7 @@ class UnlockScreenState extends State<UnlockScreen> {
   /// être sorti de la calculatrice, donc le camouflage est de toute façon
   /// tombé. Et l'action ne touche QUE l'icône du lanceur — elle n'ouvre rien,
   /// ne déchiffre rien, ne révèle aucune donnée.
-  late final Future<bool> _disguisedFuture;
+  late final Future<bool?> _disguisedFuture;
 
   @override
   void initState() {
@@ -735,7 +735,7 @@ class UnlockScreenState extends State<UnlockScreen> {
                         // accessible SANS ouvrir le coffre. Voir
                         // `_disguisedFuture`. N'apparaît que si le camouflage
                         // est effectivement actif.
-                        FutureBuilder<bool>(
+                        FutureBuilder<bool?>(
                           future: _disguisedFuture,
                           builder: (_, snap) {
                             if (snap.data != true) {

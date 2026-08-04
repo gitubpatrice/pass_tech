@@ -249,7 +249,21 @@ class MainActivity : FlutterFragmentActivity() {
                             // ENABLED ou (DEFAULT && manifest enabled=true). Manifest = false.
                             result.success(state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
                         } catch (e: Exception) {
-                            result.success(false)
+                            // SEC 2026-08-04 (audit GPT F8) — une erreur remonte
+                            // comme ERREUR, plus comme « non camouflé ».
+                            //
+                            // Avant, toute exception devenait `success(false)`.
+                            // Le Dart appelant croit pourtant traiter l'échec en
+                            // fail-closed : son `catch` s'abstient de vérifier
+                            // les mises à jour « plutôt que de trahir un
+                            // camouflage actif ». Ce `catch` n'était jamais
+                            // atteint — l'erreur arrivait déguisée en réponse
+                            // normale, et l'application contactait le réseau
+                            // alors que le mode panique était actif.
+                            //
+                            // Répondre « je ne sais pas » là où l'on ne sait pas
+                            // laisse l'appelant choisir le côté sûr.
+                            result.error("DISGUISE_STATE_ERROR", e.message, null)
                         }
                     }
                     else -> result.notImplemented()
