@@ -383,10 +383,28 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
           // raisonnement, on ne sait pas combien de temps s'est écoulé.
           elapsedMs = _dureeInfinieMs;
         } else if (nowBootMs >= pausedBootMs) {
-          // Un recul signalerait un redémarrage — impossible ici, le processus
-          // n'y survit pas — ou une réponse incohérente : on l'ignore.
           final bootElapsed = nowBootMs - pausedBootMs;
           if (bootElapsed > elapsedMs) elapsedMs = bootElapsed;
+        } else {
+          // SEC 2026-08-04 (relecture Codex) — un RECUL de l'ancre système
+          // verrouille, au lieu d'être ignoré.
+          //
+          // La version précédente écrivait « on l'ignore », et ignorer revenait
+          // à ne garder que le `Stopwatch` — celui qui NE COMPTE PAS la veille
+          // profonde. C'est le troisième repli de ce bloc, et c'était le seul à
+          // pencher du mauvais côté, alors que les deux autres, dix lignes plus
+          // haut, verrouillent précisément parce que l'ancre est inexploitable.
+          //
+          // La documentation de `MonotonicClock.elapsedRealtimeMs` demande
+          // d'ailleurs qu'un appelant qui persiste une valeur « détecte le
+          // recul et le traite de façon conservatrice ». Ce code le détectait
+          // sans le traiter.
+          //
+          // Le cas devrait être hors d'atteinte — `elapsedRealtime` ne recule
+          // qu'au redémarrage de l'appareil, auquel le processus ne survit pas.
+          // Mais un repli n'a de valeur que par le sens dans lequel il échoue,
+          // et celui-ci laissait un coffre ouvert.
+          elapsedMs = _dureeInfinieMs;
         }
       }
 

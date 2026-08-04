@@ -433,10 +433,35 @@ class VaultService {
     // l'utilisateur y aurait rangé deviennent alors inatteignables par le flux
     // normal de l'application.
     //
-    // ⚠️ `passwordMatchesPrimary` exige d'être appelé depuis le slot principal
-    // et respecte le verrouillage : il ne rend `true` que sur une vraie
-    // correspondance. Un `false` peut donc signifier « verrouillé » ; dans ce
-    // cas on laisse passer, l'écran ayant déjà fait le contrôle en amont.
+    // ⚠️ SEC 2026-08-04 (relecture Codex) — la garde n'a de valeur que si la
+    // vérification a pu ABOUTIR.
+    //
+    // `passwordMatchesPrimary` rend `false` dans trois cas qui ne signifient
+    // PAS « les mots de passe diffèrent » : emplacement actif autre que le
+    // principal, verrouillage anti-force-brute en cours, déverrouillage
+    // concurrent. Ne tester que la valeur de retour, c'était donc reproduire
+    // exactement le défaut que ce bloc prétend corriger : l'invariant restait
+    // suspendu à la garde d'ÉCRAN, seule capable de distinguer « non » de
+    // « je ne sais pas ».
+    //
+    // On rend ces trois cas explicites et bloquants. La conséquence d'un
+    // faux « non » n'est pas cosmétique : deux emplacements ouverts par le
+    // même mot de passe rendent le leurre inatteignable — la boucle
+    // d'ouverture garde toujours le premier qui déchiffre, c'est-à-dire le
+    // principal — et tout ce que l'utilisateur y aurait rangé est perdu.
+    //
+    // Aucun parcours légitime n'est touché : l'écran de réglages n'est
+    // accessible que sur une session ouverte, et le seul point d'appel y
+    // configure le leurre depuis le coffre PRINCIPAL.
+    if (!_isOpen || _activeSlot != _Slot.primary) {
+      throw StateError(
+        'Decoy setup : exige une session PRINCIPALE ouverte, sans quoi la '
+        'comparaison avec le mot de passe principal ne peut pas aboutir',
+      );
+    }
+    if (_unlockGate != null || await getLockoutRemaining() != null) {
+      throw StateError(vaultBusy);
+    }
     if (await passwordMatchesPrimary(decoyPassword)) {
       throw ArgumentError(
         'Decoy password : doit differer du mot de passe principal, '
@@ -1130,6 +1155,15 @@ class VaultService {
   @visibleForTesting
   static int get paddingBaseRungForTest => _paddingBaseRungBytes;
 
+  /// Entrée de test pour la garde d'aliasing du cache méta.
+  ///
+  /// Ce garde-fou tient sur une seule comparaison d'identité, et se tromper de
+  /// sens y remplace un sel par des zéros — perte définitive du coffre. Il doit
+  /// donc être couvert par des tests, pas seulement par relecture.
+  @visibleForTesting
+  static void wipeUnlessSameForTest(Uint8List? sortant, Uint8List? conserve) =>
+      _wipeUnlessSame(sortant, conserve);
+
   /// Entrée de test pour le calcul de longueur base64 sans décodage.
   @visibleForTesting
   static int decodedLenFromBase64ForTest(String b64) {
@@ -1411,6 +1445,21 @@ class VaultService {
       }
       _key = null;
     }
+  }
+
+  /// Efface [sortant] SAUF s'il désigne le même tampon que [conserve].
+  ///
+  /// SEC 2026-08-04 (relecture Codex) — garde-fou d'aliasing pour les
+  /// restaurations de cache méta. `SecretBytes.wipe` écrit des zéros DANS le
+  /// tampon : effacer une référence que l'on s'apprête à remettre en place
+  /// remettrait un sel nul dans le cache, et la première écriture suivante
+  /// annoncerait ce sel nul dans le fichier — coffre définitivement illisible.
+  ///
+  /// Le cas se produit dès qu'une opération échoue AVANT d'avoir remplacé le
+  /// cache : l'instantané et la valeur courante sont alors le MÊME objet.
+  static void _wipeUnlessSame(Uint8List? sortant, Uint8List? conserve) {
+    if (sortant == null || identical(sortant, conserve)) return;
+    SecretBytes.wipe(sortant);
   }
 
   // ── Crypto helpers (statics — re-utilisés par les parts) ────────────────────

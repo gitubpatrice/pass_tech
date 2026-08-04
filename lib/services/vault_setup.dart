@@ -48,6 +48,37 @@ extension VaultSetup on VaultService {
     final sessionEntries = List<Entry>.from(_entries);
     final sessionOpen = _isOpen;
     final sessionSlot = _activeSlot;
+    // SEC 2026-08-04 (relecture Codex) — le cache méta fait partie de la
+    // session, et il manquait à l'instantané. C'est le défaut CRITIQUE de la
+    // version précédente de ce correctif.
+    //
+    // `_saveVaultV4` termine par `_cachedSalt/_cachedWrappedDek/`
+    // `_cachedWrapNonce/_cachedKdfParams = <métadonnées du slot écrit>`. La
+    // restauration ci-dessous ne remettait que la clé, les entrées et
+    // l'emplacement actif : le cache continuait de décrire le LEURRE.
+    //
+    // Chaîne complète de la perte, depuis une session PRINCIPALE ouverte :
+    //   1. `setupDecoyVault` → `_createSlot(decoy)` ;
+    //   2. `_saveVaultV4` réussit → le cache passe sur le leurre ;
+    //   3. l'écriture du sel (ou `_onUnlockSuccess`) lève — stockage sécurisé
+    //      indisponible, Keystore saturé ;
+    //   4. le `finally` remet la session sur le principal, cache resté leurre ;
+    //   5. la moindre modification d'entrée appelle `_saveVault`, dont le
+    //      chemin rapide n'exige que quatre valeurs non nulles : il réécrit le
+    //      fichier PRINCIPAL en y annonçant le sel et l'enveloppe du LEURRE,
+    //      alors que le contenu est chiffré sous la clé du principal ;
+    //   6. au déverrouillage suivant, la dérivation repart du sel du leurre et
+    //      l'enveloppe est déballée avec la mauvaise KEK : **le coffre
+    //      principal ne s'ouvre plus jamais**, avec aucun des deux mots de
+    //      passe.
+    //
+    // Ces quatre champs sont des RÉFÉRENCES, pas des copies : `_saveVaultV4`
+    // réaffecte, il ne modifie jamais les tampons en place. L'instantané reste
+    // donc valide sans duplication de matériel sensible.
+    final cacheSalt = _cachedSalt;
+    final cacheWrappedDek = _cachedWrappedDek;
+    final cacheWrapNonce = _cachedWrapNonce;
+    final cacheParams = _cachedKdfParams;
     var creationCommitted = false;
     try {
       final alias = _aliasFor(slot);
@@ -109,12 +140,37 @@ extension VaultSetup on VaultService {
           _entries = [];
           _isOpen = false;
           _activeSlot = null;
+          // Le verrouillage a déjà vidé le cache méta, mais `_saveVaultV4` a pu
+          // le repeupler APRÈS lui : on le revide, sinon il survivrait au
+          // verrouillage en décrivant l'emplacement qui vient d'être écrit.
+          VaultService._wipeUnlessSame(_cachedSalt, cacheSalt);
+          VaultService._wipeUnlessSame(_cachedWrappedDek, cacheWrappedDek);
+          VaultService._wipeUnlessSame(_cachedWrapNonce, cacheWrapNonce);
+          if (cacheSalt != null) SecretBytes.wipe(cacheSalt);
+          if (cacheWrappedDek != null) SecretBytes.wipe(cacheWrappedDek);
+          if (cacheWrapNonce != null) SecretBytes.wipe(cacheWrapNonce);
+          _cachedSalt = null;
+          _cachedWrappedDek = null;
+          _cachedWrapNonce = null;
+          _cachedKdfParams = null;
         } else {
           _wipeKey();
           _key = sessionKey;
           _entries = sessionEntries;
           _isOpen = sessionOpen;
           _activeSlot = sessionSlot;
+          // Le cache méta revient avec le reste de la session. L'effacement des
+          // tampons sortants passe par `_wipeUnlessSame` : si l'échec est
+          // survenu AVANT `_saveVaultV4`, le cache courant et l'instantané sont
+          // le MÊME objet, et un effacement direct remettrait un sel nul en
+          // place — exactement la corruption que ce bloc existe pour empêcher.
+          VaultService._wipeUnlessSame(_cachedSalt, cacheSalt);
+          VaultService._wipeUnlessSame(_cachedWrappedDek, cacheWrappedDek);
+          VaultService._wipeUnlessSame(_cachedWrapNonce, cacheWrapNonce);
+          _cachedSalt = cacheSalt;
+          _cachedWrappedDek = cacheWrappedDek;
+          _cachedWrapNonce = cacheWrapNonce;
+          _cachedKdfParams = cacheParams;
         }
       } else if (sessionKey != null) {
         // Création réussie : l'instantané est du matériel de clé, il ne doit
@@ -310,6 +366,22 @@ extension VaultSetup on VaultService {
         // Sans cette restauration, `_key` gardait la clé neuve alors que le
         // fichier était resté sous l'ancienne : le premier ajout d'entrée
         // scellait l'incohérence et rendait le coffre définitivement illisible.
+        //
+        // ⚠️ INVARIANT À NE PAS ROMPRE — SEC 2026-08-04 (relecture Codex).
+        //
+        // Le cache méta (`_cachedSalt` / `_cachedWrappedDek` /
+        // `_cachedWrapNonce` / `_cachedKdfParams`) n'a PAS besoin d'être
+        // restauré ici, contrairement à `_createSlot` où son omission ouvrait
+        // une perte définitive du coffre principal. Raison : `_saveVaultV4` ne
+        // met ce cache à jour qu'APRÈS le renommage atomique, et
+        // `rotationCommitted = true` suit cet appel SANS aucun `await`
+        // intermédiaire. Il n'existe donc aucun état où le cache décrit la
+        // nouvelle dérivation alors que la rotation est annulée.
+        //
+        // Insérer un `await` entre `_saveVaultV4` et `rotationCommitted = true`
+        // ROMPRAIT cet invariant et rouvrirait exactement le défaut corrigé
+        // dans `_createSlot` : il faudrait alors instantané et restauration des
+        // quatre champs, comme là-bas.
         _wipeKey();
         _key = previousKey;
       } else if (previousKey != null) {

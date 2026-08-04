@@ -494,6 +494,17 @@ class _SettingsScreenState extends State<SettingsScreen>
       SnackUtils.showInfo(messenger, t.decoyConfiguredSnack);
       // Retour au unlock screen
       Navigator.of(context).popUntil((r) => r.isFirst);
+    } on StateError catch (e) {
+      // SEC 2026-08-04 (relecture Codex) — `setupDecoyVault` refuse désormais
+      // de créer un leurre quand la comparaison avec le mot de passe principal
+      // ne peut pas ABOUTIR (verrouillage anti-force-brute en cours, opération
+      // concurrente). Même traitement que le changement de mot de passe
+      // maître : message dédié, pas de sentinel interne à l'écran.
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, switch (e.message) {
+        VaultService.vaultBusy => t.vaultBusyRetry,
+        _ => t.genericError('$e'),
+      });
     } catch (e) {
       if (!mounted) return;
       SnackUtils.showError(context, messenger, t.genericError('$e'));

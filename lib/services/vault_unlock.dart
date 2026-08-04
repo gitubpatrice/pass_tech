@@ -251,6 +251,22 @@ extension VaultUnlock on VaultService {
         _cachedSalt = r.salt;
         _cachedWrappedDek = r.wrappedDek;
         _cachedWrapNonce = r.wrapNonce;
+        // SEC 2026-08-04 (relecture Codex, par extension) — le QUATRIÈME champ
+        // du cache manquait ici, alors que le chemin principal
+        // (`_unlockInternal`) le pose. Les quatre forment un lot indissociable :
+        // ils décrivent le MÊME fichier.
+        //
+        // Deux conséquences de l'omission :
+        //   • `_migrateFileLabelIfLegacy`, appelée deux lignes plus bas, renonce
+        //     quand les paramètres sont nuls — la migration d'étiquette SEC F18
+        //     ne s'est donc jamais faite par ce chemin ;
+        //   • pire, si un autre emplacement était ouvert avant SANS
+        //     verrouillage intermédiaire, les paramètres restaient ceux de
+        //     l'ANCIEN coffre à côté du sel du NOUVEAU. Le chemin rapide de
+        //     `_saveVault` n'exige que quatre valeurs non nulles : il aurait
+        //     réécrit ce coffre en annonçant une dérivation qui n'est pas la
+        //     sienne, le rendant illisible au déverrouillage suivant.
+        _cachedKdfParams = r.params;
         await _onUnlockSuccess();
         // SEC F18 v2.5.4 — voir `_migrateFileLabelIfLegacy`. Ce chemin est
         // secondaire (`_unlockInternal` est le principal) mais doit migrer
