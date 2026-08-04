@@ -349,11 +349,17 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
 
       // AUDIT 2026-08-03 — temps réellement écoulé en arrière-plan.
       //
-      // `elapsedRealtime` compte le sommeil profond, le `Stopwatch` non. On
-      // retient le PLUS GRAND des deux : en fonctionnement normal c'est
-      // toujours le premier, et si le canal rend une valeur aberrante ou
-      // indisponible, on retombe sur le second — donc on verrouille trop tôt,
-      // jamais trop tard.
+      // `elapsedRealtime` compte le sommeil profond, le `Stopwatch` non. Quand
+      // les deux ancres sont exploitables, on retient le PLUS GRAND ; en
+      // fonctionnement normal c'est toujours la première.
+      //
+      // ⚠️ Le `Stopwatch` ci-dessous n'est PAS un repli : il ne mesure que le
+      // temps où l'appareil était éveillé, donc s'y rabattre seul RALLONGE le
+      // délai avant verrouillage. Les trois cas où l'ancre système est
+      // inexploitable — absente au départ, absente au retour, ou en recul —
+      // sont traités juste en dessous, et tous les trois verrouillent. La
+      // version d'origine de ce commentaire affirmait l'inverse ; le
+      // raisonnement complet est en SEC 2026-08-04 (audit GPT F7).
       var elapsedMs = pausedMs == null
           ? 0
           : _stopwatch.elapsedMilliseconds - pausedMs;

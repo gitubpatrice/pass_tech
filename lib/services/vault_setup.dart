@@ -73,8 +73,14 @@ extension VaultSetup on VaultService {
     //      passe.
     //
     // Ces quatre champs sont des RÉFÉRENCES, pas des copies : `_saveVaultV4`
-    // réaffecte, il ne modifie jamais les tampons en place. L'instantané reste
-    // donc valide sans duplication de matériel sensible.
+    // RÉAFFECTE `_cachedSalt` et ses voisins, il ne touche pas aux tampons
+    // précédents. L'instantané reste donc valide sans dupliquer du matériel
+    // sensible.
+    //
+    // ⚠️ Une seule chose les modifie en place : `lock()`, qui les zéroïse. Ce
+    // n'est pas un problème, c'est même la raison du branchement plus bas — si
+    // un verrouillage est survenu, l'instantané est justement ce qu'il ne faut
+    // PAS remettre en service.
     final cacheSalt = _cachedSalt;
     final cacheWrappedDek = _cachedWrappedDek;
     final cacheWrapNonce = _cachedWrapNonce;
