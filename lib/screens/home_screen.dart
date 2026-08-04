@@ -494,7 +494,41 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               scrollDirection: Axis.horizontal,
               itemCount: _chips.length,
-              separatorBuilder: (_, i) => const SizedBox(width: 6),
+              // UI 2026-08-04 — séparateurs aux FRONTIÈRES DE GROUPE.
+              //
+              // Cette rangée empile trois familles de filtres qui ne se
+              // comparent pas : la portée (Tous, Favoris), le TYPE d'entrée
+              // (Mot de passe, Note, Carte bancaire — il décide des champs du
+              // formulaire) et la CATÉGORIE (Web, Email, Banque… — un simple
+              // rangement). Toutes s'affichaient à l'identique, si bien qu'on
+              // lisait « Cartes bancaires » et « Cartes » comme deux variantes
+              // de la même chose, alors que la première filtre un type et la
+              // seconde une catégorie.
+              //
+              // Un trait fin plutôt que deux rangées ou des en-têtes : la
+              // rangée reste unique, donc aucun appui supplémentaire et aucune
+              // hauteur prise sur la liste des entrées, qui est ce que
+              // l'utilisateur vient voir.
+              //
+              // Les frontières sont CALCULÉES et non écrites en dur : ajouter
+              // un type ou une catégorie les déplace toute seule.
+              separatorBuilder: (_, i) {
+                final finPortee = 1; // ...Tous, Favoris | types...
+                final finTypes = 1 + _typeChips.length; // ...types | catégories
+                if (i == finPortee || i == finTypes) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      indent: 8,
+                      endIndent: 8,
+                      color: cs.outlineVariant,
+                    ),
+                  );
+                }
+                return const SizedBox(width: 6);
+              },
               itemBuilder: (context, i) {
                 final chip = _chips[i];
                 final selected = _filter == chip;
