@@ -369,6 +369,22 @@ class UnlockScreenState extends State<UnlockScreen> {
           _error = t.vaultBusyRetry;
         });
         break;
+      case UnlockResult.biometricCanceled:
+        // UX 2026-08-04 — repli SILENCIEUX, sans message.
+        //
+        // L'utilisateur a annulé l'invite, ou l'OS l'a fermée. Rien n'a échoué,
+        // il n'y a donc rien à signaler : on lui rend simplement le champ de
+        // saisie, qui est exactement ce qu'il demandait. Auparavant il lisait
+        // « Échec biométrique » et pouvait croire son empreinte défaillante.
+        //
+        // `_error` est remis à `null` et non laissé tel quel : un message issu
+        // d'une tentative précédente resterait affiché sans rapport.
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+        break;
     }
   }
 
@@ -458,6 +474,17 @@ class UnlockScreenState extends State<UnlockScreen> {
         setState(() {
           _loading = false;
           _error = t.vaultBusyRetry;
+        });
+        break;
+      case UnlockResult.biometricCanceled:
+        // Inatteignable depuis l'ouverture par mot de passe — ce chemin ne
+        // sollicite jamais l'invite biométrique. Présent pour l'exhaustivité
+        // de l'énumération, et traité comme un non-événement plutôt que comme
+        // une erreur, au cas où un refactor futur le ferait remonter ici.
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = null;
         });
         break;
     }

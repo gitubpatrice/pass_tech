@@ -665,7 +665,13 @@ extension VaultUnlock on VaultService {
         case AuthExceptionCode.userCanceled:
         case AuthExceptionCode.canceled:
         case AuthExceptionCode.timeout:
-          return UnlockResult.wrongPassword;
+          // UX 2026-08-04 — rend `biometricCanceled` et non plus
+          // `wrongPassword`. Le « repli silencieux » que ce commentaire
+          // promettait depuis la v2.4.2 n'existait pas : la distinction était
+          // calculée ici, puis perdue en rendant la valeur d'un vrai échec.
+          // L'écran affichait « Échec biométrique » à quelqu'un qui venait
+          // simplement de choisir de taper son mot de passe.
+          return UnlockResult.biometricCanceled;
         default:
           // Cleanup best-effort — la clé Keystore est probablement morte,
           // tenter de la réutiliser sur la prochaine tentative donnerait

@@ -132,6 +132,27 @@ enum UnlockResult {
   ///
   /// ⚠️ Ne déclenche AUCUN comptage d'échec : rien n'a été tenté.
   busy,
+
+  /// UX 2026-08-04 — l'invite biométrique a été ANNULÉE, pas échouée.
+  ///
+  /// Couvre `userCanceled` (l'utilisateur a tapé Annuler ou Retour),
+  /// `canceled` (l'OS a fermé l'invite : bascule d'application, écran
+  /// verrouillé) et `timeout` (l'invite a expiré sans interaction).
+  ///
+  /// Ces trois cas rendaient [wrongPassword], et l'écran affichait donc
+  /// « Échec biométrique » — alors que rien n'a échoué. Annuler est une
+  /// DÉCISION : « je préfère taper mon mot de passe ». Lui répondre par un
+  /// message d'erreur, sur l'écran le plus sensible de l'application, laisse
+  /// croire à un dysfonctionnement de l'empreinte.
+  ///
+  /// Le service savait déjà faire la différence — le `switch` sur
+  /// `AuthExceptionCode` existe depuis la v2.4.2, et son commentaire promettait
+  /// un « repli silencieux ». Mais l'information calculée était jetée en
+  /// rendant la même valeur qu'un échec réel. Ce cas la conserve jusqu'à
+  /// l'interface.
+  ///
+  /// ⚠️ Aucun comptage d'échec : aucune tentative de déchiffrement n'a eu lieu.
+  biometricCanceled,
 }
 
 /// Identifie quel slot du vault est en cours d'utilisation.
