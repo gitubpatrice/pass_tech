@@ -400,15 +400,35 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
   }
 }
 
-ThemeData _lightTheme() => ThemeData(
-  useMaterial3: true,
-  colorSchemeSeed: const Color(0xFF1F6FEB),
-  brightness: Brightness.light,
-  // U11 v2.4.4 — snack flottant par défaut (cohérent avec SnackUtils +
-  // les ScaffoldMessenger inline qui n'avaient pas `behavior:floating`).
-  // Aligné PDF Tech v1.12.4 U2.
-  snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
-);
+ThemeData _lightTheme() {
+  // Le schéma est construit ICI plutôt que via `colorSchemeSeed`, pour pouvoir
+  // en réutiliser les couleurs dans les thèmes de composants ci-dessous.
+  // Strictement équivalent : `colorSchemeSeed` fait exactement cet appel.
+  final cs = ColorScheme.fromSeed(seedColor: const Color(0xFF1F6FEB));
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: cs,
+    brightness: Brightness.light,
+    // U11 v2.4.4 — snack flottant par défaut (cohérent avec SnackUtils +
+    // les ScaffoldMessenger inline qui n'avaient pas `behavior:floating`).
+    // Aligné PDF Tech v1.12.4 U2.
+    //
+    // UI 2026-08-04 — fond BLEU de la marque au lieu du gris très sombre que
+    // Material pose par défaut (`inverseSurface`), qui jurait avec le reste de
+    // l'application en thème clair.
+    //
+    // Les couleurs viennent du schéma, jamais codées en dur : c'est ce qui
+    // garantit le contraste dans les deux thèmes. `onPrimary` est calculé par
+    // Material pour être lisible sur `primary` — l'écrire à la main
+    // reproduirait l'erreur des `Colors.grey` corrigée en v2.4.4.
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: cs.primary,
+      contentTextStyle: TextStyle(color: cs.onPrimary),
+      actionTextColor: cs.onPrimary,
+    ),
+  );
+}
 
 ThemeData _darkTheme() {
   const bg = Color(0xFF0D1117);
@@ -468,6 +488,14 @@ ThemeData _darkTheme() {
     listTileTheme: const ListTileThemeData(tileColor: surface),
     dividerColor: border,
     // U11 v2.4.4 — snack flottant sur dark theme.
-    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+    // UI 2026-08-04 — même fond bleu qu'en thème clair. Ici `blue` (#58A6FF)
+    // est clair et le texte sombre (#0D1117), l'inverse du thème clair : c'est
+    // exactement ce que le passage par le schéma de couleurs garantit.
+    snackBarTheme: const SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: blue,
+      contentTextStyle: TextStyle(color: Color(0xFF0D1117)),
+      actionTextColor: Color(0xFF0D1117),
+    ),
   );
 }
