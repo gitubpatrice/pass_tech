@@ -1873,6 +1873,25 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
     final t = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(widget.title),
+      // UI 2026-08-04 — signalé en usage réel : le message « Mot de passe trop
+      // devinable… » chevauchait les boutons Annuler / Chiffrer.
+      //
+      // Ce n'est pas un manque de marge, c'est un DÉBORDEMENT. Le contenu d'un
+      // `AlertDialog` est enveloppé dans un `Flexible` ; quand le clavier est
+      // ouvert — il l'est toujours ici, le premier champ prend le focus — la
+      // hauteur disponible tombe de plusieurs centaines de pixels. Le message
+      // d'erreur fait alors passer la colonne au-delà de sa boîte, et une
+      // `Column` ne rogne pas : elle peint par-dessus les actions.
+      //
+      // Ajouter de la marge sous le texte AGGRAVERAIT le débordement. La parade
+      // est de rendre le contenu défilable : la colonne reçoit alors la hauteur
+      // qui reste et défile au lieu de déborder. La marge ci-dessous vient en
+      // plus, pour que le message ne colle pas aux boutons quand tout tient.
+      //
+      // Le seuil dépend de la taille de police du système et de la longueur du
+      // message traduit : ce qui tient en français sur un grand écran peut
+      // déborder ailleurs. D'où une correction structurelle, pas un réglage.
+      scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1902,6 +1921,9 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+            // Marge sous le message : sans elle, un texte de trois lignes
+            // arrive au ras des boutons.
+            const SizedBox(height: 8),
           ],
         ],
       ),
@@ -2044,6 +2066,14 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final t = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(t.changePasswordDialogTitle),
+      // UI 2026-08-04 — JUMEAU du dialogue de phrase secrète, corrigé avec lui.
+      //
+      // Le débordement n'a été signalé que sur le coffre leurre, mais ce
+      // dialogue-ci porte le MÊME message `passwordTooWeak` avec UN CHAMP DE
+      // PLUS : il déborde donc plus tôt, pas plus tard. Ne corriger que celui
+      // qui a été vu, c'est laisser le défaut à l'endroit le plus exposé — le
+      // changement de mot de passe maître.
+      scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2067,6 +2097,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+            const SizedBox(height: 8),
           ],
         ],
       ),
