@@ -41,6 +41,9 @@ extension VaultSetup on VaultService {
     // ouvert, vide, avec une clé qui ne correspond pas au disque, tandis que
     // les caches décrivent encore le principal. La session principale a été
     // écrasée en mémoire par une opération qui a échoué.
+    // SEC 2026-08-04 — relevé avant l'Argon2id, comparé dans le `finally`.
+    // Voir le raisonnement au point de comparaison.
+    final genAvantCreation = _lockGeneration;
     final sessionKey = _key == null ? null : Uint8List.fromList(_key!);
     final sessionEntries = List<Entry>.from(_entries);
     final sessionOpen = _isOpen;
@@ -85,11 +88,34 @@ extension VaultSetup on VaultService {
       if (!creationCommitted) {
         // Échec en cours de route : on remet la session dans l'état d'avant
         // l'appel, au lieu de laisser un emplacement à demi ouvert.
-        _wipeKey();
-        _key = sessionKey;
-        _entries = sessionEntries;
-        _isOpen = sessionOpen;
-        _activeSlot = sessionSlot;
+        //
+        // ⚠️ SEC 2026-08-04 — SAUF si un verrouillage est survenu entre-temps.
+        //
+        // Ce `finally` a été ajouté une heure après le correctif jumeau de
+        // `changeMasterPassword`, et reproduisait le défaut que celui-ci
+        // corrigeait : `_createSlot` dure un Argon2id complet, pendant lequel
+        // `lock()` peut survenir — mise en arrière-plan, minuterie, ou MODE
+        // PANIQUE. Restaurer sans condition remettait alors le coffre principal
+        // OUVERT en mémoire, APRÈS la panique. La décision de verrouiller doit
+        // primer sur la restauration d'une opération qui a échoué.
+        //
+        // Dans ce cas on efface l'instantané et on laisse le coffre fermé :
+        // l'appelant verra l'exception, et l'utilisateur retrouvera son écran
+        // de déverrouillage — ce qu'il a demandé.
+        if (_lockGeneration != genAvantCreation) {
+          if (sessionKey != null) SecretBytes.wipe(sessionKey);
+          sessionEntries.clear();
+          _wipeKey();
+          _entries = [];
+          _isOpen = false;
+          _activeSlot = null;
+        } else {
+          _wipeKey();
+          _key = sessionKey;
+          _entries = sessionEntries;
+          _isOpen = sessionOpen;
+          _activeSlot = sessionSlot;
+        }
       } else if (sessionKey != null) {
         // Création réussie : l'instantané est du matériel de clé, il ne doit
         // pas attendre le ramasse-miettes.
