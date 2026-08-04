@@ -4,6 +4,7 @@ import '../models/category.dart';
 import '../models/entry.dart';
 import '../services/breach_service.dart';
 import '../services/password_strength_service.dart';
+import '../services/vault_audit_score.dart';
 import '../services/vault_service.dart';
 import '../utils/snack_utils.dart';
 import 'entry_detail_screen.dart';
@@ -16,14 +17,35 @@ class AuditScreen extends StatefulWidget {
 }
 
 class _AuditScreenState extends State<AuditScreen> {
-  static const _sensitiveCategories = {'Banque', 'Email'};
-
   late List<Entry> _all;
   late List<Entry> _weak;
   late List<Entry> _duplicates;
   late List<Entry> _old;
   late List<Entry> _missing2fa;
-  late int _score;
+
+  /// `null` quand le coffre ne contient aucun mot de passe : il n'y a alors
+  /// rien à noter. L'ancien calcul répondait `100`, « Excellent » — féliciter
+  /// un coffre vide.
+  int? _score;
+
+  /// Points de santé par entrée, AVANT prise en compte des fuites. Conservés
+  /// pour pouvoir recalculer le score quand la vérification HIBP rend son
+  /// résultat, sans refaire les analyses coûteuses (entropie, doublons).
+  final Map<String, int> _pointsBase = {};
+
+  /// Mots de passe reconnus dans une fuite publique.
+  Set<String>? _breachedPasswords;
+
+  /// Mots de passe RÉELLEMENT soumis à la vérification, qu'ils soient sortis
+  /// compromis ou non.
+  ///
+  /// Ne pas confondre avec [_breachedPasswords] : c'est la couverture, pas le
+  /// résultat. Sans elle, une première version de ce correctif annonçait un
+  /// score complet dès qu'une vérification avait tourné UNE FOIS — y compris
+  /// après l'ajout d'un mot de passe que personne n'avait jamais confronté aux
+  /// fuites. L'écran affirmait alors « vérifié » sur une donnée absente, ce qui
+  /// est exactement le défaut que le drapeau « partiel » existe pour éviter.
+  Set<String>? _checkedPasswords;
   // P6 v2.4.4 — compteurs aggregés en single-pass dans `_analyze()`. Avant :
   // 4 `.where().length` recalculés à CHAQUE build (refresh, breach progress
   // setState) sur _all, soit 4×N evals par rebuild en plus des 4 passes
@@ -67,6 +89,7 @@ class _AuditScreenState extends State<AuditScreen> {
     int with2fa = 0;
 
     // 1ʳᵉ passe : compteurs + remplissage `counts` pour détection doublons.
+    final weakIds = <String>{};
     for (final e in _all) {
       switch (e.type) {
         case EntryType.password:
@@ -74,10 +97,13 @@ class _AuditScreenState extends State<AuditScreen> {
           if (e.totpSecret.isNotEmpty) with2fa++;
           if (e.password.isNotEmpty) {
             counts[e.password] = (counts[e.password] ?? 0) + 1;
-            if (PasswordStrengthService.isWeak(e.password)) weak.add(e);
+            if (PasswordStrengthService.isWeak(e.password)) {
+              weak.add(e);
+              weakIds.add(e.id);
+            }
           }
           if (e.updatedAt.isBefore(yearAgo)) old.add(e);
-          if (_sensitiveCategories.contains(e.category) &&
+          if (VaultAuditScore.sensitiveCategories.contains(e.category) &&
               e.totpSecret.isEmpty) {
             missing2fa.add(e);
           }
@@ -90,13 +116,23 @@ class _AuditScreenState extends State<AuditScreen> {
           break;
       }
     }
-    // 2ᵉ passe (post-counts) : doublons confirmés.
+    final missing2faIds = {for (final e in missing2fa) e.id};
+    // 2ᵉ passe (post-counts) : doublons confirmés + barème par entrée.
+    _pointsBase.clear();
     for (final e in _all) {
-      if (e.type == EntryType.password &&
-          e.password.isNotEmpty &&
-          (counts[e.password] ?? 0) > 1) {
-        duplicates.add(e);
-      }
+      if (e.type != EntryType.password || e.password.isEmpty) continue;
+      final isDuplicate = (counts[e.password] ?? 0) > 1;
+      if (isDuplicate) duplicates.add(e);
+      // Les fuites sont volontairement ABSENTES d'ici : elles ne sont connues
+      // qu'après la vérification réseau, et elles s'appliquent par-dessus dans
+      // `_computeScore`. Ce barème-ci ne dépend que du contenu du coffre, donc
+      // il n'a pas à être recalculé à chaque résultat HIBP.
+      _pointsBase[e.id] = VaultAuditScore.pointsFor(
+        compromised: false,
+        weak: weakIds.contains(e.id),
+        duplicate: isDuplicate,
+        sensitiveWithout2fa: missing2faIds.contains(e.id),
+      );
     }
 
     _weak = weak;
@@ -108,13 +144,62 @@ class _AuditScreenState extends State<AuditScreen> {
     _cardCount = cardCount;
     _with2fa = with2fa;
 
-    // Score
-    int s = 100;
-    s -= _weak.length.clamp(0, 6) * 5; // -5 each, max -30
-    s -= _duplicates.length.clamp(0, 6) * 5; // -5 each, max -30
-    s -= _old.length.clamp(0, 4) * 5; // -5 each, max -20
-    s -= _missing2fa.length.clamp(0, 4) * 5; // -5 each, max -20
-    _score = s.clamp(0, 100);
+    // Les entrées compromises affichées sont reconstruites à partir des mots de
+    // passe retenus, jamais conservées telles quelles : si l'utilisateur vient
+    // de corriger un mot de passe signalé, il ne doit plus apparaître ici.
+    final breachedPw = _breachedPasswords;
+    _breached = breachedPw == null
+        ? null
+        : _all
+              .where(
+                (e) =>
+                    e.type == EntryType.password &&
+                    e.password.isNotEmpty &&
+                    breachedPw.contains(e.password),
+              )
+              .toList();
+
+    _computeScore();
+  }
+
+  /// Score = santé MOYENNE des mots de passe du coffre.
+  ///
+  /// Voir `VaultAuditScore` pour le raisonnement : l'ancien calcul soustrayait
+  /// des points en valeur absolue et plafonnait, si bien qu'un coffre de six
+  /// entrées toutes faibles affichait « Bon ».
+  void _computeScore() {
+    final breachedPw = _breachedPasswords;
+    _score = VaultAuditScore.average([
+      for (final e in _all)
+        if (e.type == EntryType.password && e.password.isNotEmpty)
+          breachedPw != null && breachedPw.contains(e.password)
+              ? VaultAuditScore.pointsCompromised
+              // Le repli est INATTEIGNABLE par construction : `_pointsBase` est
+              // rempli dans `_analyze` sous le filtre EXACTEMENT identique à
+              // celui de la ligne ci-dessus. Désaligner ces deux filtres
+              // rendrait des entrées silencieusement « saines ».
+              : (_pointsBase[e.id] ?? VaultAuditScore.pointsHealthy),
+    ]);
+  }
+
+  /// Vrai dès qu'AU MOINS UN mot de passe du coffre n'a pas été confronté aux
+  /// fuites — jamais lancé, ou lancé avant l'ajout de cette entrée.
+  ///
+  /// Le score ignore alors le seul signal FACTUEL dont l'application dispose,
+  /// et il est annoncé comme partiel plutôt que présenté comme un verdict.
+  bool get _scorePartial {
+    // Pas de score, rien à compléter. Sans cette ligne, un coffre dont toutes
+    // les entrées ont un mot de passe VIDE affichait « — » assorti d'un
+    // avertissement de score partiel.
+    if (_score == null) return false;
+    final checked = _checkedPasswords;
+    if (checked == null) return true;
+    return _all.any(
+      (e) =>
+          e.type == EntryType.password &&
+          e.password.isNotEmpty &&
+          !checked.contains(e.password),
+    );
   }
 
   /// v2.5.0 (F4a + F14) — couleurs sémantiques alignées Material 3.
@@ -129,16 +214,22 @@ class _AuditScreenState extends State<AuditScreen> {
   /// contraste limite < WCAG AA pour le texte blanc — corrigé.
   Color _scoreColor(BuildContext ctx) {
     final cs = Theme.of(ctx).colorScheme;
-    if (_score >= 90) return cs.tertiary;
-    if (_score >= 70) return Colors.amber.shade700;
-    if (_score >= 50) return Colors.deepOrange;
+    final s = _score;
+    // Coffre sans mot de passe : rien à qualifier, donc pas de couleur de
+    // verdict. Un vert « Excellent » sur un coffre vide serait un mensonge.
+    if (s == null) return cs.outline;
+    if (s >= 90) return cs.tertiary;
+    if (s >= 70) return Colors.amber.shade700;
+    if (s >= 50) return Colors.deepOrange;
     return cs.error;
   }
 
   String _scoreLabel(AppLocalizations t) {
-    if (_score >= 90) return t.auditScoreExcellent;
-    if (_score >= 70) return t.auditScoreGood;
-    if (_score >= 50) return t.auditScoreMedium;
+    final s = _score;
+    if (s == null) return t.auditScoreNone;
+    if (s >= 90) return t.auditScoreExcellent;
+    if (s >= 70) return t.auditScoreGood;
+    if (s >= 50) return t.auditScoreMedium;
     return t.auditScoreWeak;
   }
 
@@ -147,9 +238,11 @@ class _AuditScreenState extends State<AuditScreen> {
   /// daltonien deutéranope/protanope confond. Icône complémentaire avec
   /// charge sémantique cohérente.
   IconData _scoreIcon() {
-    if (_score >= 90) return Icons.check_circle;
-    if (_score >= 70) return Icons.thumb_up_alt;
-    if (_score >= 50) return Icons.warning_amber_rounded;
+    final s = _score;
+    if (s == null) return Icons.help_outline;
+    if (s >= 90) return Icons.check_circle;
+    if (s >= 70) return Icons.thumb_up_alt;
+    if (s >= 50) return Icons.warning_amber_rounded;
     return Icons.error;
   }
 
@@ -195,7 +288,7 @@ class _AuditScreenState extends State<AuditScreen> {
                           width: 90,
                           height: 90,
                           child: CircularProgressIndicator(
-                            value: _score / 100,
+                            value: (_score ?? 0) / 100,
                             strokeWidth: 8,
                             backgroundColor: cs.surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation(scoreColor),
@@ -205,20 +298,21 @@ class _AuditScreenState extends State<AuditScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '$_score',
+                              _score?.toString() ?? '—',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
                                 color: scoreColor,
                               ),
                             ),
-                            Text(
-                              '/100',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurfaceVariant,
+                            if (_score != null)
+                              Text(
+                                '/100',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ],
@@ -230,7 +324,9 @@ class _AuditScreenState extends State<AuditScreen> {
                       // U4 v2.4.4 — Semantics group annonçant le score et
                       // sa qualification (TalkBack lit "Score 85 sur 100,
                       // Bon" au lieu de juste "85" hors contexte).
-                      label: '${t.auditScoreLabel} $_score / 100',
+                      label: _score == null
+                          ? t.auditScoreLabel
+                          : '${t.auditScoreLabel} $_score / 100',
                       value: _scoreLabel(t),
                       container: true,
                       child: Column(
@@ -265,7 +361,9 @@ class _AuditScreenState extends State<AuditScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _score == 100
+                            _score == null
+                                ? t.auditScoreNoneHint
+                                : _score == 100
                                 ? t.auditScorePerfect
                                 : t.auditScoreImprovements,
                             style: TextStyle(
@@ -273,6 +371,32 @@ class _AuditScreenState extends State<AuditScreen> {
                               color: cs.onSurfaceVariant,
                             ),
                           ),
+                          // Le score ignore les fuites tant que la
+                          // vérification n'a pas tourné : c'est le seul signal
+                          // FACTUEL de l'écran, et le taire donnerait un
+                          // verdict trop favorable sans le dire.
+                          if (_scorePartial) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 14,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    t.auditScorePartial,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -389,10 +513,17 @@ class _AuditScreenState extends State<AuditScreen> {
             onTap: _refreshFromDetail,
             emptyText: t.auditIssueNo2faEmpty,
           ),
+          // L'ancienneté est INFORMATIVE et ne pèse plus sur le score.
+          //
+          // Le NIST (SP 800-63B) recommande explicitement de ne pas imposer de
+          // rotation périodique et de ne changer qu'en cas de compromission
+          // avérée. La section est conservée — savoir ce qu'on n'a pas revu
+          // depuis un an a une valeur — mais elle passe en ton neutre : ce
+          // n'est pas un défaut, et la présenter en orange en faisait un.
           _IssueSection(
             title: t.auditIssueOldTitle,
             description: t.auditIssueOldDesc,
-            color: Colors.amber.shade700,
+            color: Theme.of(context).colorScheme.outline,
             icon: Icons.schedule_outlined,
             entries: _old,
             onTap: _refreshFromDetail,
@@ -433,6 +564,7 @@ class _AuditScreenState extends State<AuditScreen> {
     );
 
     final breached = <Entry>[];
+    final breachedPasswords = <String>{};
     bool networkOk = true;
     for (final e in candidates) {
       final n = results[e.password] ?? -1;
@@ -440,7 +572,10 @@ class _AuditScreenState extends State<AuditScreen> {
         networkOk = false;
         break;
       }
-      if (n > 0) breached.add(e);
+      if (n > 0) {
+        breached.add(e);
+        breachedPasswords.add(e.password);
+      }
     }
 
     if (!mounted) return;
@@ -455,6 +590,15 @@ class _AuditScreenState extends State<AuditScreen> {
     setState(() {
       _checkingBreach = false;
       _breached = breached;
+      // Le résultat entre dans le score. Avant, il ne servait qu'à peupler une
+      // liste : un mot de passe dont on a la PREUVE qu'il figure dans une fuite
+      // publique ne coûtait rien, tandis que l'ancienneté — le critère le plus
+      // contestable — coûtait jusqu'à vingt points.
+      _breachedPasswords = breachedPasswords;
+      // La COUVERTURE est enregistrée séparément du résultat : un mot de passe
+      // ajouté après cette vérification doit remettre le score en « partiel ».
+      _checkedPasswords = {for (final e in candidates) e.password};
+      _computeScore();
     });
   }
 }
