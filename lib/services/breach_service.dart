@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:files_tech_core/files_tech_core.dart';
 import 'package:http/http.dart' as http;
 
 /// Privacy-preserving breach check via HaveIBeenPwned k-anonymity API.
@@ -27,7 +28,21 @@ class BreachService {
   static Future<int> checkPassword(String password) async {
     if (password.isEmpty) return 0;
     try {
-      final hash = sha1.convert(utf8.encode(password)).toString().toUpperCase();
+      // SEC 2026-08-04 — le tampon UTF-8 du mot de passe est effacé après le
+      // calcul de l'empreinte.
+      //
+      // Sixième site du même motif, manqué lors du passage du 2026-08-03 qui
+      // en avait corrigé cinq (KDF, export, héritage ×2, import). Celui-ci est
+      // dans le contrôle de fuite HIBP, c'est-à-dire sur un chemin où
+      // l'utilisateur soumet volontairement ses mots de passe les plus
+      // sensibles, un par un.
+      final pwBytes = utf8.encode(password);
+      final String hash;
+      try {
+        hash = sha1.convert(pwBytes).toString().toUpperCase();
+      } finally {
+        SecretBytes.wipe(pwBytes);
+      }
       final prefix = hash.substring(0, 5);
       final suffix = hash.substring(5);
 

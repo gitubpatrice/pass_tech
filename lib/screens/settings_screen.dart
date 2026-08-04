@@ -850,7 +850,21 @@ class _SettingsScreenState extends State<SettingsScreen>
       // indéfiniment à côté — sans mot de passe, sans Keystore, sans Argon2id
       // pour le protéger. Le plugin accorde en outre une permission de lecture
       // sur cette copie à toute activité résolvant le sélecteur.
-      _shredStaleExports(dir);
+      //
+      // SEC 2026-08-04 — cette purge est DÉPLACÉE vers l'export suivant.
+      //
+      // `Share.shareXFiles` rend la main dès que l'activité cible se termine,
+      // ce qui ne signifie pas qu'elle a fini de LIRE. Une cible qui téléverse
+      // en tâche de fond — Drive, messagerie — lit encore après notre retour.
+      // Écraser sa source d'octets aléatoires à cet instant produirait un
+      // export CORROMPU, que l'on ne découvrirait qu'au moment d'en avoir
+      // besoin. C'est le pire moment possible pour une sauvegarde.
+      //
+      // Le raisonnement de SEC F8 reste entièrement valable : cette copie ne
+      // doit pas survivre indéfiniment. Elle est donc purgée par l'appel à
+      // `_shredStaleExports` placé AVANT le partage, qui balaie les résidus de
+      // l'export précédent. Le résidu est borné dans le temps sans jamais
+      // couper une lecture en cours.
     }
   }
 
@@ -971,8 +985,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           XFile(file.path, mimeType: 'application/octet-stream'),
         ], subject: t.exportEncryptedShareSubject);
       } finally {
+        // SEC 2026-08-04 — voir `_exportVault` : on déchiquette NOTRE fichier,
+        // jamais la copie de `share_plus` que la cible est peut-être encore en
+        // train de lire. Une sauvegarde `.ptbak` corrompue au moment du
+        // téléversement serait découverte le jour de la restauration, quand il
+        // est trop tard. La copie du plugin est purgée à l'export suivant.
         _shredFile(file);
-        _shredStaleExports(dir);
       }
     } catch (e) {
       if (!mounted) return;
