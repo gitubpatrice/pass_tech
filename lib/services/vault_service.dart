@@ -41,6 +41,7 @@ import 'clipboard_service.dart';
 import 'kdf_service.dart';
 import 'keystore_service.dart';
 import 'monotonic_clock.dart';
+import 'password_policy.dart';
 
 part 'vault_brute_force.dart';
 part 'vault_crypto.dart';
@@ -379,6 +380,23 @@ class VaultService {
   /// et l'unlock retournerait toujours le même (le primary qui est testé
   /// avant). L'appelant doit valider en amont que le 2 mots de passe diffèrent.
   Future<void> setupDecoyVault(String decoyPassword) async {
+    // SEC 2026-08-04 — garde de robustesse au niveau du SERVICE.
+    //
+    // `HeritageService.setupOrUpdateSnapshot` en avait une depuis toujours ;
+    // ce jumeau-ci n'en avait aucune. L'écran est aujourd'hui le seul rempart,
+    // et un rempart d'interface ne protège que l'interface : tout futur
+    // appelant — écran refait, test, automatisation — pourrait poser un mot de
+    // passe leurre trivial sans que rien ne l'arrête.
+    //
+    // Un leurre à mot de passe devinable est pire qu'un leurre absent : il
+    // s'ouvre tout seul sous la contrainte et désigne du même coup l'existence
+    // du coffre principal.
+    if (PasswordPolicy.check(decoyPassword) != null) {
+      throw ArgumentError(
+        'Decoy password : ${PasswordPolicy.minLength} caractères minimum, '
+        'et pas de suite ni de répétition triviale',
+      );
+    }
     // `_createSlot(decoy)` écrase le fichier `_b` (leurre factice) par un VRAI
     // coffre leurre (contenu + mot de passe choisis par l'utilisateur).
     await _createSlot(_Slot.decoy, decoyPassword);

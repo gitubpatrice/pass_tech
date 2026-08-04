@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
+import '../services/password_policy.dart';
 import '../services/password_strength_service.dart';
 import '../services/vault_service.dart';
 import '../widgets/password_text_field.dart';
@@ -40,13 +41,19 @@ class _SetupScreenState extends State<SetupScreen> {
     final t = AppLocalizations.of(context);
     final p1 = _pass1.text;
     final p2 = _pass2.text;
-    if (p1.length < 12) {
-      setState(() => _error = t.setupErrorMin);
-      return;
-    }
-    if (PasswordStrengthService.score(p1) < 0.6) {
-      setState(() => _error = t.setupErrorWeak);
-      return;
+    // SEC 2026-08-04 — règle unique, partagée avec les quatre autres points
+    // d'entrée (changement de mot de passe maître, phrase `.ptbak`, coffre
+    // leurre, mot de passe héritier). Auparavant, ce contrôle d'entropie
+    // n'existait QUE sur cet écran-ci.
+    switch (PasswordPolicy.check(p1)) {
+      case PasswordRejection.tooShort:
+        setState(() => _error = t.setupErrorMin);
+        return;
+      case PasswordRejection.tooWeak:
+        setState(() => _error = t.passwordTooWeak);
+        return;
+      case null:
+        break;
     }
     if (p1 != p2) {
       setState(() => _error = t.setupErrorMismatch);

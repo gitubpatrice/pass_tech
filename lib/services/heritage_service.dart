@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/entry.dart';
 import 'aead_service.dart';
 import 'kdf_service.dart';
+import 'password_policy.dart';
 import 'monotonic_clock.dart';
 import 'vault_service.dart';
 
@@ -195,8 +196,16 @@ class HeritageService {
     // COMPLÈTE du coffre dérivée du SEUL heir_password (pas de liaison TEE,
     // l'héritier déchiffre ailleurs) : un mot de passe faible = brute-force
     // offline du `pt_heir.enc` depuis une simple copie de fichier.
-    if (heirPassword.length < 12) {
-      throw ArgumentError('Heir password : 12 caractères minimum');
+    // SEC 2026-08-04 — la règle passe par `PasswordPolicy`, partagée avec les
+    // écrans. Elle ajoute au contrôle de longueur le rejet des répétitions,
+    // des suites et des mots de passe courants : `aaaaaaaaaaaa` était accepté.
+    // Enjeu particulier ici — `pt_heir.enc` n'est PAS lié au matériel, il se
+    // déchiffre ailleurs à partir de ce seul mot de passe.
+    if (PasswordPolicy.check(heirPassword) != null) {
+      throw ArgumentError(
+        'Heir password : ${PasswordPolicy.minLength} caractères minimum, '
+        'et pas de suite ni de répétition triviale',
+      );
     }
     final entries = VaultService().entries;
     if (entries.isEmpty) {

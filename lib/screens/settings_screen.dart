@@ -14,6 +14,7 @@ import '../models/entry.dart';
 import '../main.dart' show prefKeyScreenshotProtection;
 import '../services/anti_phishing_service.dart';
 import '../services/backup_reminder.dart';
+import '../services/password_policy.dart';
 import '../services/clipboard_service.dart';
 import '../services/heritage_service.dart';
 import '../services/import_export_service.dart';
@@ -1884,9 +1885,25 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
               return;
             }
             if (widget.confirm) {
-              if (_ctrl1.text.length < 12) {
-                setState(() => _error = t.passphraseErrorMin);
-                return;
+              // SEC 2026-08-04 — ce dialogue sert la phrase secrète d'une
+              // sauvegarde `.ptbak`, le mot de passe du coffre leurre ET celui
+              // de l'héritier. Il ne vérifiait que la longueur : `aaaaaaaaaaaa`
+              // passait. Le cas du `.ptbak` est le plus grave — c'est le seul
+              // fichier NON lié au matériel, donc le seul attaquable hors ligne
+              // depuis une simple copie.
+              //
+              // `confirm: false` (restauration d'une sauvegarde) ne passe pas
+              // par ici : on y SAISIT une phrase existante, il n'y a rien à
+              // valider.
+              switch (PasswordPolicy.check(_ctrl1.text)) {
+                case PasswordRejection.tooShort:
+                  setState(() => _error = t.passphraseErrorMin);
+                  return;
+                case PasswordRejection.tooWeak:
+                  setState(() => _error = t.passwordTooWeak);
+                  return;
+                case null:
+                  break;
               }
               if (_ctrl1.text != _ctrl2.text) {
                 setState(() => _error = t.passphraseErrorMismatch);
@@ -2032,9 +2049,23 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
               setState(() => _error = t.changePasswordErrorCurrentRequired);
               return;
             }
-            if (_ctrl1.text.length < 12) {
-              setState(() => _error = t.changePasswordErrorMin);
-              return;
+            // SEC 2026-08-04 — ce chemin ne contrôlait QUE la longueur.
+            //
+            // On pouvait donc créer un coffre avec un mot de passe solide —
+            // l'écran de création, lui, vérifiait l'entropie — puis le
+            // remplacer ici par `aaaaaaaaaaaa` : douze caractères, accepté sans
+            // broncher. La garde protégeait la porte d'entrée pendant que la
+            // porte de service restait ouverte, et c'est celle-ci qui permet de
+            // DÉGRADER un coffre existant.
+            switch (PasswordPolicy.check(_ctrl1.text)) {
+              case PasswordRejection.tooShort:
+                setState(() => _error = t.changePasswordErrorMin);
+                return;
+              case PasswordRejection.tooWeak:
+                setState(() => _error = t.passwordTooWeak);
+                return;
+              case null:
+                break;
             }
             if (_ctrl1.text != _ctrl2.text) {
               setState(() => _error = t.changePasswordErrorMismatch);

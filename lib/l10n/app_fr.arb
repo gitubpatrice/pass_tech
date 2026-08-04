@@ -66,7 +66,7 @@
   "setupCreateCta": "Créer le coffre-fort",
   "setupEncrypting": "Chiffrement en cours…",
   "setupErrorMin": "Minimum 12 caractères",
-  "setupErrorWeak": "Mot de passe trop faible — variez majuscules, chiffres, symboles",
+  "passwordTooWeak": "Mot de passe trop devinable — évitez les répétitions, les suites et les mots courants. Allongez-le plutôt que d'ajouter des symboles.",
   "setupErrorMismatch": "Les mots de passe ne correspondent pas",
   "setupWarning": "Ce mot de passe ne peut pas être récupéré. Si vous l'oubliez, vos données seront inaccessibles.",
   "strengthWeak": "Faible",
