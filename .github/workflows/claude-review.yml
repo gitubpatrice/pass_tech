@@ -59,6 +59,25 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # CI 2026-08-04 — le jeton du workflow, au lieu de l'app GitHub.
+          #
+          # Sans lui, l'action tente d'obtenir un jeton via l'application
+          # GitHub « Claude Code », qui n'est pas autorisée sur ce dépôt :
+          #   App token exchange failed: 401 Unauthorized
+          #   Claude Code is not installed on this repository
+          # Le job échouait donc sur CHAQUE pull request, quel qu'en soit le
+          # contenu — la clé API était bien présente, c'est l'app qui manquait.
+          #
+          # Les entrées de l'action décrivent `github_token` comme
+          # « optional if using GitHub App » : les deux sont des voies
+          # ALTERNATIVES, et le workflow n'en fournissait aucune.
+          #
+          # `GITHUB_TOKEN` porte déjà les droits nécessaires — ils sont
+          # déclarés dans le bloc `permissions:` ci-dessus (contents,
+          # pull-requests, issues). Installer l'app reste possible si l'on veut
+          # que les commentaires soient signés par elle plutôt que par
+          # `github-actions[bot]`.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           # Prompt pour les auto-reviews PR (skip pour @claude mentions
           # qui suivent l'instruction du commentaire).
           prompt: |
