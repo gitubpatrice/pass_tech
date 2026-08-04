@@ -123,8 +123,19 @@ jobs:
       - name: Aucun tracker connu (Exodus Privacy)
         run: |
           APK=$(find build -name '*release*.apk' | head -1)
+          # CI 2026-08-04 — syntaxe corrigée. `-j` est un DRAPEAU (sortie JSON),
+          # il ne prend pas de nom de fichier ; c'est `-o` qui reçoit la
+          # destination. Écrit `-j <fichier> <apk>`, l'outil prenait le fichier
+          # pour l'APK et refusait le vrai chemin en argument surnuméraire :
+          #   exodus_analyze.py: error: unrecognized arguments: /w/…/app-release.apk
+          # La forme erronée vient de `ci-et-chaine-de-publication.md` §6, à
+          # corriger là-bas aussi.
           docker run --rm -v "$PWD:/w" exodusprivacy/exodus-standalone \
-            -j /w/exodus.json "/w/$APK" || true
+            -j -o /w/exodus.json "/w/$APK" || true
+          if [ ! -f exodus.json ]; then
+            echo "ECHEC : Exodus n'a produit aucun rapport."
+            exit 1
+          fi
           COUNT=$(jq '.trackers | length' exodus.json)
           echo "Trackers détectés : $COUNT"
           jq -r '.trackers[]?.name' exodus.json || true

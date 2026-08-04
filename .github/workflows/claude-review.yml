@@ -78,6 +78,17 @@ jobs:
           # que les commentaires soient signés par elle plutôt que par
           # `github-actions[bot]`.
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # CI 2026-08-04 — modèle FIXÉ explicitement.
+          #
+          # Sans cette ligne, l'action retenait `claude-opus-5[1m]`, la variante
+          # à contexte étendu, et la requête était rejetée en 440 ms pour un
+          # coût de 0 $ — donc refusée avant tout traitement, faute d'accès à ce
+          # modèle sur cette clé.
+          #
+          # Laisser un défaut implicite décider du modèle en intégration
+          # continue est de toute façon une mauvaise idée : le coût par revue et
+          # la disponibilité changent sans qu'aucun fichier du dépôt ne bouge.
+          claude_args: "--model claude-sonnet-5"
           # Prompt pour les auto-reviews PR (skip pour @claude mentions
           # qui suivent l'instruction du commentaire).
           prompt: |
