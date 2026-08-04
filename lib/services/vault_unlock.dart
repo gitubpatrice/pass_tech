@@ -529,6 +529,20 @@ extension VaultUnlock on VaultService {
   }
 
   Future<UnlockResult> _unlockWithBiometricInternal() async {
+    // SEC 2026-08-04 — dernier chemin long dépourvu de la garde de
+    // verrouillage, et paradoxalement le plus exposé des quatre.
+    //
+    // Les trois autres — ouverture par mot de passe, création d'emplacement,
+    // rotation — durent un ou deux Argon2id, soit une à deux secondes. Ici la
+    // fenêtre est ouverte tant que l'invite biométrique attend un doigt :
+    // plusieurs dizaines de secondes, sans borne. C'est la plus grande fenêtre
+    // de toute l'application pour qu'un `lock()` s'intercale, et notamment un
+    // MODE PANIQUE déclenché pendant que l'invite est à l'écran.
+    //
+    // Sans cette garde, le déverrouillage reprenait après la panique et
+    // rouvrait le coffre en mémoire. Relevé ici, comparé avant l'application du
+    // résultat.
+    final genAvantBio = _lockGeneration;
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     try {
       final store = await _bioStorage();
@@ -662,6 +676,17 @@ extension VaultUnlock on VaultService {
       }
 
       if (ok) {
+        // SEC 2026-08-04 — un verrouillage pendant l'invite biométrique prime.
+        // `ok` a été calculé avec `_entries` et `_isOpen` déjà posés plus haut ;
+        // on les annule ici plutôt que de rendre un succès sur un coffre que
+        // l'utilisateur vient de demander à fermer.
+        if (_lockGeneration != genAvantBio) {
+          _wipeKey();
+          _entries = [];
+          _isOpen = false;
+          _activeSlot = null;
+          return UnlockResult.biometricCanceled;
+        }
         _activeSlot = _Slot.primary;
         await _onUnlockSuccess();
         // AUDIT 2026-08-03 — mêmes traitements de fin d'ouverture que sur le
