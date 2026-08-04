@@ -687,12 +687,33 @@ class UnlockScreenState extends State<UnlockScreen> {
                   else
                     Column(
                       children: [
-                        FilledButton.icon(
-                          onPressed: _unlock,
-                          icon: const Icon(Icons.lock_open, size: 18),
-                          label: Text(t.unlockCta),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
+                        // UX 2026-08-04 — le bouton est DÉSACTIVÉ tant que le
+                        // champ est vide.
+                        //
+                        // Signalé en usage réel : appuyer sur « Déverrouiller »
+                        // sans rien avoir saisi ne produisait rien du tout.
+                        // `_unlock()` sort en silence sur `pass.isEmpty`, donc
+                        // l'appui était avalé — aucun message, aucun indice.
+                        // Sur l'écran d'entrée de l'application, un bouton qui
+                        // ne réagit pas laisse penser qu'elle est figée.
+                        //
+                        // Un bouton grisé vaut mieux qu'un message d'erreur :
+                        // il dit AVANT l'appui qu'il n'y a rien à valider,
+                        // au lieu de le reprocher après.
+                        //
+                        // `ValueListenableBuilder` plutôt qu'un `onChanged` qui
+                        // appellerait `setState` : le contrôleur EST déjà un
+                        // `ValueNotifier`, et seul le bouton se reconstruit —
+                        // pas tout l'écran à chaque frappe.
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _passCtrl,
+                          builder: (_, value, _) => FilledButton.icon(
+                            onPressed: value.text.isEmpty ? null : _unlock,
+                            icon: const Icon(Icons.lock_open, size: 18),
+                            label: Text(t.unlockCta),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                            ),
                           ),
                         ),
                         if (_hasBiometric) ...[
