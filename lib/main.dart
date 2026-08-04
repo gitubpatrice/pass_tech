@@ -305,7 +305,28 @@ class _PassTechAppState extends State<PassTechApp> with WidgetsBindingObserver {
         // autre écran (accueil, réglages) après un verrouillage automatique. Si
         // l'écran est déjà là, il n'y a rien à faire — et surtout pas le
         // reconstruire, ce qui effacerait une saisie en cours.
-        if (UnlockScreenState.estAffiche) return;
+        if (UnlockScreenState.estAffiche) {
+          // SEC 2026-08-04 — on REVIENT à l'écran de déverrouillage au lieu de
+          // le reconstruire.
+          //
+          // Un simple `return` ici — première version du correctif — était une
+          // régression : l'écran de déverrouillage existe encore SOUS la vue
+          // héritier, qui affiche les entrées déchiffrées de l'instantané. Le
+          // garde voyait « écran présent, rien à faire » et laissait donc cette
+          // vue ouverte au retour au premier plan, alors que le comportement
+          // d'avant la refermait.
+          //
+          // `popUntil(isFirst)` traite les deux cas d'un coup : s'il y a une
+          // route au-dessus (vue héritier, ou toute autre à venir), elle est
+          // fermée ; s'il n'y en a pas, l'appel ne fait rien — donc ni boucle
+          // d'invite biométrique, ni saisie effacée.
+          //
+          // `isFirst` désigne bien l'écran voulu : `SplashGate` RENVOIE
+          // l'écran de déverrouillage comme widget enfant plutôt que de le
+          // pousser, il n'y a donc qu'une route à la racine.
+          _navigatorKey.currentState?.popUntil((r) => r.isFirst);
+          return;
+        }
         _navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const UnlockScreen()),
           (_) => false,
