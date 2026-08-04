@@ -144,6 +144,9 @@ extension VaultSetup on VaultService {
     // produisait l'ancienne clé : l'étiquette AES-GCM ne pouvait plus se
     // vérifier. **Ni l'ancien ni le nouveau mot de passe n'ouvraient plus le
     // coffre** — perte définitive, à partir d'un simple disque plein.
+    // SEC 2026-08-04 (audit GPT F1) — relevé AVANT la dérivation, comparé juste
+    // avant l'écriture. Voir le raisonnement complet au point de comparaison.
+    final genAvantRotation = _lockGeneration;
     final Uint8List? previousKey = _key == null
         ? null
         : Uint8List.fromList(_key!);
@@ -159,6 +162,31 @@ extension VaultSetup on VaultService {
         hwSecret: hwSecret,
       );
 
+      // SEC 2026-08-04 (audit GPT F1) — CRITIQUE : un verrouillage survenu
+      // pendant la rotation ferait écrire un coffre VIDE par-dessus le vrai.
+      //
+      // Entre la vérification du mot de passe et ici, il s'écoule un Argon2id
+      // complet — près d'une seconde. Si `lock()` survient dans cet intervalle
+      // (mise en arrière-plan avec verrouillage immédiat, minuterie
+      // d'inactivité, ou MODE PANIQUE), il pose `_entries = []`. Or
+      // `_saveVaultV4` sérialise `_entries` : la rotation, qui ne consultait
+      // rien, réécrivait alors le coffre AVEC UNE LISTE VIDE, chiffrée sous le
+      // nouveau mot de passe. Toutes les entrées perdues, sans erreur, sans
+      // trace, et le nouveau mot de passe ouvrant un coffre vide.
+      //
+      // La panique est le pire déclencheur : elle appelle `lock()` précisément
+      // quand l'utilisateur est sous contrainte.
+      //
+      // J'avais ajouté `_lockGeneration` pour la VÉRIFICATION du mot de passe
+      // et son commentaire annonce « toute opération longue [...] doit relever
+      // ce compteur ». La rotation ne le faisait pas : le commentaire décrivait
+      // une règle que son propre fichier n'appliquait pas.
+      //
+      // On abandonne, sans rien écrire. La rotation n'a pas eu lieu, l'ancien
+      // mot de passe reste valide, et le verrouillage demandé est respecté.
+      if (_lockGeneration != genAvantRotation) {
+        throw StateError(VaultService.vaultBusy);
+      }
       _wipeKey();
       _key = Uint8List.fromList(finalKey);
 
@@ -259,11 +287,25 @@ extension VaultSetup on VaultService {
     }
     if (!newDecoy.existsSync() && oldDecoy.existsSync()) {
       // Un VRAI decoy existait (ancien schéma) → on le porte + marque le flag.
-      await oldDecoy.rename(newDecoy.path);
+      //
+      // SEC 2026-08-04 (audit GPT F2) — le drapeau est écrit AVANT le
+      // renommage, pour la même raison que dans `setupDecoyVault`.
+      //
+      // Dans l'ordre inverse, un processus tué entre les deux laissait le VRAI
+      // leurre en place sous son nouveau nom, avec un drapeau absent. Au
+      // démarrage suivant, `read(...) == 'true'` rendait `false` — l'absence
+      // devenant indistinguable d'un « pas de vrai leurre » — et l'étiquette du
+      // fichier, encore l'ancienne, déclenchait `_createDummyDecoy()`. Le vrai
+      // coffre leurre était écrasé sans recours.
+      //
+      // Écrit d'abord, le pire cas devient un drapeau `'true'` sans vrai leurre
+      // derrière : l'application s'abstient de toucher à `_b`. Incohérence
+      // bénigne au lieu d'une perte définitive.
       await VaultService._storage.write(
         key: VaultService._decoyConfiguredKey,
         value: 'true',
       );
+      await oldDecoy.rename(newDecoy.path);
     }
 
     // 2. Pas de coffre principal (fresh install pré-createVault) : rien à faire,

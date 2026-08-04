@@ -418,11 +418,29 @@ class VaultService {
         'et pas de suite ni de répétition triviale',
       );
     }
+    // SEC 2026-08-04 (audit GPT F2) — le drapeau est écrit AVANT la création.
+    //
+    // L'ordre inverse ouvrait une fenêtre de PERTE DE DONNÉES : `_createSlot`
+    // remplaçait `_b` par un VRAI coffre leurre, puis on écrivait `'true'`. Un
+    // processus tué entre les deux laissait un vrai coffre sur le disque avec
+    // un drapeau resté à `'false'`. Plus tard, au premier franchissement de
+    // barreau de rembourrage, `_realignDummyDecoyIfSmaller` lisait exactement
+    // `'false'`, en concluait que `_b` était factice, et l'écrasait par un
+    // leurre aléatoire définitivement indéchiffrable.
+    //
+    // Ma garde « le drapeau doit valoir EXACTEMENT `'false'` » était juste dans
+    // son intention et fausse dans son hypothèse : un `'false'` PÉRIMÉ est
+    // possible. On ne peut pas rendre la paire fichier + drapeau atomique, donc
+    // on choisit le sens dans lequel l'incohérence est bénigne.
+    //
+    // Avec cet ordre, une interruption laisse `'true'` sans vrai leurre : le
+    // pire cas est que l'application croie à un vrai leurre là où il n'y a
+    // qu'un factice. Elle s'abstient alors de toucher à `_b` — on perd une
+    // régénération de rembourrage, jamais des données.
+    await _storage.write(key: _decoyConfiguredKey, value: 'true');
     // `_createSlot(decoy)` écrase le fichier `_b` (leurre factice) par un VRAI
     // coffre leurre (contenu + mot de passe choisis par l'utilisateur).
     await _createSlot(_Slot.decoy, decoyPassword);
-    // v2.5.x (H1) — marque qu'un VRAI decoy existe désormais (pour l'UI).
-    await _storage.write(key: _decoyConfiguredKey, value: 'true');
   }
 
   /// SEC F18 v2.5.4 — étiquette NEUTRE écrite dans le fichier et utilisée comme
@@ -526,6 +544,10 @@ class VaultService {
     // compteur à zéro (`_onUnlockSuccess`), donc l'utilisateur légitime ne voit
     // jamais la différence.
     await _reserveUnlockAttempt();
+    // SEC 2026-08-04 (audit GPT F4) — relevé avant les dérivations, comparé
+    // avant d'appliquer le résultat. Voir le raisonnement au point de
+    // comparaison.
+    final genAvantOuverture = _lockGeneration;
     // Déni plausible : on tente UNE PASSE Argon2id sur CHAQUE slot, même si
     // un slot précédent a matché. Sinon le timing révèle l'existence du
     // decoy (1× Argon2id = matché primary, 2× = matché decoy ou échec avec
@@ -637,6 +659,38 @@ class VaultService {
       if (winnerWrapNonce != null) SecretBytes.wipe(winnerWrapNonce);
       winnerEntries = null;
       rethrow;
+    }
+
+    // SEC 2026-08-04 (audit GPT F4) — un verrouillage survenu PENDANT
+    // l'ouverture doit l'emporter sur elle.
+    //
+    // Deux Argon2id s'écoulent avant d'arriver ici, soit près de deux secondes.
+    // Si `lock()` intervient dans cet intervalle — mise en arrière-plan,
+    // minuterie, ou MODE PANIQUE — l'ouverture reprenait ensuite et posait
+    // `_key`, `_entries` et `_isOpen = true` : **le coffre se rouvrait en
+    // mémoire APRÈS la panique**, et l'appelant recevait `success`.
+    //
+    // Le commentaire de `_lockGeneration` annonçait pourtant la règle : « toute
+    // opération longue qui prend un instantané de l'état du coffre [...] doit
+    // relever ce compteur avant, et renoncer à restaurer s'il a changé ». Je
+    // l'avais appliquée à la vérification de mot de passe et pas à l'ouverture
+    // elle-même — un commentaire décrivant une règle que son propre fichier
+    // n'appliquait pas.
+    //
+    // On efface les tampons gagnants et on rend `wrongPassword` : rien ne
+    // s'ouvre, et la décision de verrouiller est respectée. L'utilisateur
+    // légitime n'a qu'à ressaisir son mot de passe.
+    if (_lockGeneration != genAvantOuverture) {
+      if (winnerKey != null) SecretBytes.wipe(winnerKey);
+      if (winnerSalt != null) SecretBytes.wipe(winnerSalt);
+      if (winnerWrappedDek != null) SecretBytes.wipe(winnerWrappedDek);
+      if (winnerWrapNonce != null) SecretBytes.wipe(winnerWrapNonce);
+      winnerEntries = null;
+      _wipeKey();
+      _entries = [];
+      _isOpen = false;
+      _activeSlot = null;
+      return UnlockResult.wrongPassword;
     }
 
     if (matchedSlot != null && winnerKey != null) {
