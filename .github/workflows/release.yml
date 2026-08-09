@@ -118,7 +118,7 @@ jobs:
           echo "SHA-256   : $SHA"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # `github.ref_name` vaudrait la BRANCHE en déclenchement manuel.
           tag_name: ${{ inputs.tag }}
