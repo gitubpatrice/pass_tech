@@ -57,7 +57,7 @@ jobs:
           ref: v0.3.4
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
