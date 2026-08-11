@@ -1,0 +1,8 @@
+Update check: four defects fixed in the only code of the app that reaches the network.
+
+• A Wi-Fi captive portal — an HTML page returned with a "200" status — made the check count as done: no further check for twelve hours, even once the connection was back.
+• The server response was not bounded by any size limit.
+• Redirects were followed without revalidating the destination host.
+• The timeout did not cover reading the response.
+
+No change to the vault or to the encryption.

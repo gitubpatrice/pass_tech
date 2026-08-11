@@ -1,0 +1,8 @@
+Vérification de mise à jour : quatre défauts sur le seul code de l'app qui sorte sur le réseau.
+
+• Un portail captif Wi-Fi — page HTML renvoyée en « 200 » — faisait passer la vérification pour faite : plus aucun contrôle pendant 12 h.
+• La réponse n'était bornée par aucune limite de taille.
+• Les redirections n'étaient pas revérifiées.
+• Le délai ne couvrait pas la lecture de la réponse.
+
+Coffre et chiffrement inchangés.
