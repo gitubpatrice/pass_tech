@@ -109,7 +109,10 @@ jobs:
         id: sha
         run: |
           SRC=pass_tech/build/app/outputs/flutter-apk/app-release.apk
-          DEST=pass_tech-v${{ steps.version.outputs.VERSION }}.apk
+          # Convention Files Tech : `<app>-universel-<version>.apk`. Le build
+          # est un `flutter build apk --release` sans split : l'APK contient
+          # bien les trois architectures.
+          DEST=pass-tech-universel-${{ steps.version.outputs.VERSION }}.apk
           cp "$SRC" "$DEST"
           SHA=$(sha256sum "$DEST" | awk '{print $1}')
           echo "SHA256=$SHA" >> $GITHUB_OUTPUT
@@ -139,7 +142,7 @@ jobs:
 
             Vérifiez avec :
             ```
-            sha256sum pass_tech-v${{ steps.version.outputs.VERSION }}.apk
+            sha256sum pass-tech-universel-${{ steps.version.outputs.VERSION }}.apk
             ```
 
             ---
