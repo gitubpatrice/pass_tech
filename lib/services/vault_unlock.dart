@@ -745,6 +745,34 @@ extension VaultUnlock on VaultService {
           // simplement de choisir de taper son mot de passe.
           return UnlockResult.biometricCanceled;
         default:
+          // 2026-09-20 — GARDE DE PREMIER PLAN, ajoutée avec la montée de
+          // `biometric_storage` en 6.0.0-dev.5.
+          //
+          // `unknown` ne signifie plus une seule chose. Jusqu'en 5.0.x, une
+          // authentification demandée alors que l'activité ne pouvait pas
+          // héberger de dialogue — `androidx.biometric` refuse de démarrer
+          // après `onSaveInstanceState` — ne rappelait AUCUN callback : le
+          // résultat Flutter restait pendant, indéfiniment. La 6.0.0-dev.2
+          // corrige ce blocage en le rapportant comme
+          // `AuthException(AuthExceptionCode.unknown)`, et son changelog
+          // precise que c'est atteignable « whenever the app is backgrounded ».
+          //
+          // Sans ce garde, la correction d'un blocage se serait donc payée
+          // d'une régression : basculer l'application en arrière-plan au
+          // mauvais instant aurait effacé l'enveloppe biométrique, et
+          // l'utilisateur aurait dû la réactiver depuis Réglages sans
+          // comprendre pourquoi.
+          //
+          // On ne détruit rien quand l'application n'est pas au premier plan.
+          // Aucune protection n'est perdue : si la clé Keystore est réellement
+          // morte, la tentative suivante — au premier plan, puisqu'il faut
+          // voir l'écran pour la lancer — retombera sur `unknown` et fera le
+          // ménage à ce moment-là.
+          final foreground =
+              SchedulerBinding.instance.lifecycleState ==
+              AppLifecycleState.resumed;
+          if (!foreground) return UnlockResult.biometricCanceled;
+
           // Cleanup best-effort — la clé Keystore est probablement morte,
           // tenter de la réutiliser sur la prochaine tentative donnerait
           // la même erreur. On supprime le flag + le storage entry pour

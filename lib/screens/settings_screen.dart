@@ -845,9 +845,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     final file = File('${dir.path}/pass_tech_export.json');
     await file.writeAsString(json);
     try {
-      await Share.shareXFiles([
-        XFile(file.path, mimeType: 'application/json'),
-      ], subject: t.exportShareSubject);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/json')],
+          subject: t.exportShareSubject,
+        ),
+      );
     } finally {
       // F20 v2.3.7 — overwrite plaintext avec random bytes AVANT delete
       // (best-effort — F2FS/SSD wear-leveling ne garantit pas l'effacement
@@ -992,9 +995,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (!mounted) return;
       Navigator.of(context).pop(); // close progress
       try {
-        await Share.shareXFiles([
-          XFile(file.path, mimeType: 'application/octet-stream'),
-        ], subject: t.exportEncryptedShareSubject);
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(file.path, mimeType: 'application/octet-stream')],
+            subject: t.exportEncryptedShareSubject,
+          ),
+        );
       } finally {
         // SEC 2026-08-04 — voir `_exportVault` : on déchiquette NOTRE fichier,
         // jamais la copie de `share_plus` que la cible est peut-être encore en
@@ -1019,24 +1025,50 @@ class _SettingsScreenState extends State<SettingsScreen>
     final messenger = ScaffoldMessenger.of(context);
     final t = AppLocalizations.of(context);
     // 1. Sélection sans bytes pour récupérer juste la taille (évite OOM).
-    final probe = await FilePicker.pickFiles(type: FileType.any);
-    if (probe == null || probe.files.isEmpty || !mounted) return;
-    final probeFile = probe.files.first;
-    if (probeFile.size > _kMaxImportBytes) {
-      SnackUtils.showError(
-        context,
-        messenger,
-        t.importTooLarge(
-          (probeFile.size / 1024 / 1024).toStringAsFixed(0),
-          '${_kMaxImportBytes ~/ (1024 * 1024)}',
-        ),
-      );
-      return;
-    }
+    //
+    // `pickFile` (singulier), et non `pickFiles` : en file_picker 13 le pluriel
+    // active TOUJOURS la sélection multiple, et rend une liste non nullable.
+    // Cet écran importe UNE sauvegarde ; avec le pluriel, choisir deux fichiers
+    // en aurait importé un au hasard — `.first` — sans rien dire à personne.
+    // Le singulier envoie `allowMultiple: false` au natif, donc comportement
+    // identique à la 11.
+    final probeFile = await FilePicker.pickFile(type: FileType.any);
+    if (probeFile == null || !mounted) return;
     // 2. Le path Android est rempli par défaut → on lit directement.
     final filePath = probeFile.path;
     if (filePath == null) {
       SnackUtils.showError(context, messenger, t.importReadError);
+      return;
+    }
+    // 3. Plafond anti-OOM, AVANT toute lecture des octets.
+    //
+    // `PlatformFile.size` a disparu en file_picker 13 au profit de
+    // `int? lengthSync()`, qui rend `null` quand le sélecteur natif n'a PAS
+    // communiqué la taille. Traduire `size` en `lengthSync()!` ou en
+    // `lengthSync() ?? 0` aurait fait SAUTER ce plafond dans ce cas précis —
+    // exactement le fichier dont on ne sait rien, donc le pire à laisser
+    // passer. On retombe sur un `stat` du fichier, qui ne lit pas son contenu.
+    int size;
+    try {
+      size = probeFile.lengthSync() ?? await File(filePath).length();
+    } catch (_) {
+      if (!mounted) return;
+      SnackUtils.showError(context, messenger, t.importReadError);
+      return;
+    }
+    // Le `stat` de repli ci-dessus est asynchrone : l'écran a pu disparaître
+    // entre-temps. Sans ce garde, le bandeau s'afficherait via un `context`
+    // démonté.
+    if (!mounted) return;
+    if (size > _kMaxImportBytes) {
+      SnackUtils.showError(
+        context,
+        messenger,
+        t.importTooLarge(
+          (size / 1024 / 1024).toStringAsFixed(0),
+          '${_kMaxImportBytes ~/ (1024 * 1024)}',
+        ),
+      );
       return;
     }
     final Uint8List bytes;
