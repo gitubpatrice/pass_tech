@@ -41,7 +41,19 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          # Version FIGEE, et non `channel: stable`. Avec le canal, chaque sortie
+          # de Flutter changeait en silence ce qui etait construit, teste et
+          # publie : rien dans ce depot ne bougeait, et le resultat si.
+          #
+          # Mesure le 2026-09-20 : le `pubspec.lock` commite avait ete genere par
+          # une version anterieure, et `pub get` sous 3.47.2 deplacait cinq
+          # paquets epingles par le SDK. Le lock ne decrivait donc pas ce que la
+          # CI livrait. Meme defaut que notes_tech, corrige de la meme facon.
+          #
+          # 3.47.2 doit rester identique dans les TROIS workflows de ce depot et
+          # correspondre au lock commite : sinon ce qui est teste, ce qui verifie
+          # les promesses et ce qui est publie ne sont pas la meme chose.
+          flutter-version: 3.47.2
           cache: true
 
       - name: Pub get
