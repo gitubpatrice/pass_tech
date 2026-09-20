@@ -1,0 +1,7 @@
+Italiano, tedesco e spagnolo, accanto a francese e inglese. La scelta è nelle Impostazioni.
+
+Tradurre ha portato alla luce 21 stringhe scritte in francese nel codice, fuori dal sistema di traduzione: avviso di integrità, errori di importazione, richiesta biometrica.
+
+Cassaforte esca, due difetti corretti:
+• La biometria apriva la cassaforte PRINCIPALE e la richiesta partiva da sola. Ora si escludono.
+• Un'esportazione in chiaro sopravviveva a «Elimina tutti i dati» e alla modalità panico.

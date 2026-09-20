@@ -1,0 +1,7 @@
+Allemand, italien et espagnol, en plus du français et de l'anglais. Choix dans les Réglages.
+
+Traduire a trouvé 21 chaînes en français codé en dur, hors du système de traduction : alerte d'intégrité, erreurs d'import, invite biométrique.
+
+Coffre leurre, deux défauts corrigés :
+• La biométrie ouvrait le coffre PRINCIPAL, l'invite partant seule. Les deux s'excluent désormais.
+• Un export en clair survivait à « Supprimer toutes mes données » et au mode panique. Les deux le déchiquettent.

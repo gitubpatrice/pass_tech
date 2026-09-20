@@ -1,0 +1,38 @@
+Pass Tech ist ein zu 100 % lokaler Passwort-Manager für Android. Keine
+Cloud, kein Konto, kein Server, kein Tracker, keine Werbung.
+
+<b>Kryptografie (v4)</b>
+* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
+* AES-256-GCM mit Anti-Downgrade-AAD
+* An den Keystore gebundener KEK (StrongBox/TEE) mit HKDF-SHA256
+* CSPRNG über Random.secure
+* HMAC-Prüfung in konstanter Zeit
+* Exponentielle Brute-Force-Sperre (1, 2, 4, 8, 16 Minuten) auf Basis
+  einer monotonen Uhr (schützt vor Rücksetzen der Zeit durch Root)
+
+<b>Privatsphäre</b>
+* Phishing-Schutz pro Domain (minimaler AccessibilityService)
+* Schein-Tresor gegen Nötigung (glaubhafte Abstreitbarkeit, zeitlich
+  angeglichen)
+* Panikmodus: sofortige Zerstörung des KEK im Keystore
+* Launcher-Tarnung (Symbol als Rechner getarnt)
+* Nachlass nach Inaktivität (Totmannschalter)
+* FLAG_SECURE standardmäßig aktiv bei Einträgen vom Typ Passwort /
+  Karte / Identität (seit v2.3.11 in den Einstellungen abschaltbar) —
+  Notiz-Einträge lockern FLAG_SECURE, damit Samsung Knox den
+  Einfügen-Vorschlag nicht verbirgt
+* Die INTERNET-Berechtigung dient allein der anonymen Update-Prüfung
+  über die GitHub-Releases-API; es werden keine Daten erhoben
+
+<b>Sprachen</b>
+Deutsch, Englisch, Spanisch, Französisch und Italienisch — frei wählbar
+in den Einstellungen, unabhängig von der Sprache des Geräts.
+
+<b>Audit (v2.3.8 → v2.4.0)</b>
+Fachaudit ohne offene Schwachstellen: A1-A20 und B1-B24 behoben.
+Dynamisches FLAG_SECURE über einen Kotlin-MethodChannel mit Refcount,
+gemeinsamer MonotonicClock-Dienst, Versionsanzeige über PackageInfo,
+sensible Controller geleert und freigegeben, Phishing-Momentaufnahme im
+Panikmodus gelöscht.
+
+<b>Open Source</b> Apache 2.0 — vollständiger Quellcode auf GitHub.

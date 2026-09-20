@@ -1,0 +1,38 @@
+Pass Tech è un gestore di password 100% locale per Android. Nessun
+cloud, nessun account, nessun server, nessun tracker, nessuna pubblicità.
+
+<b>Crittografia (v4)</b>
+* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
+* AES-256-GCM con AAD anti-downgrade
+* KEK legata al Keystore (StrongBox/TEE) con HKDF-SHA256
+* CSPRNG tramite Random.secure
+* Verifica HMAC a tempo costante
+* Blocco anti forza bruta esponenziale (1, 2, 4, 8, 16 minuti) basato su
+  un orologio monotono (resiste allo spostamento dell'ora da root)
+
+<b>Riservatezza</b>
+* Anti-phishing per dominio (AccessibilityService minimo)
+* Cassaforte esca anti-coercizione (negabilità plausibile, tempi
+  allineati)
+* Modalità panico: distruzione immediata della KEK nel Keystore
+* Camuffamento nel launcher (icona travestita da Calcolatrice)
+* Eredità dopo lunga inattività (interruttore dell'uomo morto)
+* FLAG_SECURE attivo di default sulle voci password / carta / identità
+  (regolabile nelle Impostazioni dalla v2.3.11) — le voci Nota
+  allentano FLAG_SECURE affinché Samsung Knox non nasconda il
+  suggerimento di incolla
+* Il permesso INTERNET serve solo al controllo anonimo degli
+  aggiornamenti tramite l'API GitHub Releases; nessuna raccolta di dati
+
+<b>Lingue</b>
+Italiano, inglese, francese, tedesco e spagnolo — a scelta nelle
+Impostazioni, indipendentemente dalla lingua del dispositivo.
+
+<b>Audit (v2.3.8 → v2.4.0)</b>
+Audit specialistico senza vulnerabilità aperte: A1-A20 e B1-B24 chiusi.
+FLAG_SECURE dinamico tramite MethodChannel Kotlin con refcount, servizio
+MonotonicClock condiviso, versione letta da PackageInfo, controller
+sensibili svuotati e rilasciati, istantanea anti-phishing eliminata in
+modalità panico.
+
+<b>Open source</b> Apache 2.0 — codice integrale su GitHub.

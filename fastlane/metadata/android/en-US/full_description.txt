@@ -22,6 +22,10 @@ account, no server, no tracker, no ads.
 * INTERNET permission used only for anonymous GitHub Releases update
   check; no data collection
 
+<b>Languages</b>
+English, French, German, Italian and Spanish — your pick in Settings,
+independent of the device language.
+
 <b>Audit (v2.3.8 → v2.4.0)</b>
 Zero-vuln zero-flaw expert audit: A1-A20 + B1-B24 findings closed.
 Dynamic FLAG_SECURE via Kotlin MethodChannel with refcount, shared
