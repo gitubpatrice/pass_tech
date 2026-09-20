@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_disguise_label">Calcolatrice</string>
+    <string name="phishing_service_label">Pass Tech — anti-phishing</string>
+    <string name="phishing_detector_description">Legge il dominio mostrato dal
+        browser in primo piano per verificare che corrisponda alla voce di Pass
+        Tech prima di copiare una password. Nessun dato viene memorizzato o
+        trasmesso — viene letto solo il dominio principale, in memoria volatile
+        e unicamente sui browser riconosciuti. Questa protezione si attiva su
+        tua richiesta e resta disattivabile in qualsiasi momento.</string>
+</resources>

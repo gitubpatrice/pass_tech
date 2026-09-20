@@ -52,11 +52,25 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // P2.1 v2.4.3 — réduction APK : seuls FR + EN embarqués (vs ~50 locales
-        // tirées par biometric_storage / Material). Gain ~3-6 Mo.
+        // P2.1 v2.4.3 — réduction APK : on n'embarque que les locales réellement
+        // proposées, au lieu des ~50 tirées par biometric_storage / Material.
+        // Gain ~3-6 Mo.
         // (2026-08-03 : `mobile_scanner` ne figure plus dans cette liste, la
         // dépendance ayant été retirée avec le scan de QR code.)
-        resourceConfigurations.addAll(listOf("en", "fr"))
+        //
+        // ⚠️ v2.7.0 — CE FILTRE EST UNE TROISIÈME LISTE DE LANGUES, et il n'a
+        // pas suivi les deux autres. Il ne listait que l'anglais et le
+        // français : tout `values-de/`, `values-it/` ou `values-es/` aurait été
+        // RETIRÉ de l'APK à la construction, sans erreur ni avertissement. Les
+        // traductions Flutter, elles, vivent dans `libapp.so` et ne passent pas
+        // par ici — c'est ce qui rendait le défaut invisible : l'application
+        // aurait parlé allemand pendant que ses ressources Android, dont le
+        // libellé de camouflage du mode panique, seraient restées en français.
+        //
+        // `tool/verifier_l10n.py` compare désormais cette ligne à
+        // `appLanguageCodes` et aux fichiers .arb. Les trois listes ne peuvent
+        // plus diverger en silence.
+        resourceConfigurations.addAll(listOf("en", "fr", "de", "it", "es"))
     }
 
     // P2.1 v2.4.3 — Le split par ABI est obtenu via le flag CLI Flutter

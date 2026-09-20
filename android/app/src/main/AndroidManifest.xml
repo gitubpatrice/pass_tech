@@ -129,7 +129,7 @@
              et les limites assumées. -->
         <activity
             android:name=".CalculatorActivity"
-            android:label="Calculatrice"
+            android:label="@string/app_disguise_label"
             android:icon="@drawable/ic_launcher_calc"
             android:exported="false"
             android:theme="@style/NormalTheme" />
@@ -137,7 +137,7 @@
         <activity-alias
             android:name=".MainAliasDecoy"
             android:targetActivity=".CalculatorActivity"
-            android:label="Calculatrice"
+            android:label="@string/app_disguise_label"
             android:icon="@drawable/ic_launcher_calc"
             android:exported="true"
             android:enabled="false">
@@ -159,7 +159,7 @@
             android:name=".PhishingDetectorService"
             android:exported="false"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:label="Pass Tech — anti-phishing">
+            android:label="@string/phishing_service_label">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>

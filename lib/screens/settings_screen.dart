@@ -510,9 +510,22 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       );
       if (accepte != true || !mounted) return;
-      await VaultService().deleteBiometricKey();
-      if (!mounted) return;
-      setState(() => _biometricEnabled = false);
+      // AUDIT 2026-09-20 (relecture 3 axes, constat B) — on ne désarme PAS ici.
+      //
+      // La v2.6.2 appelait `deleteBiometricKey()` dès cet accord. Or quatre
+      // sorties suivent avant qu'un leurre existe : l'explication qu'on peut
+      // refuser, la saisie qu'on peut annuler, le mot de passe identique au
+      // principal qu'on refuse, et l'échec du service. Dans ces quatre cas
+      // l'utilisateur repartait SANS leurre et SANS biométrie, alors qu'il
+      // avait accepté « désarmer POUR configurer un leurre ».
+      //
+      // Le commentaire ci-dessus dit lui-même qu'une biométrie qui cesse de
+      // fonctionner doit signaler une intervention : la retirer sans
+      // contrepartie fait douter l'utilisateur de son téléphone, pour rien.
+      //
+      // `setupDecoyVault` s'en charge désormais, dans la même opération que la
+      // création. L'accord recueilli ici reste indispensable — il prévient —
+      // mais il ne détruit plus rien à lui seul.
     }
     // Avertissement explicatif avant la configuration.
     final go = await showDialog<bool>(
@@ -559,7 +572,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       await VaultService().setupDecoyVault(pwd);
       VaultService().lock();
       if (!mounted) return;
-      setState(() {});
+      // Le service vient de désarmer la biométrie : l'écran s'aligne sur le
+      // fait accompli plutôt que de l'anticiper.
+      setState(() => _biometricEnabled = false);
       SnackUtils.showInfo(messenger, t.decoyConfiguredSnack);
       // Retour au unlock screen
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -792,6 +807,22 @@ class _SettingsScreenState extends State<SettingsScreen>
         // dual-vault). On absorbe silencieusement pour ne pas trahir
         // l'existence du decoy à un attaquant attentif.
         await VaultService().saveBiometricKey(biometricPromptTextOf(t));
+      } on StateError catch (e) {
+        // AUDIT 2026-09-20 — le service refuse aussi, désormais. Le contrôle
+        // juste au-dessus arrête le cas nominal ; celui-ci rattrape ce qui
+        // passerait entre les deux (leurre créé pendant que cet écran est
+        // ouvert). Même message, donc même verdict qu'un refus en amont : rien
+        // ne distingue les deux chemins pour l'observateur.
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, switch (e.message) {
+          // Les deux sentinelles rendent le MÊME message. Les distinguer à
+          // l'écran ferait du refus un oracle : depuis le leurre, une
+          // formulation différente trahirait l'existence du mécanisme.
+          VaultService.biometricDecoyConflict ||
+          VaultService.biometricPrimaryOnly => t.settingsBiometricDecoyConflict,
+          _ => t.genericError('$e'),
+        });
+        return;
       } on AuthException catch (e) {
         // (v2.4.2) Discrimine annulation (userCanceled/canceled) d'échec
         // technique pour donner un feedback explicite à l'utilisateur,

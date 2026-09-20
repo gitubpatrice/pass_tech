@@ -23,6 +23,17 @@ Ce que ce controle verifie, et pourquoi chaque point existe :
      dans `lib/`, sinon elle grossit l'APK et les fichiers de traduction sans
      que personne ne la voie jamais.
 
+  6. LES QUATRE LISTES DE LANGUES CONCORDENT. La langue est declaree a quatre
+     endroits qui s'ignorent : les fichiers .arb, `appLanguageCodes` dans
+     `lib/main.dart`, les dossiers `values-*` des ressources Android, et
+     `resourceConfigurations` dans `android/app/build.gradle.kts`. Ce dernier
+     FILTRE l'APK : une locale absente de sa liste est retiree a la
+     construction, sans erreur ni avertissement. En v2.7.0 il valait
+     `("en", "fr")` alors que l'application en proposait cinq — les traductions
+     Flutter vivant dans `libapp.so`, le defaut etait invisible partout
+     ailleurs, et le libellé de camouflage du mode panique serait reste en
+     francais sur un telephone allemand.
+
 Sortie : code 0 si tout va bien, 1 sinon. `--negatif` execute le CONTROLE
 NEGATIF : il fabrique des fichiers volontairement fautifs en memoire et exige
 que chaque regle les rejette. Un controle qu'on n'a jamais vu echouer ne prouve
@@ -185,6 +196,86 @@ def controler(gabarit, traduction, langue, orphelines_aussi=True,
     return erreurs
 
 
+RES = os.path.join("android", "app", "src", "main", "res")
+GRADLE = os.path.join("android", "app", "build.gradle.kts")
+MAIN_DART = os.path.join("lib", "main.dart")
+
+RE_RESCONFIG = re.compile(
+    r"resourceConfigurations\.addAll\(listOf\(([^)]*)\)\)")
+RE_CODES_DART = re.compile(
+    r"appLanguageCodes\s*=\s*\[([^\]]*)\]")
+RE_STRING_NAME = re.compile(r'<string\s+name="([^"]+)"')
+
+
+def _codes_entre_guillemets(texte):
+    return [m for m in re.findall(r'"([a-z]{2})"', texte)]
+
+
+def controler_listes_de_langues():
+    """Les quatre declarations de langues doivent decrire le meme ensemble."""
+    erreurs = []
+    attendu = set([GABARIT] + LANGUES)
+
+    # 1. Les fichiers .arb presents sur le disque.
+    arb = {f[4:-4] for f in os.listdir(DOSSIER)
+           if f.startswith("app_") and f.endswith(".arb")}
+    if arb != attendu:
+        erreurs.append(
+            "[langues] fichiers .arb %s, attendu %s"
+            % (sorted(arb), sorted(attendu)))
+
+    # 2. `appLanguageCodes` dans lib/main.dart — la liste que le SELECTEUR
+    #    propose. L'anglais du gabarit en fait partie.
+    with io.open(MAIN_DART, encoding="utf-8") as f:
+        m = RE_CODES_DART.search(f.read())
+    if not m:
+        erreurs.append("[langues] appLanguageCodes introuvable dans %s"
+                       % MAIN_DART)
+    else:
+        codes = set(re.findall(r"'([a-z]{2})'", m.group(1)))
+        if codes != attendu:
+            erreurs.append(
+                "[langues] appLanguageCodes %s, attendu %s"
+                % (sorted(codes), sorted(attendu)))
+
+    # 3. `resourceConfigurations` dans le Gradle — le FILTRE de l'APK.
+    with io.open(GRADLE, encoding="utf-8") as f:
+        m = RE_RESCONFIG.search(f.read())
+    if not m:
+        erreurs.append("[langues] resourceConfigurations introuvable dans %s"
+                       % GRADLE)
+    else:
+        codes = set(_codes_entre_guillemets(m.group(1)))
+        if codes != attendu:
+            erreurs.append(
+                "[langues] resourceConfigurations %s, attendu %s — les locales "
+                "absentes de cette liste sont RETIREES de l'APK a la "
+                "construction" % (sorted(codes), sorted(attendu)))
+
+    # 4. Les ressources Android : memes cles dans chaque `values-*`.
+    defaut = os.path.join(RES, "values", "strings.xml")
+    if not os.path.exists(defaut):
+        return erreurs
+    with io.open(defaut, encoding="utf-8") as f:
+        cles_defaut = set(RE_STRING_NAME.findall(f.read()))
+    for langue in LANGUES:
+        chemin = os.path.join(RES, "values-%s" % langue, "strings.xml")
+        if not os.path.exists(chemin):
+            erreurs.append(
+                "[langues] %s manquant : Android affichera le texte par defaut "
+                "— en anglais — dans les reglages d'accessibilite et sous "
+                "l'icone du lanceur" % chemin.replace(os.sep, "/"))
+            continue
+        with io.open(chemin, encoding="utf-8") as f:
+            cles = set(RE_STRING_NAME.findall(f.read()))
+        if cles != cles_defaut:
+            erreurs.append(
+                "[langues] %s : cles %s, attendu %s"
+                % (chemin.replace(os.sep, "/"), sorted(cles),
+                   sorted(cles_defaut)))
+    return erreurs
+
+
 def lire_sources():
     morceaux = []
     for racine, _d, fichiers in os.walk("lib"):
@@ -267,6 +358,16 @@ def main():
     gabarit = charger(GABARIT)
     sources = lire_sources()
     total = 0
+
+    erreurs_listes = controler_listes_de_langues()
+    if erreurs_listes:
+        total += len(erreurs_listes)
+        for e in erreurs_listes:
+            print(e)
+    else:
+        print("[langues] .arb, appLanguageCodes, resourceConfigurations et "
+              "values-* concordent")
+
     for langue in LANGUES:
         erreurs = controler(gabarit, charger(langue), langue,
                             orphelines_aussi=(langue == LANGUES[0]),

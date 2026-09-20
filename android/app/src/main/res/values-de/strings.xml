@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_disguise_label">Rechner</string>
+    <string name="phishing_service_label">Pass Tech — Phishing-Schutz</string>
+    <string name="phishing_detector_description">Liest die Domain, die der
+        Browser im Vordergrund anzeigt, um vor dem Kopieren eines Passworts zu
+        prüfen, ob sie zum Pass-Tech-Eintrag passt. Es werden keine Daten
+        gespeichert oder übertragen — gelesen wird nur die Hauptdomain, im
+        flüchtigen Speicher und ausschließlich in bekannten Browsern. Dieser
+        Schutz wird auf Ihren Wunsch aktiviert und lässt sich jederzeit wieder
+        abschalten.</string>
+</resources>
