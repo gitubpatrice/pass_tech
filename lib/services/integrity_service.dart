@@ -41,13 +41,29 @@ class IntegrityStatus {
 
   bool get hasIssue => rooted || emulator || debuggable || debugger;
 
-  /// Liste des problèmes détectés en français pour affichage UI.
-  List<String> get issues {
-    final list = <String>[];
-    if (rooted) list.add('Appareil rooté détecté');
-    if (debugger) list.add('Debugger attaché');
-    if (debuggable) list.add('App en mode debug');
-    if (emulator) list.add('Émulateur détecté');
+  /// Problèmes détectés, sous forme d'identifiants STABLES.
+  ///
+  /// v2.7.0 — ce getter rendait auparavant des libellés français tout faits,
+  /// que `unlock_screen` affichait tels quels : un utilisateur anglophone
+  /// lisait « Appareil rooté détecté ». Le libellé est désormais choisi par
+  /// l'écran, qui a la locale ; le service ne rend que le fait.
+  ///
+  /// L'identifiant doit rester stable pour une seconde raison, moins visible :
+  /// `unlock_screen._checkIntegrity` en dérive l'empreinte qui évite de
+  /// ré-avertir à chaque ouverture. Une empreinte bâtie sur du texte affiché
+  /// aurait changé au premier changement de langue, et l'avertissement serait
+  /// reparti alors que rien n'avait bougé sur l'appareil.
+  List<IntegrityIssue> get issues {
+    final list = <IntegrityIssue>[];
+    if (rooted) list.add(IntegrityIssue.rooted);
+    if (debugger) list.add(IntegrityIssue.debuggerAttached);
+    if (debuggable) list.add(IntegrityIssue.debuggableBuild);
+    if (emulator) list.add(IntegrityIssue.emulator);
     return list;
   }
 }
+
+/// Un problème d'intégrité, indépendant de la langue.
+/// `name` sert d'identifiant persistant — ne pas renommer ces valeurs sans
+/// accepter un avertissement supplémentaire chez les utilisateurs existants.
+enum IntegrityIssue { rooted, debuggerAttached, debuggableBuild, emulator }

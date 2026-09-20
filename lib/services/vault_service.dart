@@ -201,6 +201,24 @@ enum VaultDeleteOutcome {
   decoyOnly,
 }
 
+/// Textes de l'invite biométrique système.
+///
+/// v2.7.0 — ces deux chaînes étaient écrites en dur en français dans
+/// `_bioStorage`. Elles s'affichent dans un dialogue rendu par Android, hors
+/// de tout widget : aucun écran ne pouvait les traduire à notre place, et un
+/// utilisateur anglophone lisait « Déverrouiller votre coffre-fort » /
+/// « Annuler ».
+///
+/// Le service n'a pas de `BuildContext`. Plutôt que d'aller chercher la locale
+/// depuis une variable globale, l'appelant — qui a le contexte — les fournit.
+/// Le paramètre est REQUIS à dessein : ainsi le compilateur désigne tout
+/// nouveau chemin qui déclencherait l'invite sans se poser la question.
+class BiometricPromptText {
+  final String subtitle;
+  final String cancel;
+  const BiometricPromptText({required this.subtitle, required this.cancel});
+}
+
 class VaultService {
   static final VaultService _instance = VaultService._();
   factory VaultService() => _instance;
@@ -293,16 +311,30 @@ class VaultService {
         // sans que l'utilisateur ne s'authentifie à nouveau.
         androidBiometricOnly: true,
       ),
+      // Invite par défaut — elle ne sert QUE de valeur de repli pour `delete`,
+      // qui côté Android ne passe pas par `withAuth` et n'affiche donc aucun
+      // dialogue (vérifié dans `BiometricStoragePlugin.kt`). Les deux chemins
+      // qui font réellement apparaître l'invite, lecture et écriture, passent
+      // leur propre `promptInfo` traduit.
       promptInfo: const PromptInfo(
         androidPromptInfo: AndroidPromptInfo(
           title: 'Pass Tech',
-          subtitle: 'Déverrouiller votre coffre-fort',
-          negativeButton: 'Annuler',
           confirmationRequired: false,
         ),
       ),
     );
   }
+
+  /// Construit l'invite système à partir des textes fournis par l'appelant.
+  /// Le titre reste la marque, qui ne se traduit pas.
+  static PromptInfo biometricPromptInfo(BiometricPromptText text) => PromptInfo(
+    androidPromptInfo: AndroidPromptInfo(
+      title: 'Pass Tech',
+      subtitle: text.subtitle,
+      negativeButton: text.cancel,
+      confirmationRequired: false,
+    ),
+  );
 
   // Crypto parameters
   // v3 (legacy, read-only): PBKDF2-HMAC-SHA256 600 000 iter, AES-CBC + HMAC.
@@ -810,7 +842,7 @@ class VaultService {
   Future<bool> get hasBiometricKey async =>
       (await _storage.read(key: _biometricFlagKey)) == '1';
 
-  Future<void> saveBiometricKey() async {
+  Future<void> saveBiometricKey(BiometricPromptText prompt) async {
     if (_key == null) return;
     // SÉCURITÉ : la biométrique est verrouillée au coffre PRIMARY.
     // Si l'utilisateur ouvre le decoy puis tente d'activer la bio, on
@@ -824,7 +856,10 @@ class VaultService {
       );
     }
     final store = await _bioStorage();
-    await store.write(base64Encode(_key!));
+    await store.write(
+      base64Encode(_key!),
+      promptInfo: biometricPromptInfo(prompt),
+    );
     await _storage.write(key: _biometricFlagKey, value: '1');
   }
 

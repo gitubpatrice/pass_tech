@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
+/// Motif de rejet d'un secret TOTP saisi ou importé, indépendant de la langue.
+enum TotpSecretError { empty, invalidCharacters, tooShort }
+
 /// RFC 6238 TOTP-SHA1 / 30-second period / 6 digits.
 ///
 /// v2.5.0 (F5) — `DateTime.now()` est utilisé INTENTIONNELLEMENT pour le
@@ -53,15 +56,21 @@ class TotpService {
     return r == 0 ? _stepSeconds : r;
   }
 
-  /// Returns null if the input is a valid Base32 TOTP secret, else an error message.
-  static String? validate(String secret) {
+  /// Rend `null` si l'entrée est un secret TOTP Base32 valide, sinon la cause
+  /// du rejet.
+  ///
+  /// v2.7.0 — rendait auparavant un message français tout fait, affiché tel
+  /// quel sous le champ de saisie : un utilisateur anglophone lisait
+  /// « Caractères invalides (Base32 attendu) ». Le libellé est choisi par
+  /// l'écran, qui connaît la langue.
+  static TotpSecretError? validate(String secret) {
     final cleaned = secret.toUpperCase().replaceAll(RegExp(r'\s'), '');
-    if (cleaned.isEmpty) return 'Secret vide';
+    if (cleaned.isEmpty) return TotpSecretError.empty;
     if (!RegExp(r'^[A-Z2-7=]+$').hasMatch(cleaned)) {
-      return 'Caractères invalides (Base32 attendu)';
+      return TotpSecretError.invalidCharacters;
     }
     final bytes = _decodeBase32(secret);
-    if (bytes.length < 10) return 'Secret trop court';
+    if (bytes.length < 10) return TotpSecretError.tooShort;
     return null;
   }
 

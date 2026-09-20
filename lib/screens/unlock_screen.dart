@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../services/heritage_service.dart';
 import '../services/integrity_service.dart';
 import '../services/panic_service.dart';
+import '../utils/biometric_prompt.dart';
 import '../utils/snack_utils.dart';
 import '../services/vault_service.dart';
 import '../widgets/password_text_field.dart';
@@ -145,13 +146,36 @@ class UnlockScreenState extends State<UnlockScreen> {
   /// Vérifie root / émulateur / debugger. Avertit l'utilisateur une seule
   /// fois par session si un problème est détecté. L'app fonctionne malgré
   /// tout — c'est purement informatif (best-effort).
+  /// Libellé d'un problème d'intégrité dans la langue de l'application.
+  /// Le service rend un identifiant ; la traduction se décide ici, où la
+  /// locale est connue.
+  String _integrityIssueLabel(IntegrityIssue issue, AppLocalizations t) {
+    switch (issue) {
+      case IntegrityIssue.rooted:
+        return t.integrityIssueRooted;
+      case IntegrityIssue.debuggerAttached:
+        return t.integrityIssueDebugger;
+      case IntegrityIssue.debuggableBuild:
+        return t.integrityIssueDebuggable;
+      case IntegrityIssue.emulator:
+        return t.integrityIssueEmulator;
+    }
+  }
+
   Future<void> _checkIntegrity() async {
     final status = await IntegrityService.check();
     if (!status.hasIssue || !mounted) return;
     final prefs = await SharedPreferences.getInstance();
     // Mémoriser le hash des problèmes détectés pour ne ré-avertir que
     // si la situation change (ex: rootage post-install).
-    final fingerprint = status.issues.join('|');
+    //
+    // v2.7.0 — l'empreinte se calcule sur les identifiants et non plus sur les
+    // libellés affichés, qui viennent de changer de langue avec l'utilisateur.
+    // Conséquence assumée à la mise à jour : une empreinte enregistrée par une
+    // version antérieure ne correspond plus, donc les appareils concernés — ceux
+    // qui ont réellement un problème d'intégrité — reçoivent l'avertissement une
+    // fois de plus. Il est purement informatif.
+    final fingerprint = status.issues.map((i) => i.name).join('|');
     if (prefs.getString('integrity_warned') == fingerprint) return;
     if (!mounted) return;
     final t = AppLocalizations.of(context);
@@ -178,7 +202,10 @@ class UnlockScreenState extends State<UnlockScreen> {
                         Icon(Icons.circle, size: 6, color: cs.error),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(i, style: const TextStyle(fontSize: 13)),
+                          child: Text(
+                            _integrityIssueLabel(i, t),
+                            style: const TextStyle(fontSize: 13),
+                          ),
                         ),
                       ],
                     ),
@@ -294,6 +321,10 @@ class UnlockScreenState extends State<UnlockScreen> {
 
   Future<void> _tryBiometric() async {
     if (_lockoutRemaining != null) return;
+    // Capturé AVANT le `setState` et l'await : l'invite système peut rester
+    // plusieurs dizaines de secondes à l'écran, et `context` n'est plus sûr
+    // après.
+    final promptText = biometricPromptTextOf(AppLocalizations.of(context));
     setState(() {
       _loading = true;
       _error = null;
@@ -303,7 +334,7 @@ class UnlockScreenState extends State<UnlockScreen> {
     // successful read implies a successful biometric authentication.
     final UnlockResult result;
     try {
-      result = await VaultService().unlockWithBiometric();
+      result = await VaultService().unlockWithBiometric(promptText);
     } catch (e) {
       // AUDIT 2026-08-03 — même filet que `_unlock()` : jamais d'indicateur de
       // progression bloqué sur l'écran de déverrouillage.
@@ -566,11 +597,13 @@ class UnlockScreenState extends State<UnlockScreen> {
     );
   }
 
-  String _formatLockout(int seconds) {
-    if (seconds < 60) return '${seconds}s';
+  String _formatLockout(int seconds, AppLocalizations t) {
+    if (seconds < 60) return t.unitSecondsShort('$seconds');
     final m = seconds ~/ 60;
     final s = seconds % 60;
-    return s == 0 ? '${m}min' : '${m}min ${s}s';
+    return s == 0
+        ? t.unitMinutesShort('$m')
+        : t.unitMinutesSecondsShort('$m', '$s');
   }
 
   @override
@@ -639,7 +672,7 @@ class UnlockScreenState extends State<UnlockScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _formatLockout(_lockoutRemaining!),
+                          _formatLockout(_lockoutRemaining!, t),
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w700,

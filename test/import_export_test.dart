@@ -13,10 +13,14 @@ void main() {
       // Header valide, puis 1 ligne avec une cellule "name" de 100 KB.
       final bigCell = 'A' * (100 * 1024);
       final csv = 'name,password\n"$bigCell",secret123\n';
-      final result = ImportExportService.parse(csv);
+      final result = ImportExportService.parse(csv, untitled: 'Untitled');
       expect(result.entries, isEmpty);
       expect(result.error, isNotNull);
-      expect(result.error, contains('CSV invalide'));
+      // v2.7.0 — l'assertion portait sur le texte « CSV invalide », ce qui
+      // faisait dépendre un test de crypto de la langue de l'interface. Elle
+      // révélait au passage que ce libellé générique était produit par CE cas
+      // et par lui seul : le dépassement de cellule a désormais le sien.
+      expect(result.error!.code, ImportErrorCode.cellTooLarge);
     });
 
     test('CSV normal n\'est pas affecté par le cap', () {
@@ -24,7 +28,7 @@ void main() {
           'name,username,password\n'
           'Gmail,alice@example.com,p4ssw0rd\n'
           'GitHub,alice,t0ken123\n';
-      final result = ImportExportService.parse(csv);
+      final result = ImportExportService.parse(csv, untitled: 'Untitled');
       expect(result.entries, hasLength(2));
       expect(result.error, isNull);
     });
@@ -32,8 +36,16 @@ void main() {
     test('Cellule pile sous la limite (~64 KB) passe', () {
       final cellOk = 'B' * (60 * 1024);
       final csv = 'name,password\nx,$cellOk\n';
-      final result = ImportExportService.parse(csv);
+      final result = ImportExportService.parse(csv, untitled: 'Untitled');
       expect(result.entries, hasLength(1));
+    });
+
+    test('Titre vide reçoit le libellé fourni par l\'appelant', () {
+      // Le service ne connaît pas la langue : il écrit ce qu'on lui donne.
+      const csv = 'name,password\n,secret123\n';
+      final result = ImportExportService.parse(csv, untitled: 'Untitled');
+      expect(result.entries, hasLength(1));
+      expect(result.entries.first.title, 'Untitled');
     });
   });
 
