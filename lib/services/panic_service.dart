@@ -82,6 +82,21 @@ class PanicService {
     try {
       await VaultService().deleteBiometricKey();
     } catch (_) {}
+    // 5 bis. AUDIT 2026-09-20 — déchiqueter les exports résiduels du cache.
+    //
+    // La panique verrouillait le coffre et désarmait la biométrie, mais ne
+    // touchait AUCUN fichier. Un export en clair antérieur — `pass_tech_export
+    // .json`, qui contient tous les mots de passe, graines TOTP, numéros de
+    // carte et PIN — survivait donc intact dans le cache, et la copie qu'en
+    // fait `share_plus` avec lui. Pour un adversaire qui a le téléphone, c'est
+    // un contournement complet d'Argon2id et de la KEK liée au TEE : un `cat`
+    // suffisait là où la crypto tient.
+    //
+    // Le balayage existait déjà, correct, mais vivait dans l'écran Réglages et
+    // n'était appelé que depuis un export — donc jamais sur ce chemin.
+    try {
+      await VaultService.shredCachedExports();
+    } catch (_) {}
     // 6. Disguise (Android 11+ : peut prendre 1-2s à se refléter sur le launcher)
     if (disguise) {
       try {
