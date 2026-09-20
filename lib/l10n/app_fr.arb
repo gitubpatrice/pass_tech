@@ -392,7 +392,7 @@
   "panicRevealSnack": "Icône Pass Tech restaurée — relancez le launcher si elle n'apparaît pas",
 
   "decoyDialogTitle": "Coffre leurre",
-  "decoySetupBody": "Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec un mot de passe différent.\n\nUsage : si quelqu'un vous force à ouvrir Pass Tech (frontière, agression, contrôle), vous donnez le mot de passe du leurre. L'app affiche alors un faux coffre — il est cryptographiquement impossible de prouver l'existence du vrai.\n\nÀ retenir :\n• Le mot de passe du leurre doit être différent du vrai\n• Remplissez le leurre avec quelques entrées crédibles\n• Vous ne pourrez pas activer la biométrique sur le leurre",
+  "decoySetupBody": "Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec un mot de passe différent.\n\nUsage : si quelqu'un vous force à ouvrir Pass Tech (frontière, agression, contrôle), vous donnez le mot de passe du leurre. L'app affiche alors un faux coffre — il est cryptographiquement impossible de prouver l'existence du vrai.\n\nÀ retenir :\n• Le mot de passe du leurre doit être différent du vrai\n• Remplissez le leurre avec quelques entrées crédibles\n• Le déverrouillage biométrique sera désactivé : l'empreinte ouvre directement le vrai coffre, elle annulerait le leurre",
   "decoyConfigure": "Configurer",
   "decoyPasswordPromptTitle": "Mot de passe du coffre leurre",
   "decoySamePasswordError": "Ce mot de passe est déjà celui du coffre principal — choisissez-en un différent.",
@@ -453,6 +453,8 @@
   "settingsBiometricDisabled": "Déverrouillage biométrique désactivé.",
   "settingsBiometricEnableCanceled": "Activation biométrique annulée.",
   "settingsBiometricEnableFailed": "Activation biométrique échouée.",
+  "settingsBiometricDecoyConflict": "Le déverrouillage biométrique est indisponible tant qu'un coffre leurre est configuré. Quelqu'un capable de vous faire poser le doigt ouvrirait le VRAI coffre sans jamais demander de mot de passe — précisément ce que le leurre existe pour empêcher.",
+  "decoySetupBiometricWarning": "Configurer un coffre leurre désactivera le déverrouillage biométrique. L'empreinte ouvre directement le vrai coffre : elle annulerait le leurre dans la situation même où il sert. Vous déverrouillerez avec votre mot de passe principal.",
   "settingsBiometricNewEnrollmentWarning": "Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.",
   "@settingsBiometricNewEnrollmentWarning": { "description": "Avertissement subtil affiche sous le toggle biometrique : invalidation cle Android Keystore si nouvelle enrollment ajoutee (ROADMAP_HARDENING M-6)." },
   "settingsChangeMasterTitle": "Changer le mot de passe maître",

@@ -445,6 +445,45 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _setupDecoy() async {
     final t = AppLocalizations.of(context);
+    // AUDIT 2026-09-20 — l'autre sens de l'exclusion biométrie / leurre.
+    //
+    // Refuser l'activation de la biométrie quand un leurre existe ne suffit
+    // pas : il faut aussi traiter l'ordre inverse, quelqu'un qui a déjà armé
+    // la biométrie et configure un leurre ensuite. Sans cela le trou reste
+    // grand ouvert pour exactement les mêmes personnes.
+    //
+    // Le désarmement est ANNONCÉ, pas silencieux. `vault_setup.dart` s'appuie
+    // sur le fait qu'une biométrie qui cesse de fonctionner signale une
+    // intervention : la désactiver sans rien dire romprait cet invariant et
+    // ferait douter l'utilisateur de son téléphone. On lui explique pourquoi,
+    // avec la même franchise que `panicWarnBiometricBody`, et il décide.
+    if (_biometricEnabled) {
+      final accepte = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          icon: const Icon(Icons.fingerprint, size: 36),
+          title: Text(t.decoyDialogTitle),
+          content: Text(
+            t.decoySetupBiometricWarning,
+            style: const TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t.actionCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(t.decoyConfigure),
+            ),
+          ],
+        ),
+      );
+      if (accepte != true || !mounted) return;
+      await VaultService().deleteBiometricKey();
+      if (!mounted) return;
+      setState(() => _biometricEnabled = false);
+    }
     // Avertissement explicatif avant la configuration.
     final go = await showDialog<bool>(
       context: context,
@@ -685,6 +724,36 @@ class _SettingsScreenState extends State<SettingsScreen>
     final t = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     if (v) {
+      // AUDIT 2026-09-20 — REFUS quand un coffre leurre existe.
+      //
+      // Le chemin biométrique ouvre le slot PRIMARY en dur, et l'écran de
+      // déverrouillage déclenche l'invite TOUT SEUL. Un adversaire qui tient
+      // le téléphone et fait poser le doigt ouvrait donc le vrai coffre sans
+      // jamais demander de mot de passe — exactement le scénario de coercition
+      // que le leurre existe pour déjouer, et que l'application promet de
+      // déjouer (`decoySetupBody` : « frontière, agression, contrôle »).
+      //
+      // `panic_service.dart` décrit cette attaque mot pour mot et la corrige
+      // en désarmant la biométrie. Le correctif n'avait jamais été posé sur le
+      // chemin jumeau : le leurre vise la MÊME menace et n'avait aucune garde.
+      // `saveBiometricKey` ne refusait que d'armer la biométrie DEPUIS une
+      // session leurre, pas de l'armer ALORS QU'un leurre existe.
+      //
+      // Le refus est volontairement le MÊME depuis les deux coffres : il ne
+      // dépend que de `hasDecoyVault`, jamais du slot actif. Un adversaire à
+      // qui l'on a livré le leurre obtient donc le message qu'il obtiendrait
+      // depuis le principal — le refus cesse d'être un oracle. L'ancien
+      // `catch (_)` silencieux, lui, en était un : l'absence d'invite système
+      // se remarque en une tape.
+      if (await VaultService().hasDecoyVault) {
+        if (!mounted) return;
+        SnackUtils.showError(
+          context,
+          messenger,
+          t.settingsBiometricDecoyConflict,
+        );
+        return;
+      }
       try {
         // saveBiometricKey() écrit dans biometric_storage, qui crée une
         // clé Keystore avec setUserAuthenticationRequired(true). La première
@@ -841,7 +910,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     // ne s'exécute jamais et la copie faite par share_plus survit indéfiniment.
     // Le commentaire de SEC F8 affirmait que ce ménage avait aussi lieu « au
     // verrouillage » — c'était faux, la fonction n'avait qu'un seul appelant.
-    _shredStaleExports(dir);
+    await VaultService.shredCachedExports();
     final file = File('${dir.path}/pass_tech_export.json');
     await file.writeAsString(json);
     try {
@@ -876,7 +945,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       //
       // Le raisonnement de SEC F8 reste entièrement valable : cette copie ne
       // doit pas survivre indéfiniment. Elle est donc purgée par l'appel à
-      // `_shredStaleExports` placé AVANT le partage, qui balaie les résidus de
+      // `VaultService.shredCachedExports()` placé AVANT le partage, qui balaie
+      // les résidus de
       // l'export précédent. Le résidu est borné dans le temps sans jamais
       // couper une lecture en cours.
     }
@@ -932,28 +1002,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   /// regardait que le sous-dossier du plugin, jamais notre propre fichier.
   ///
   /// Appelée AVANT et APRÈS chaque partage : c'est l'appel « avant » qui
-  /// rattrape l'export précédent interrompu.
-  static void _shredStaleExports(Directory cacheDir) {
-    try {
-      final shareDir = Directory('${cacheDir.path}/share_plus');
-      if (shareDir.existsSync()) {
-        for (final ent in shareDir.listSync(followLinks: false)) {
-          if (ent is File) _shredFile(ent);
-        }
-      }
-    } catch (_) {}
-    try {
-      for (final ent in cacheDir.listSync(followLinks: false)) {
-        if (ent is! File) continue;
-        final name = ent.uri.pathSegments.last;
-        if (name == 'pass_tech_export.json' ||
-            (name.startsWith('pass_tech_') && name.endsWith('.ptbak'))) {
-          _shredFile(ent);
-        }
-      }
-    } catch (_) {}
-  }
-
   Future<void> _exportEncrypted() async {
     final messenger = ScaffoldMessenger.of(context);
     final t = AppLocalizations.of(context);
@@ -984,7 +1032,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       // une copie complète du coffre, laissée dans un répertoire sur lequel le
       // plugin accorde une permission de lecture à toute application capable
       // de répondre au sélecteur.
-      _shredStaleExports(dir);
+      await VaultService.shredCachedExports();
       final file = File('${dir.path}/pass_tech_$date.ptbak');
       await file.writeAsString(content);
       // 2026-08-03 — trace de la sauvegarde. C'est ce qui fait disparaître le

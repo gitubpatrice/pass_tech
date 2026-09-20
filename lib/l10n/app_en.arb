@@ -408,7 +408,7 @@
   "panicRevealSnack": "Pass Tech icon restored — relaunch the launcher if it does not appear",
 
   "decoyDialogTitle": "Decoy vault",
-  "decoySetupBody": "A decoy vault is a second, fully separate vault unlocked with a different password.\n\nUse case: if someone forces you to open Pass Tech (border, assault, control), you give the decoy password. The app then shows a fake vault — it is cryptographically impossible to prove the real one exists.\n\nKeep in mind:\n• The decoy password must differ from the real one\n• Fill the decoy with a few credible entries\n• You cannot enable biometrics on the decoy",
+  "decoySetupBody": "A decoy vault is a second, fully separate vault unlocked with a different password.\n\nUse case: if someone forces you to open Pass Tech (border, assault, control), you give the decoy password. The app then shows a fake vault — it is cryptographically impossible to prove the real one exists.\n\nKeep in mind:\n• The decoy password must differ from the real one\n• Fill the decoy with a few credible entries\n• Biometric unlock will be turned off: the fingerprint opens the real vault directly, which would defeat the decoy",
   "decoyConfigure": "Set up",
   "decoyPasswordPromptTitle": "Decoy vault password",
   "decoySamePasswordError": "This password is already used by the main vault — choose a different one.",
@@ -469,6 +469,8 @@
   "settingsBiometricDisabled": "Biometric unlock disabled.",
   "settingsBiometricEnableCanceled": "Biometric activation canceled.",
   "settingsBiometricEnableFailed": "Biometric activation failed.",
+  "settingsBiometricDecoyConflict": "Biometric unlock is unavailable while a decoy vault is set up. Someone who can make you place your finger would open the REAL vault without ever asking for a password — which is exactly what the decoy exists to prevent.",
+  "decoySetupBiometricWarning": "Setting up a decoy vault will turn off biometric unlock. The fingerprint opens the real vault directly, so it would defeat the decoy in the very situation the decoy is for. You can still unlock with your master password.",
   "settingsBiometricNewEnrollmentWarning": "If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.",
   "@settingsBiometricNewEnrollmentWarning": { "description": "Subtle warning shown below the biometric toggle: Android Keystore key invalidation if a new biometric enrollment is added (ROADMAP_HARDENING M-6)." },
   "settingsChangeMasterTitle": "Change master password",

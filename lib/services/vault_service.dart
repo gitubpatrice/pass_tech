@@ -1228,6 +1228,53 @@ class VaultService {
   /// Une seule définition désormais, et c'est la plus stricte des trois.
   static void shredFileSync(File file) => _shredSync(file);
 
+  /// Déchiquette les exports résiduels laissés dans le cache de l'application.
+  ///
+  /// Deux emplacements, parce qu'un export en produit deux :
+  ///  - `<cache>/pass_tech_export.json` et `<cache>/pass_tech_*.ptbak`, nos
+  ///    propres fichiers ;
+  ///  - `<cache>/share_plus/`, où `share_plus` RECOPIE le fichier partagé et
+  ///    ne fait le ménage qu'au début du partage suivant.
+  ///
+  /// AUDIT 2026-09-20 — ce balayage existait, correct et complet, mais vivait
+  /// dans l'écran Réglages et n'était appelé QUE depuis un export. Un vidage
+  /// JSON en clair de TOUTES les entrées survivait donc à « Supprimer toutes
+  /// mes données » et au mode panique : la purge était conditionnée à un export
+  /// ultérieur, c'est-à-dire à un geste que quelqu'un qui vient de tout effacer
+  /// ne fera jamais. Après `deleteVault()`, les deux KEK sont détruites — ce
+  /// résidu devenait la SEULE copie lisible du coffre, en clair, alors que le
+  /// dialogue promet une suppression définitive.
+  ///
+  /// Remonté ici pour être atteignable par les trois déclencheurs qui prétendent
+  /// faire disparaître le coffre. Volontairement `static` et sans état : il doit
+  /// pouvoir tourner même quand le coffre est déjà détruit.
+  static Future<void> shredCachedExports() async {
+    final Directory cacheDir;
+    try {
+      cacheDir = await getTemporaryDirectory();
+    } catch (_) {
+      return;
+    }
+    try {
+      final shareDir = Directory('${cacheDir.path}/share_plus');
+      if (shareDir.existsSync()) {
+        for (final ent in shareDir.listSync(followLinks: false)) {
+          if (ent is File) _shredSync(ent);
+        }
+      }
+    } catch (_) {}
+    try {
+      for (final ent in cacheDir.listSync(followLinks: false)) {
+        if (ent is! File) continue;
+        final name = ent.uri.pathSegments.last;
+        if (name == 'pass_tech_export.json' ||
+            (name.startsWith('pass_tech_') && name.endsWith('.ptbak'))) {
+          _shredSync(ent);
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Écrase le contenu d'un fichier par des octets aléatoires avant l'unlink,
   /// pour qu'une récupération des blocs sous-jacents ne rende pas le clair.
   /// Best-effort : sur un système de fichiers à copie sur écriture (F2FS,
@@ -1371,6 +1418,11 @@ class VaultService {
     // Ne pas l'effacer ici laissait un coffre fraîchement recréé hériter de ce
     // plancher empoisonné.
     await _storage.delete(key: 'pt_max_seen_ms');
+    // AUDIT 2026-09-20 — le cache aussi, sinon un export en clair antérieur
+    // survit à la suppression. Les deux KEK viennent d'être détruites : ce
+    // résidu serait la SEULE copie lisible du coffre, alors que le dialogue
+    // promet « supprimés définitivement ».
+    await shredCachedExports();
     return VaultDeleteOutcome.fullWipe;
   }
 

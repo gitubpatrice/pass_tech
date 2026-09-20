@@ -417,6 +417,11 @@ Le modèle de menace cible trois scénarios :
 
 1. **Anti-coercition** — un attaquant force l'utilisateur à déverrouiller
    l'app. Pass Tech répond avec le coffre leurre + mode panique.
+   Le déverrouillage biométrique est incompatible avec cette défense et
+   l'application les exclut mutuellement depuis le 2026-09-20 : l'empreinte
+   ouvre le coffre **principal** sans mot de passe, donc un adversaire qui
+   fait poser le doigt contournait le leurre entièrement. Cf. `THREAT_MODEL.md`
+   §4, point 5.
 2. **Perte / vol de l'appareil** — l'attaquant a un accès physique mais
    pas le master password. Pass Tech répond avec Argon2id + KEK Keystore
    non-extractible + lockout progressif + auto-lock + wipe RAM.

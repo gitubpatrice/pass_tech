@@ -153,6 +153,20 @@ doivent être les plus claires.
 4. **Vous restez le maillon.** Si vous ouvrez le coffre principal devant
    l'adversaire, aucune propriété cryptographique ne vous sauve.
 
+5. **Le déverrouillage biométrique et le coffre leurre sont incompatibles, et
+   l'application vous en empêche désormais.** L'empreinte ouvre le coffre
+   **principal**, directement, sans mot de passe — et l'écran de déverrouillage
+   déclenchait l'invite de lui-même. Un adversaire qui tient l'appareil et vous
+   fait poser le doigt obtenait donc le vrai coffre sans jamais vous demander
+   quoi que ce soit : le leurre n'avait pas l'occasion de servir.
+
+   Depuis le 2026-09-20, les deux fonctions s'excluent : activer la biométrie
+   est refusé tant qu'un leurre existe, et configurer un leurre désactive la
+   biométrie après vous l'avoir annoncé. Cette page affirmait jusque-là une
+   couverture qu'elle n'avait pas — le mode panique désarmait bien la
+   biométrie pour cette raison précise, mais le chemin du leurre, qui vise la
+   même menace, n'avait aucune garde équivalente.
+
 ---
 
 ## 5. Hors du modèle de menace
