@@ -273,6 +273,47 @@ def controler_listes_de_langues():
                 "[langues] %s : cles %s, attendu %s"
                 % (chemin.replace(os.sep, "/"), sorted(cles),
                    sorted(cles_defaut)))
+
+    erreurs.extend(controler_nom_du_service())
+    return erreurs
+
+
+RE_LABEL_SERVICE = re.compile(r'phishing_service_label">([^<]*)')
+RE_NOM_CITE = re.compile(u'[«"„](.+?)[»"“]')
+
+
+def controler_nom_du_service():
+    """Le nom que l'application dit de chercher doit être celui qu'Android
+    affiche.
+
+    `settingsAntiPhishingNeedsAS` envoie l'utilisateur activer une ligne
+    NOMMÉE dans les réglages d'accessibilité. Ce nom-là vient des ressources
+    Android, pas des .arb : les deux vivent dans des fichiers différents et
+    rien ne les reliait. Deux divergences ont été trouvées le 2026-09-20 —
+    « anti-hameçonnage » côté Android contre « anti-phishing » côté
+    application en français, et un cadratin contre un demi-cadratin en
+    allemand. Dans les deux cas l'utilisateur cherche une ligne qui n'existe
+    pas sous ce nom, et la comparaison se fait sur les POINTS DE CODE : à
+    l'écran, les deux tirets se ressemblent.
+    """
+    erreurs = []
+    for langue in [GABARIT] + LANGUES:
+        dossier = "values" if langue == GABARIT else "values-%s" % langue
+        chemin = os.path.join(RES, dossier, "strings.xml")
+        if not os.path.exists(chemin):
+            continue
+        with io.open(chemin, encoding="utf-8") as f:
+            m = RE_LABEL_SERVICE.search(f.read())
+        if not m:
+            continue
+        affiche = m.group(1).strip()
+        cite = RE_NOM_CITE.search(charger(langue)["settingsAntiPhishingNeedsAS"])
+        if not cite:
+            continue
+        if cite.group(1).strip() != affiche:
+            erreurs.append(
+                "[langues] %s : l'application dit de chercher %r, Android "
+                "affiche %r" % (langue, cite.group(1).strip(), affiche))
     return erreurs
 
 

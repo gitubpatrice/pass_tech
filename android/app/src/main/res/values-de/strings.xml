@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_disguise_label">Rechner</string>
-    <string name="phishing_service_label">Pass Tech — Phishing-Schutz</string>
+    <!-- Tiret demi-cadratin (U+2013), identique à celui de `app_de.arb`. Le
+         fichier portait un cadratin (U+2014) : l'application nommait donc un
+         intitulé qu'Android n'affichait pas à l'identique. -->
+    <string name="phishing_service_label">Pass Tech – Phishing-Schutz</string>
     <string name="phishing_detector_description">Liest die Domain, die der
         Browser im Vordergrund anzeigt, um vor dem Kopieren eines Passworts zu
         prüfen, ob sie zum Pass-Tech-Eintrag passt. Es werden keine Daten

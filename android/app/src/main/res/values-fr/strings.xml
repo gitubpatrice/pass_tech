@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_disguise_label">Calculatrice</string>
-    <string name="phishing_service_label">Pass Tech — anti-hameçonnage</string>
+    <!-- « anti-phishing », et non « anti-hameçonnage » : c'est sous CE nom que
+         l'application demande de le chercher dans la liste Android
+         (`settingsAntiPhishingNeedsAS`). Un intitulé plus juste en français
+         qui ne correspond pas à celui affiché envoie l'utilisateur chercher
+         une ligne qui n'existe pas. Les deux doivent bouger ensemble. -->
+    <string name="phishing_service_label">Pass Tech — anti-phishing</string>
     <string name="phishing_detector_description">Détecte le domaine du
         navigateur frontal pour vérifier qu\'il correspond bien à l\'entrée Pass
         Tech avant de copier un mot de passe. Aucune donnée n\'est stockée ni
