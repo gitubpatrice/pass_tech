@@ -1,0 +1,1 @@
+Zu 100 % lokaler Passwort-Manager. Argon2id + AES-256-GCM.

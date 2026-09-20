@@ -47,6 +47,7 @@ La majorité des gestionnaires de mots de passe synchronisent vos données via l
 - Vérification de fuites HIBP (k-anonymat, optionnelle)
 - Export / import du coffre chiffré (`.ptbak`)
 - Mises à jour vérifiables via GitHub Releases (SHA-256 publié)
+- Cinq langues — français, anglais, allemand, italien, espagnol — au choix dans les Réglages, indépendamment de la langue de l'appareil
 
 ### Pack confidentialité radicale
 
@@ -77,7 +78,7 @@ La majorité des gestionnaires de mots de passe synchronisent vos données via l
 
 La liste des permissions est figée dans [`android/expected-permissions.txt`](android/expected-permissions.txt) et vérifiée **sur l'APK construit à chaque commit**, avec un contrôle de traceurs Exodus Privacy.
 
-Voir [THREAT_MODEL.md](THREAT_MODEL.md) pour ce qui est protégé, contre qui, **et ce qui ne l'est pas** — limites assumées comprises. Voir [SECURITY.md](SECURITY.md) pour signaler une vulnérabilité.
+Voir [THREAT_MODEL.md](THREAT_MODEL.md) pour ce qui est protégé, contre qui, **et ce qui ne l'est pas** — limites assumées comprises. Voir [SECURITY.fr.md](SECURITY.fr.md) pour signaler une vulnérabilité.
 
 ## Captures d'écran
 
@@ -138,7 +139,7 @@ storeFile=../keystore.jks
 - [THREAT_MODEL.md](THREAT_MODEL.md) — ce qui est protégé, contre qui, et ce qui ne l'est pas
 - [PRIVACY.md](PRIVACY.md) / [PRIVACY.fr.md](PRIVACY.fr.md) — politique de confidentialité
 - [TERMS.md](TERMS.md) / [TERMS.fr.md](TERMS.fr.md) — conditions d'utilisation
-- [SECURITY.md](SECURITY.md) — politique de signalement de vulnérabilités
+- [SECURITY.fr.md](SECURITY.fr.md) — politique de signalement de vulnérabilités
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — dépendances tierces
 - [NOTICE](NOTICE) — mentions Apache 2.0
 

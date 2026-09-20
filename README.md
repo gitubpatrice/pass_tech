@@ -47,6 +47,7 @@ Most password managers sync your data through their cloud — which means trusti
 - HIBP breach check (k-anonymity, opt-in)
 - Encrypted vault export / import (`.ptbak`)
 - Verifiable updates via GitHub Releases (published SHA-256)
+- Five languages — English, French, German, Italian, Spanish — picked in Settings, independently of the device language
 
 ### Radical privacy pack
 

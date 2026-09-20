@@ -1,0 +1,7 @@
+Español, alemán e italiano, junto al francés y el inglés. La elección está en Ajustes.
+
+Traducir sacó a la luz 21 cadenas escritas en francés dentro del código, fuera del sistema de traducción: aviso de integridad, errores de importación, petición biométrica.
+
+Caja fuerte señuelo, dos defectos corregidos:
+• La biometría abría la caja fuerte PRINCIPAL y la petición saltaba sola. Ahora ambas se excluyen.
+• Una exportación en claro sobrevivía a «Eliminar todos los datos» y al modo pánico.

@@ -201,6 +201,24 @@ enum VaultDeleteOutcome {
   decoyOnly,
 }
 
+/// Textes de l'invite biométrique système.
+///
+/// v2.7.0 — ces deux chaînes étaient écrites en dur en français dans
+/// `_bioStorage`. Elles s'affichent dans un dialogue rendu par Android, hors
+/// de tout widget : aucun écran ne pouvait les traduire à notre place, et un
+/// utilisateur anglophone lisait « Déverrouiller votre coffre-fort » /
+/// « Annuler ».
+///
+/// Le service n'a pas de `BuildContext`. Plutôt que d'aller chercher la locale
+/// depuis une variable globale, l'appelant — qui a le contexte — les fournit.
+/// Le paramètre est REQUIS à dessein : ainsi le compilateur désigne tout
+/// nouveau chemin qui déclencherait l'invite sans se poser la question.
+class BiometricPromptText {
+  final String subtitle;
+  final String cancel;
+  const BiometricPromptText({required this.subtitle, required this.cancel});
+}
+
 class VaultService {
   static final VaultService _instance = VaultService._();
   factory VaultService() => _instance;
@@ -293,16 +311,30 @@ class VaultService {
         // sans que l'utilisateur ne s'authentifie à nouveau.
         androidBiometricOnly: true,
       ),
+      // Invite par défaut — elle ne sert QUE de valeur de repli pour `delete`,
+      // qui côté Android ne passe pas par `withAuth` et n'affiche donc aucun
+      // dialogue (vérifié dans `BiometricStoragePlugin.kt`). Les deux chemins
+      // qui font réellement apparaître l'invite, lecture et écriture, passent
+      // leur propre `promptInfo` traduit.
       promptInfo: const PromptInfo(
         androidPromptInfo: AndroidPromptInfo(
           title: 'Pass Tech',
-          subtitle: 'Déverrouiller votre coffre-fort',
-          negativeButton: 'Annuler',
           confirmationRequired: false,
         ),
       ),
     );
   }
+
+  /// Construit l'invite système à partir des textes fournis par l'appelant.
+  /// Le titre reste la marque, qui ne se traduit pas.
+  static PromptInfo biometricPromptInfo(BiometricPromptText text) => PromptInfo(
+    androidPromptInfo: AndroidPromptInfo(
+      title: 'Pass Tech',
+      subtitle: text.subtitle,
+      negativeButton: text.cancel,
+      confirmationRequired: false,
+    ),
+  );
 
   // Crypto parameters
   // v3 (legacy, read-only): PBKDF2-HMAC-SHA256 600 000 iter, AES-CBC + HMAC.
@@ -497,6 +529,27 @@ class VaultService {
     // pire cas est que l'application croie à un vrai leurre là où il n'y a
     // qu'un factice. Elle s'abstient alors de toucher à `_b` — on perd une
     // régénération de rembourrage, jamais des données.
+    // AUDIT 2026-09-20 (relecture 3 axes, constat A) — le désarmement de la
+    // biométrie descend ICI, dans le service.
+    //
+    // La v2.6.2 l'avait posé dans `settings_screen._setupDecoy`, et le fichier
+    // que voici condamne cet emplacement vingt lignes plus haut, pour
+    // l'invariant jumeau « mot de passe leurre ≠ mot de passe principal » :
+    // *une garantie confiée à une couche plus étroite que celle qui la promet
+    // est une garantie qui tombera*. Le défaut que SEC F6 a diagnostiqué et
+    // corrigé pour son voisin, je venais de le reproduire à côté.
+    //
+    // AVANT la création, et non après, parce que les deux ordres n'échouent
+    // pas du même côté : interrompu APRÈS, on laisserait un leurre avec la
+    // biométrie encore armée — exactement la faille que l'exclusion existe pour
+    // fermer, puisque l'empreinte ouvre le coffre PRINCIPAL. Interrompu avant,
+    // on laisse une biométrie désarmée sans leurre : l'utilisateur la réarme
+    // d'une tape, et rien n'est exposé entre-temps.
+    //
+    // `deleteBiometricKey` efface le drapeau d'interface EN PREMIER (cf. F2
+    // v2.4.3) : même si l'effacement Keystore échoue derrière, le bouton
+    // biométrique disparaît et aucun chemin ne peut plus le rouvrir.
+    await deleteBiometricKey();
     await _storage.write(key: _decoyConfiguredKey, value: 'true');
     // `_createSlot(decoy)` écrase le fichier `_b` (leurre factice) par un VRAI
     // coffre leurre (contenu + mot de passe choisis par l'utilisateur).
@@ -810,7 +863,7 @@ class VaultService {
   Future<bool> get hasBiometricKey async =>
       (await _storage.read(key: _biometricFlagKey)) == '1';
 
-  Future<void> saveBiometricKey() async {
+  Future<void> saveBiometricKey(BiometricPromptText prompt) async {
     if (_key == null) return;
     // SÉCURITÉ : la biométrique est verrouillée au coffre PRIMARY.
     // Si l'utilisateur ouvre le decoy puis tente d'activer la bio, on
@@ -819,12 +872,29 @@ class VaultService {
     // sans connaître son password (avec juste l'empreinte). Pire encore,
     // cela trahirait l'existence du decoy à un attaquant attentif.
     if (_activeSlot != _Slot.primary) {
-      throw StateError(
-        'La biométrique n\'est disponible que sur le coffre principal',
-      );
+      throw StateError(biometricPrimaryOnly);
+    }
+    // AUDIT 2026-09-20 (relecture 3 axes, constat A) — l'AUTRE sens de
+    // l'exclusion, lui aussi descendu dans le service.
+    //
+    // La garde ci-dessus refuse d'armer la biométrie DEPUIS une session leurre.
+    // Elle ne dit rien du cas qui compte vraiment : l'armer depuis le coffre
+    // principal ALORS QU'un leurre existe. C'est celui-là qui rouvre la faille,
+    // puisque l'empreinte ouvre ensuite le principal sans demander de mot de
+    // passe — et sous contrainte, l'invite part toute seule.
+    //
+    // L'écran le refuse déjà, avec un message traduit ; mais un écran est un
+    // rempart d'interface. Ici le refus ne dépend que de l'existence d'un
+    // leurre, jamais de l'emplacement actif : il rend le même verdict depuis
+    // les deux coffres, donc il n'est pas un oracle.
+    if (await hasDecoyVault) {
+      throw StateError(biometricDecoyConflict);
     }
     final store = await _bioStorage();
-    await store.write(base64Encode(_key!));
+    await store.write(
+      base64Encode(_key!),
+      promptInfo: biometricPromptInfo(prompt),
+    );
     await _storage.write(key: _biometricFlagKey, value: '1');
   }
 
@@ -1320,6 +1390,17 @@ class VaultService {
   /// SEC-R1 v2.5.2 — une opération concurrente détient déjà `_unlockGate`.
   /// L'appelant doit inviter l'utilisateur à réessayer, sans rien muter.
   static const vaultBusy = 'pt_vault_busy';
+
+  /// AUDIT 2026-09-20 — sentinelles levées par [saveBiometricKey].
+  ///
+  /// Les deux disent la même chose à l'utilisateur, et c'est VOULU : l'une
+  /// signifie « un leurre existe », l'autre « vous êtes dans le leurre ». Leur
+  /// donner deux messages distincts ferait du refus un oracle — depuis une
+  /// session leurre, la différence de formulation révélerait l'existence du
+  /// mécanisme. L'appelant les traduit toutes deux par
+  /// `settingsBiometricDecoyConflict`.
+  static const biometricDecoyConflict = 'pt_biometric_decoy_conflict';
+  static const biometricPrimaryOnly = 'pt_biometric_primary_only';
 
   Future<VaultDeleteOutcome> deleteVault() async {
     // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI

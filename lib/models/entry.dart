@@ -26,16 +26,12 @@ String entryTypeToString(EntryType t) {
   }
 }
 
-String entryTypeLabel(EntryType t) {
-  switch (t) {
-    case EntryType.password:
-      return 'Mot de passe';
-    case EntryType.note:
-      return 'Note sécurisée';
-    case EntryType.card:
-      return 'Carte bancaire';
-  }
-}
+// v2.7.0 — `entryTypeLabel` a été SUPPRIMÉE : elle rendait « Mot de passe » /
+// « Note sécurisée » / « Carte bancaire » en français en dur, et plus personne
+// ne l'appelait. Son jumeau vivant est `_entryTypeLabelLocalized` dans
+// `entry_detail_screen`, qui passe par `entryTypePassword` / `entryTypeNote` /
+// `entryTypeCard`. Trouvée en cherchant les chaînes hors l10n : elle aurait
+// figuré indéfiniment dans les inventaires de traduction sans jamais s'afficher.
 
 class Entry {
   final String id;

@@ -1,0 +1,7 @@
+German, Italian and Spanish, next to French and English. Pick yours in Settings.
+
+Translating found 21 strings hardcoded in French, outside the translation system: the integrity warning, every import error, the biometric prompt.
+
+Decoy vault, two defects fixed:
+• Biometrics opened the MAIN vault, the prompt firing on its own. The two now exclude each other.
+• A plaintext export survived "Delete all my data" and panic mode. Both now shred it.

@@ -1,0 +1,7 @@
+Deutsch, Italienisch und Spanisch, neben Französisch und Englisch. Wählbar in den Einstellungen.
+
+Beim Übersetzen kamen 21 fest in Französisch verdrahtete Texte zum Vorschein, außerhalb des Übersetzungssystems: Integritätswarnung, Importfehler, biometrische Abfrage.
+
+Schein-Tresor, zwei behobene Fehler:
+• Die Biometrie öffnete den HAUPT-Tresor, die Abfrage kam von allein. Beide schließen sich nun aus.
+• Ein Klartext-Export überlebte „Alle Daten löschen" und den Panikmodus.

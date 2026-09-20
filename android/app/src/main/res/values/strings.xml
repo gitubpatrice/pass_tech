@@ -1,4 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ressources ANDROID — à ne pas confondre avec `lib/l10n/*.arb`.
+
+  Ce que l'application affiche elle-même passe par Flutter et suit la langue
+  choisie dans les Réglages. Ce fichier-ci ne porte que ce qu'ANDROID affiche
+  à notre place : le libellé sous une icône du lanceur, et la description d'un
+  service dans les réglages d'accessibilité. Ces textes suivent la langue du
+  SYSTÈME, et c'est ce qu'on veut — voir `app_disguise_label`.
+
+  v2.7.0 — ce dossier par défaut contenait du FRANÇAIS, et lui seul. Tout
+  utilisateur non francophone lisait donc une description en français dans les
+  réglages Android. Le défaut a échappé aux trois détecteurs de chaînes en dur :
+  ils balayaient `lib/**/*.dart`, et celle-ci n'est pas du Dart.
+-->
 <resources>
-    <string name="phishing_detector_description">Détecte le domaine du navigateur frontal pour vérifier qu\'il correspond bien à l\'entrée Pass Tech avant de copier un mot de passe. Aucune donnée n\'est stockée ni transmise — seul le domaine racine est lu en mémoire volatile, uniquement sur les navigateurs reconnus. Cette protection s\'active à votre demande et reste désactivable à tout moment.</string>
+    <!-- Libellé du camouflage en mode panique.
+         Il suit la langue du SYSTÈME et non celle de l'application, et c'est
+         volontaire : ce nom s'affiche dans le lanceur, au milieu des autres
+         applications. Une « Calculatrice » française sur un téléphone en
+         allemand ne passe pas inaperçue — elle DÉSIGNE l'application qu'elle
+         est censée cacher. Les qualificateurs de ressources Android suivent
+         exactement la bonne langue ici. -->
+    <string name="app_disguise_label">Calculator</string>
+
+    <!-- Libellé du service dans la liste des réglages d'accessibilité. -->
+    <string name="phishing_service_label">Pass Tech — anti-phishing</string>
+
+    <!-- Texte affiché sous l'interrupteur, dans les réglages d'accessibilité
+         d'Android. C'est là que l'utilisateur décide d'accorder, ou non, la
+         lecture du contenu de ses fenêtres : il doit pouvoir le lire. -->
+    <string name="phishing_detector_description">Reads the domain shown by the
+        foreground browser to check that it matches the Pass Tech entry before a
+        password is copied. No data is stored or transmitted — only the root
+        domain is read, in volatile memory, and only on recognised browsers.
+        This protection is turned on at your request and can be turned off at
+        any time.</string>
 </resources>

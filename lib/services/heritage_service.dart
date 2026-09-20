@@ -44,6 +44,12 @@ import 'vault_service.dart';
 /// recoverable. L'utilisateur doit le partager (oralement, via testament,
 /// dans un endroit sûr) avec son héritier hors-bande.
 class HeritageService {
+  /// Sentinelle levée par [setupOrUpdateSnapshot] quand le coffre ne contient
+  /// aucune entrée. L'appelant doit la traduire en message dédié plutôt que
+  /// d'exposer la sentinelle brute — même convention que
+  /// [VaultService.vaultBusy].
+  static const vaultEmpty = 'pt_heir_vault_empty';
+
   static const _storage = FlutterSecureStorage();
   static const _saltKey = 'pt_heir_salt';
   static const _enabledKey = 'pt_heir_enabled';
@@ -209,7 +215,13 @@ class HeritageService {
     }
     final entries = VaultService().entries;
     if (entries.isEmpty) {
-      throw StateError('Le coffre est vide — rien à transmettre');
+      // v2.7.0 — sentinelle, et non message. Ce cas est le SEUL des trois
+      // rejets de cette méthode qu'un utilisateur atteint réellement : rien à
+      // l'écran n'empêche de configurer l'héritage sur un coffre vide, et
+      // `settings_screen` affichait `e.message` tel quel — en français, quelle
+      // que soit la langue choisie. Les deux autres rejets sont des gardes
+      // d'invariant que le dialogue de saisie intercepte en amont.
+      throw StateError(vaultEmpty);
     }
     // v2.2.0 : write target = v2 (Argon2id + AES-GCM-256). Le salt sert à la
     // dérivation Argon2id ET à l'AAD (anti-downgrade). v1 reste lisible pour

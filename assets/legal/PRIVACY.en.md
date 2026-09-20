@@ -1,6 +1,6 @@
 # Privacy Policy — Pass Tech
 
-**Document version**: July 15, 2026 (Pass Tech v2.5.1)
+**Document version**: September 20, 2026 (Pass Tech v2.7.0)
 **App**: Pass Tech
 **Official website**: https://www.files-tech.com
 **Contact**: contact@files-tech.com
@@ -90,7 +90,11 @@ See [SECURITY.md](./SECURITY.md).
 | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Optional biometric unlock via Android BiometricPrompt.                                              |
 | `INTERNET`                           | Update checks (GitHub Releases) and HIBP (k-anonymity, opt-in).                                     |
-| `CAMERA`                             | Scan a 2FA QR code to add a TOTP secret. Camera frames processed locally, never recorded.           |
+
+`CAMERA` and `ACCESS_NETWORK_STATE` were **removed on 2026-08-03** together
+with QR code scanning, which relied on Google ML Kit. A 2FA secret is now
+added by pasting the `otpauth://` URI that services display under their QR
+code.
 
 ## 11. Children
 

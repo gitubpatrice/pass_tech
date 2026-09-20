@@ -523,7 +523,7 @@ extension VaultUnlock on VaultService {
   /// Déverrouillage par biométrique : la clé 32B v4 est cachée dans
   /// biometric_storage et utilisée directement (pas d'Argon2id ni d'unwrap KEK).
   /// Le tag GCM lié à l'AAD garantit fail-closed si la clé ne correspond pas.
-  Future<UnlockResult> unlockWithBiometric() async {
+  Future<UnlockResult> unlockWithBiometric(BiometricPromptText prompt) async {
     // P1-27 v2.4.0 — mutex `_unlockGate` étendu à la bio. Avant : un user
     // qui tape password puis fingerprint avant que le 1er unlock complète
     // déclenchait 2 paths en parallèle (`_key`, `_entries` mutables) →
@@ -537,14 +537,16 @@ extension VaultUnlock on VaultService {
     }
     final gate = _unlockGate = Completer<void>();
     try {
-      return await _unlockWithBiometricInternal();
+      return await _unlockWithBiometricInternal(prompt);
     } finally {
       if (!gate.isCompleted) gate.complete();
       _unlockGate = null;
     }
   }
 
-  Future<UnlockResult> _unlockWithBiometricInternal() async {
+  Future<UnlockResult> _unlockWithBiometricInternal(
+    BiometricPromptText prompt,
+  ) async {
     // SEC 2026-08-04 — dernier chemin long dépourvu de la garde de
     // verrouillage, et paradoxalement le plus exposé des quatre.
     //
@@ -562,7 +564,9 @@ extension VaultUnlock on VaultService {
     if (await getLockoutRemaining() != null) return UnlockResult.lockedOut;
     try {
       final store = await _bioStorage();
-      final keyB64 = await store.read();
+      final keyB64 = await store.read(
+        promptInfo: VaultService.biometricPromptInfo(prompt),
+      );
       if (keyB64 == null || keyB64.isEmpty) {
         // SEC F20 v2.5.4 — une lecture VIDE alors que la biométrie est
         // marquée active est anormale : l'entrée devrait exister. C'est ce que

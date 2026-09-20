@@ -1,6 +1,6 @@
 # Politique de confidentialité — Pass Tech
 
-**Version du document** : 15 juillet 2026 (Pass Tech v2.5.1)
+**Version du document** : 20 septembre 2026 (Pass Tech v2.7.0)
 **App** : Pass Tech
 **Site officiel** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -91,7 +91,11 @@ Voir [SECURITY.md](./SECURITY.md).
 | ------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Déverrouillage biométrique optionnel via Android BiometricPrompt.                                 |
 | `INTERNET`                           | Vérification de mises à jour (GitHub Releases) et HIBP (k-anonymity, opt-in).                     |
-| `CAMERA`                             | Scanner un QR code 2FA pour ajouter un secret TOTP. Flux caméra traité localement, jamais enregistré. |
+
+`CAMERA` et `ACCESS_NETWORK_STATE` ont été **retirées le 2026-08-03** avec le
+scan de QR code, qui reposait sur Google ML Kit. Un secret 2FA s'ajoute
+désormais en collant l'URI `otpauth://` que les services affichent sous leur
+QR code.
 
 ## 11. Enfants
 

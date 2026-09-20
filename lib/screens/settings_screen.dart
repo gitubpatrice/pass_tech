@@ -27,6 +27,7 @@ import '../widgets/destructive.dart';
 import '../l10n/app_localizations.dart';
 import '../main.dart'
     show
+        appLanguageCodes,
         themeNotifier,
         parseThemeMode,
         themeModeToString,
@@ -34,6 +35,7 @@ import '../main.dart'
         parseLocale,
         localeToString,
         prefKeyLocale;
+import '../utils/biometric_prompt.dart';
 import 'audit_screen.dart';
 import 'setup_screen.dart';
 import 'unlock_screen.dart';
@@ -261,12 +263,33 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
-  String _localeLabel(AppLocalizations t) {
-    if (_locale == null) return t.settingsLanguageSystem;
-    if (_locale!.languageCode == 'fr') return t.settingsLanguageFrench;
-    if (_locale!.languageCode == 'en') return t.settingsLanguageEnglish;
-    return t.settingsLanguageSystem;
+  /// Libellé d'un code de langue. `null` = suivre le système.
+  ///
+  /// Le repli rend le code brut et non « Système » : une langue reconnue par
+  /// `parseLocale` mais absente d'ici est un oubli, et l'afficher comme
+  /// « Système (auto) » aurait masqué cet oubli au lieu de le montrer — la
+  /// sélection aurait pris effet tout en paraissant inactive.
+  String _languageLabel(String? code, AppLocalizations t) {
+    switch (code) {
+      case null:
+        return t.settingsLanguageSystem;
+      case 'fr':
+        return t.settingsLanguageFrench;
+      case 'en':
+        return t.settingsLanguageEnglish;
+      case 'de':
+        return t.settingsLanguageGerman;
+      case 'it':
+        return t.settingsLanguageItalian;
+      case 'es':
+        return t.settingsLanguageSpanish;
+      default:
+        return code;
+    }
   }
+
+  String _localeLabel(AppLocalizations t) =>
+      _languageLabel(_locale?.languageCode, t);
 
   Future<void> _setAutoLock(int v) async {
     final prefs = await SharedPreferences.getInstance();
@@ -339,7 +362,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       SnackUtils.showInfo(messenger, t.heritageConfiguredSnack);
     } on StateError catch (e) {
       if (!mounted) return;
-      SnackUtils.showError(context, messenger, e.message);
+      // v2.7.0 — `e.message` n'est plus affiché brut : le seul rejet qu'un
+      // utilisateur atteint ici est le coffre vide, et il portait un texte
+      // français en dur. Les autres restent des gardes d'invariant, rendues
+      // par le message générique.
+      SnackUtils.showError(context, messenger, switch (e.message) {
+        HeritageService.vaultEmpty => t.heritageVaultEmpty,
+        _ => t.genericError('$e'),
+      });
     } on ArgumentError catch (e) {
       if (!mounted) return;
       SnackUtils.showError(context, messenger, '${e.message}');
@@ -480,9 +510,22 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       );
       if (accepte != true || !mounted) return;
-      await VaultService().deleteBiometricKey();
-      if (!mounted) return;
-      setState(() => _biometricEnabled = false);
+      // AUDIT 2026-09-20 (relecture 3 axes, constat B) — on ne désarme PAS ici.
+      //
+      // La v2.6.2 appelait `deleteBiometricKey()` dès cet accord. Or quatre
+      // sorties suivent avant qu'un leurre existe : l'explication qu'on peut
+      // refuser, la saisie qu'on peut annuler, le mot de passe identique au
+      // principal qu'on refuse, et l'échec du service. Dans ces quatre cas
+      // l'utilisateur repartait SANS leurre et SANS biométrie, alors qu'il
+      // avait accepté « désarmer POUR configurer un leurre ».
+      //
+      // Le commentaire ci-dessus dit lui-même qu'une biométrie qui cesse de
+      // fonctionner doit signaler une intervention : la retirer sans
+      // contrepartie fait douter l'utilisateur de son téléphone, pour rien.
+      //
+      // `setupDecoyVault` s'en charge désormais, dans la même opération que la
+      // création. L'accord recueilli ici reste indispensable — il prévient —
+      // mais il ne détruit plus rien à lui seul.
     }
     // Avertissement explicatif avant la configuration.
     final go = await showDialog<bool>(
@@ -529,7 +572,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       await VaultService().setupDecoyVault(pwd);
       VaultService().lock();
       if (!mounted) return;
-      setState(() {});
+      // Le service vient de désarmer la biométrie : l'écran s'aligne sur le
+      // fait accompli plutôt que de l'anticiper.
+      setState(() => _biometricEnabled = false);
       SnackUtils.showInfo(messenger, t.decoyConfiguredSnack);
       // Retour au unlock screen
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -761,7 +806,23 @@ class _SettingsScreenState extends State<SettingsScreen>
         // Lance StateError si le slot actif n'est pas primary (sécurité
         // dual-vault). On absorbe silencieusement pour ne pas trahir
         // l'existence du decoy à un attaquant attentif.
-        await VaultService().saveBiometricKey();
+        await VaultService().saveBiometricKey(biometricPromptTextOf(t));
+      } on StateError catch (e) {
+        // AUDIT 2026-09-20 — le service refuse aussi, désormais. Le contrôle
+        // juste au-dessus arrête le cas nominal ; celui-ci rattrape ce qui
+        // passerait entre les deux (leurre créé pendant que cet écran est
+        // ouvert). Même message, donc même verdict qu'un refus en amont : rien
+        // ne distingue les deux chemins pour l'observateur.
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, switch (e.message) {
+          // Les deux sentinelles rendent le MÊME message. Les distinguer à
+          // l'écran ferait du refus un oracle : depuis le leurre, une
+          // formulation différente trahirait l'existence du mécanisme.
+          VaultService.biometricDecoyConflict ||
+          VaultService.biometricPrimaryOnly => t.settingsBiometricDecoyConflict,
+          _ => t.genericError('$e'),
+        });
+        return;
       } on AuthException catch (e) {
         // (v2.4.2) Discrimine annulation (userCanceled/canceled) d'échec
         // technique pour donner un feedback explicite à l'utilisateur,
@@ -1217,10 +1278,17 @@ class _SettingsScreenState extends State<SettingsScreen>
       }
       formatLabel = t.importFormatEncryptedBackup;
     } else {
-      final result = ImportExportService.parse(content);
+      final result = ImportExportService.parse(
+        content,
+        untitled: t.importUntitledEntry,
+      );
       if (result.error != null) {
         if (!mounted) return;
-        SnackUtils.showError(context, messenger, result.error!);
+        SnackUtils.showError(
+          context,
+          messenger,
+          _importErrorLabel(result.error!, t),
+        );
         return;
       }
       imported = result.entries;
@@ -1273,6 +1341,30 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) {
       final skippedSuffix = skipped > 0 ? t.importSkippedSuffix(skipped) : '';
       SnackUtils.showInfo(messenger, t.importDoneSnack(added, skippedSuffix));
+    }
+  }
+
+  /// Libellé d'un échec d'import dans la langue de l'application.
+  /// Le `detail` reste tel quel : il vient de l'analyseur JSON ou CSV et n'a
+  /// pas de traduction.
+  String _importErrorLabel(ImportError e, AppLocalizations t) {
+    switch (e.code) {
+      case ImportErrorCode.tooLarge:
+        return t.importErrorTooLarge;
+      case ImportErrorCode.emptyFile:
+        return t.importErrorEmptyFile;
+      case ImportErrorCode.jsonUnknownFormat:
+        return t.importErrorJsonUnknown;
+      case ImportErrorCode.jsonInvalid:
+        return t.importErrorJsonInvalid(e.detail ?? '');
+      case ImportErrorCode.csvInvalid:
+        return t.importErrorCsvInvalid(e.detail ?? '');
+      case ImportErrorCode.csvEmpty:
+        return t.importErrorCsvEmpty;
+      case ImportErrorCode.csvNoPasswordColumn:
+        return t.importErrorCsvNoPasswordColumn;
+      case ImportErrorCode.cellTooLarge:
+        return t.importErrorCellTooLarge;
     }
   }
 
@@ -1511,22 +1603,22 @@ class _SettingsScreenState extends State<SettingsScreen>
                     context: ctx,
                     builder: (_) => SimpleDialog(
                       title: Text(t.settingsLanguage),
-                      children:
-                          <(String, String)>[
-                            (t.settingsLanguageSystem, 'system'),
-                            (t.settingsLanguageFrench, 'fr'),
-                            (t.settingsLanguageEnglish, 'en'),
-                          ].map((opt) {
-                            final selected =
-                                (_locale?.languageCode ?? 'system') == opt.$2;
-                            return ListTile(
-                              title: Text(opt.$1),
-                              trailing: selected
-                                  ? const Icon(Icons.check)
-                                  : null,
-                              onTap: () => Navigator.pop(ctx, opt.$2),
-                            );
-                          }).toList(),
+                      // La liste vient de `appLanguageCodes` : ajouter une
+                      // langue se fait à un seul endroit, et il devient
+                      // impossible d'en proposer une que `parseLocale` ne
+                      // sait pas interpréter.
+                      children: <String?>[null, ...appLanguageCodes].map((
+                        code,
+                      ) {
+                        final valeur = code ?? 'system';
+                        final selected =
+                            (_locale?.languageCode ?? 'system') == valeur;
+                        return ListTile(
+                          title: Text(_languageLabel(code, t)),
+                          trailing: selected ? const Icon(Icons.check) : null,
+                          onTap: () => Navigator.pop(ctx, valeur),
+                        );
+                      }).toList(),
                     ),
                   );
                   if (choice == null) return; // barrier dismiss
@@ -1799,7 +1891,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       subtitle: Text(
                         t.heritageThresholdTileSubtitle(
                           '$threshold',
-                          inactivity < 0 ? '—' : '$inactivity j',
+                          inactivity < 0 ? '—' : t.unitDaysShort('$inactivity'),
                         ),
                         style: const TextStyle(fontSize: 12),
                       ),

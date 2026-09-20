@@ -11,10 +11,45 @@ import 'aead_service.dart';
 import 'kdf_service.dart';
 import 'vault_service.dart' show pbkdf2Worker;
 
+/// Cause d'un échec d'import, indépendante de la langue.
+///
+/// v2.7.0 — `ImportResult.error` portait auparavant un message français tout
+/// fait, que `settings_screen` affichait tel quel : « Fichier vide », « CSV
+/// invalide : … » s'affichaient en français quelle que soit la langue choisie.
+/// Le service rend désormais la cause ; le libellé se décide à l'écran.
+enum ImportErrorCode {
+  tooLarge,
+  emptyFile,
+  jsonUnknownFormat,
+  jsonInvalid,
+  csvInvalid,
+  csvEmpty,
+  csvNoPasswordColumn,
+  cellTooLarge,
+}
+
+/// Un échec d'import et, quand il y en a un, le détail technique de
+/// l'analyseur. Ce détail n'est pas traduisible — il vient de `dart:convert`
+/// ou du lecteur CSV — et n'est affiché qu'en complément du libellé traduit.
+class ImportError {
+  final ImportErrorCode code;
+  final String? detail;
+  const ImportError(this.code, {this.detail});
+}
+
+/// Cellule CSV au-delà du plafond anti-DoS. Type propre — et non une
+/// `FormatException` parmi d'autres — pour que l'analyseur puisse lui rendre
+/// son libellé traduit plutôt que de la noyer dans « CSV invalide ».
+class _CsvCellTooLarge implements Exception {
+  const _CsvCellTooLarge();
+  @override
+  String toString() => 'CSV cell exceeds the import cap';
+}
+
 class ImportResult {
   final List<Entry> entries;
   final String format;
-  final String? error;
+  final ImportError? error;
   const ImportResult({required this.entries, required this.format, this.error});
 }
 
@@ -24,12 +59,17 @@ class ImportExportService {
   /// Plain JSON/CSV files larger than this are rejected (DoS safety).
   static const _maxImportBytes = 50 * 1024 * 1024; // 50 MB
 
-  static ImportResult parse(String content) {
+  /// [untitled] est le titre donné aux entrées du fichier qui n'en portent
+  /// pas. C'est de la DONNÉE, écrite dans le coffre : elle est donc rendue
+  /// dans la langue de l'application au moment de l'import, et l'appelant —
+  /// qui a le contexte — la fournit. Sans ce paramètre, tout import produisait
+  /// des entrées intitulées « Sans titre », y compris en anglais.
+  static ImportResult parse(String content, {required String untitled}) {
     if (content.length > _maxImportBytes) {
       return const ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'Fichier trop volumineux (max 50 Mo)',
+        error: ImportError(ImportErrorCode.tooLarge),
       );
     }
     final trimmed = content.trim();
@@ -37,21 +77,21 @@ class ImportExportService {
       return const ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'Fichier vide',
+        error: ImportError(ImportErrorCode.emptyFile),
       );
     }
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      return _parseJson(trimmed);
+      return _parseJson(trimmed, untitled);
     }
-    return _parseCsv(content);
+    return _parseCsv(content, untitled);
   }
 
-  static ImportResult _parseJson(String content) {
+  static ImportResult _parseJson(String content, String untitled) {
     try {
       final json = jsonDecode(content);
       // Bitwarden: { items: [...], folders: [...] }
       if (json is Map && json.containsKey('items') && json['items'] is List) {
-        return _parseBitwarden(json['items'] as List);
+        return _parseBitwarden(json['items'] as List, untitled);
       }
       // Pass Tech native: [ {id, type, title, ...}, ... ]
       if (json is List) {
@@ -77,24 +117,24 @@ class ImportExportService {
       return const ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'Format JSON non reconnu',
+        error: ImportError(ImportErrorCode.jsonUnknownFormat),
       );
     } catch (e) {
       return ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'JSON invalide : $e',
+        error: ImportError(ImportErrorCode.jsonInvalid, detail: '$e'),
       );
     }
   }
 
-  static ImportResult _parseBitwarden(List items) {
+  static ImportResult _parseBitwarden(List items, String untitled) {
     final entries = <Entry>[];
     for (final raw in items) {
       if (raw is! Map) continue;
       final item = Map<String, dynamic>.from(raw);
       final type = item['type'] as int? ?? 1;
-      final name = (item['name'] as String?) ?? 'Sans titre';
+      final name = (item['name'] as String?) ?? untitled;
       final notes = (item['notes'] as String?) ?? '';
       final favorite = item['favorite'] as bool? ?? false;
 
@@ -167,22 +207,35 @@ class ImportExportService {
     return ImportResult(entries: entries, format: 'bitwarden');
   }
 
-  static ImportResult _parseCsv(String content) {
+  static ImportResult _parseCsv(String content, String untitled) {
     final List<List<String>> rows;
     try {
       rows = _parseCsvRows(content);
-    } on FormatException catch (e) {
+    } on _CsvCellTooLarge {
+      // Ce cas se distingue des autres erreurs de forme : il a son propre
+      // libellé traduit. Confondu avec elles, son message serait arrivé à
+      // l'écran comme `detail` non traduisible de « CSV invalide ».
+      return const ImportResult(
+        entries: [],
+        format: 'unknown',
+        error: ImportError(ImportErrorCode.cellTooLarge),
+      );
+    } catch (e) {
+      // Filet, et non branche morte. `_parseCsvRows` ne lève aujourd'hui que
+      // `_CsvCellTooLarge`, traité juste au-dessus ; la clause précédente
+      // n'attrapait que `FormatException` et laissait donc TOUTE autre panne
+      // d'analyse remonter jusqu'à l'écran sous forme de plantage d'import.
       return ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'CSV invalide : ${e.message}',
+        error: ImportError(ImportErrorCode.csvInvalid, detail: '$e'),
       );
     }
     if (rows.isEmpty) {
       return const ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'CSV vide',
+        error: ImportError(ImportErrorCode.csvEmpty),
       );
     }
     final header = rows.first.map((s) => s.toLowerCase().trim()).toList();
@@ -207,7 +260,7 @@ class ImportExportService {
       return const ImportResult(
         entries: [],
         format: 'unknown',
-        error: 'Colonne "password" introuvable dans le CSV',
+        error: ImportError(ImportErrorCode.csvNoPasswordColumn),
       );
     }
 
@@ -221,7 +274,7 @@ class ImportExportService {
       entries.add(
         Entry(
           type: EntryType.password,
-          title: title.isEmpty ? 'Sans titre' : title,
+          title: title.isEmpty ? untitled : title,
           category: _guessCategory(title, url),
           username: at(iUser),
           password: at(iPass),
@@ -298,7 +351,7 @@ class ImportExportService {
   static const _maxCsvCellBytes = 64 * 1024;
 
   /// Minimal CSV parser handling quoted fields and escaped quotes.
-  /// Lance FormatException si une cellule dépasse [_maxCsvCellBytes].
+  /// Lance [_CsvCellTooLarge] si une cellule dépasse [_maxCsvCellBytes].
   static List<List<String>> _parseCsvRows(String content) {
     final rows = <List<String>>[];
     final row = <String>[];
@@ -307,7 +360,7 @@ class ImportExportService {
 
     void checkCellSize() {
       if (buf.length > _maxCsvCellBytes) {
-        throw const FormatException('Cellule CSV trop volumineuse (max 64 Ko)');
+        throw const _CsvCellTooLarge();
       }
     }
 

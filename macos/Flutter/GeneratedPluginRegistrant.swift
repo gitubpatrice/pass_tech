@@ -7,7 +7,7 @@ import Foundation
 
 import biometric_storage
 import cryptography_flutter
-import file_picker
+import file_picker_darwin
 import flutter_secure_storage_darwin
 import package_info_plus
 import share_plus
@@ -15,7 +15,7 @@ import shared_preferences_foundation
 import url_launcher_macos
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  BiometricStorageMacOSPlugin.register(with: registry.registrar(forPlugin: "BiometricStorageMacOSPlugin"))
+  BiometricStoragePlugin.register(with: registry.registrar(forPlugin: "BiometricStoragePlugin"))
   CryptographyFlutterPlugin.register(with: registry.registrar(forPlugin: "CryptographyFlutterPlugin"))
   FilePickerPlugin.register(with: registry.registrar(forPlugin: "FilePickerPlugin"))
   FlutterSecureStorageDarwinPlugin.register(with: registry.registrar(forPlugin: "FlutterSecureStorageDarwinPlugin"))

@@ -23,6 +23,10 @@ Aucun cloud, aucun compte, aucun serveur, aucun tracker, aucune publicité.
 * Permission INTERNET utilisée uniquement pour la vérification de mise
   à jour anonyme via l'API GitHub Releases ; aucune collecte de données
 
+<b>Langues</b>
+Français, anglais, allemand, italien et espagnol — au choix dans les
+Réglages, indépendamment de la langue de l'appareil.
+
 <b>Audit (v2.3.8 → v2.4.0)</b>
 Audit expert zéro-vuln zéro-faille : A1-A20 + B1-B24 corrigés.
 FLAG_SECURE dynamique via Kotlin MethodChannel avec refcount, service

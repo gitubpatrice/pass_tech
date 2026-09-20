@@ -1,6 +1,6 @@
 # Politique de confidentialité — Pass Tech
 
-**Version du document** : 15 juillet 2026 (Pass Tech v2.5.1) · 🇬🇧 [English version](PRIVACY.md)
+**Version du document** : 20 septembre 2026 (Pass Tech v2.7.0) · 🇬🇧 [English version](PRIVACY.md)
 **App** : Pass Tech
 **Site officiel** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -117,7 +117,7 @@ L'application ne transmet aucune donnée à un serveur opéré par le développe
 - **Anti-phishing par domaine** — l'app vérifie le domaine du navigateur en avant-plan avant de copier des identifiants ; alerte en cas de typosquatting.
 - Signature APK v2+ uniquement (`enableV1Signing = false`) — neutralise CVE-2017-13156 (Janus).
 
-Voir [SECURITY.md](./SECURITY.md).
+Voir [SECURITY.fr.md](./SECURITY.fr.md).
 
 ## 10. Permissions Android
 

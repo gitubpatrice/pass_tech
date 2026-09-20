@@ -33,10 +33,25 @@ Locale? parseLocale(String? code) {
       return const Locale('fr');
     case 'en':
       return const Locale('en');
+    case 'de':
+      return const Locale('de');
+    case 'it':
+      return const Locale('it');
+    case 'es':
+      return const Locale('es');
     default:
       return null;
   }
 }
+
+/// Les langues que le sélecteur propose, dans l'ordre d'affichage.
+///
+/// Source unique : `parseLocale`, `_localeLabel` et la boîte de dialogue des
+/// réglages lisaient chacun leur propre liste. Ajouter une langue demandait
+/// trois modifications, et en oublier une donnait un choix qui s'affiche mais
+/// ne s'applique pas — ou pire, un libellé « Système » pour une langue bien
+/// active.
+const List<String> appLanguageCodes = ['fr', 'en', 'de', 'it', 'es'];
 
 /// Serialize a `Locale?` for prefs. `null` → `'system'`.
 String localeToString(Locale? l) {

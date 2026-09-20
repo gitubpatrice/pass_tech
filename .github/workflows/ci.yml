@@ -63,6 +63,22 @@ jobs:
         working-directory: pass_tech
         run: flutter pub get
 
+      # v2.7.0 — parité des cinq langues (fr, en, de, it, es).
+      #
+      # Le contrôle NÉGATIF tourne en premier, et il n'est pas décoratif : il
+      # fabrique cinq fichiers volontairement fautifs et exige que chaque règle
+      # les rejette. Sans lui, un vérificateur qui ne vérifierait plus rien
+      # rendrait 0 pour toujours et cette étape serait verte à perpétuité —
+      # exactement le défaut que le `|| echo "No tests yet"` produisait ici même
+      # avant le 2026-08-03.
+      - name: l10n — contrôle négatif du vérificateur
+        working-directory: pass_tech
+        run: python3 tool/verifier_l10n.py --negatif
+
+      - name: l10n — parité des 5 langues
+        working-directory: pass_tech
+        run: python3 tool/verifier_l10n.py
+
       # AUDIT 2026-08-03 — `--no-fatal-infos` remplacé par le durcissement de la
       # doctrine (`ci-et-chaine-de-publication.md` §4.1). Vérifié en local avant
       # d'être posé ici : l'analyse rend « No issues found » sur ce dépôt, donc
