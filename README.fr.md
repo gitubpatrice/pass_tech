@@ -47,6 +47,7 @@ La majorité des gestionnaires de mots de passe synchronisent vos données via l
 - Vérification de fuites HIBP (k-anonymat, optionnelle)
 - Export / import du coffre chiffré (`.ptbak`)
 - Mises à jour vérifiables via GitHub Releases (SHA-256 publié)
+- Cinq langues — français, anglais, allemand, italien, espagnol — au choix dans les Réglages, indépendamment de la langue de l'appareil
 
 ### Pack confidentialité radicale
 

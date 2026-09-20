@@ -8,12 +8,45 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 | Version       | Supportée  |
 | ------------- | ---------- |
-| 2.5.x         | ✅          |
-| 2.4.x         | ⚠️ legacy (mettre à jour) |
-| 2.0.x – 2.3.x | ⚠️ migration uniquement |
+| 2.7.x         | ✅          |
+| 2.6.x         | ⚠️ legacy (mettre à jour) |
+| 2.0.x – 2.5.x | ⚠️ migration uniquement |
 | < 2.0.0       | ❌          |
 
 ### Historique des correctifs récents
+
+- **v2.7.0** (2026-09-20) — Coffre leurre : deux défauts annulaient la
+  protection qu'il promet.
+  - **Biométrie ↔ leurre, exclusion mutuelle.** Le déverrouillage biométrique
+    ouvre `_Slot.primary` en dur et l'invite part seule à l'ouverture de
+    l'écran. Sous contrainte, qui vous fait poser le doigt obtenait donc le
+    coffre PRINCIPAL sans jamais demander de mot de passe — le leurre était
+    contourné sans qu'on ait besoin de le connaître. Les deux fonctions
+    s'excluent désormais **dans les deux sens** : refuser une seule direction
+    laissait le trou, puisqu'on pouvait réactiver la biométrie après coup. Le
+    refus ne dépend que de l'existence d'un leurre, jamais de l'emplacement
+    actif : il n'est donc pas un oracle.
+  - **Export en clair rémanent.** Le fichier d'export non chiffré déposé en
+    cache survivait à « Supprimer toutes mes données » **et** au mode panique.
+    `VaultService.shredCachedExports()` est désormais appelé par `deleteVault()`
+    et par `panic()`.
+  - Traduction : 21 chaînes françaises codées en dur, hors du système l10n,
+    remontées. Sans effet sur la sécurité, mais l'invite biométrique du
+    système en faisait partie.
+
+- **v2.6.1** (2026-08-11) — Vérification de mise à jour, le seul code de
+  l'application qui sorte sur le réseau. Un portail captif Wi-Fi répondant
+  « 200 » avec une page HTML faisait passer la vérification pour faite et la
+  suspendait 12 h ; la réponse n'était bornée par aucune taille ; les
+  redirections n'étaient pas revérifiées ; le délai ne couvrait pas la lecture.
+  Coffre et chiffrement inchangés.
+
+- **v2.6.0** (2026-08-04) — Retrait complet des bibliothèques et services
+  Google. Audit de sécurité : le score était trompeur sur les petits coffres et
+  ignorait les fuites détectées. Mot de passe maître porté à 12 caractères sans
+  exiger symbole ni chiffre. Avertissement avant le mode panique (la biométrie
+  y est désactivée). Annuler l'invite d'empreinte n'enferme plus sur l'écran de
+  déverrouillage.
 
 - **v2.5.1** (2026-07-08) — Audit expert 4-axes post-v2.5.0
   (sécurité / perf-qualité / câblage / cohérence-i18n). Socle crypto jugé
