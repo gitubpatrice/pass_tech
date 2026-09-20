@@ -394,12 +394,8 @@ class _AboutScreenState extends State<AboutScreen> {
           LegalSupportSections(
             appName: 'Pass Tech',
             version: _version,
-            privacyAsset: Localizations.localeOf(context).languageCode == 'en'
-                ? 'assets/legal/PRIVACY.en.md'
-                : 'assets/legal/PRIVACY.fr.md',
-            termsAsset: Localizations.localeOf(context).languageCode == 'en'
-                ? 'assets/legal/TERMS.en.md'
-                : 'assets/legal/TERMS.fr.md',
+            privacyAsset: _legalAsset('PRIVACY', context),
+            termsAsset: _legalAsset('TERMS', context),
             helpSectionTitle: t.legalHelpSection,
             legalSectionTitle: t.legalLegalSection,
             contactSupportTitle: t.legalContactSupport,
@@ -416,6 +412,30 @@ class _AboutScreenState extends State<AboutScreen> {
         ],
       ),
     );
+  }
+
+  /// Langues dans lesquelles les documents juridiques sont RÉELLEMENT livrés.
+  ///
+  /// v2.7.0 — le choix était binaire : `languageCode == 'en'` donnait l'anglais,
+  /// **tout le reste le français**. Tant que l'application ne parlait que ces
+  /// deux langues, personne ne pouvait le voir. En ajoutant l'allemand,
+  /// l'italien et l'espagnol, ce même test s'est mis à servir la politique de
+  /// confidentialité EN FRANÇAIS à qui lit l'application en allemand — pour le
+  /// document auquel un utilisateur a le plus droit dans sa langue.
+  ///
+  /// La liste vit ici et non dans `appLanguageCodes` parce qu'elle répond à une
+  /// autre question : non pas « quelles langues l'interface propose-t-elle »,
+  /// mais « quels fichiers existent dans `assets/legal/` ». Les deux coïncident
+  /// aujourd'hui, et `tool/verifier_l10n.py` échoue si elles divergent.
+  static const _languesJuridiques = {'en', 'fr', 'de', 'it', 'es'};
+
+  /// Le repli est l'ANGLAIS, version de référence des deux documents, et non
+  /// le français : servir du français à un hispanophone parce que c'est la
+  /// langue d'origine du projet n'a de sens que pour qui connaît ce projet.
+  String _legalAsset(String document, BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
+    final langue = _languesJuridiques.contains(code) ? code : 'en';
+    return 'assets/legal/$document.$langue.md';
   }
 
   Widget _sectionTitle(BuildContext context, String title) => Padding(

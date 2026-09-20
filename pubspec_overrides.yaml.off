@@ -1,0 +1,13 @@
+# NON VERSIONNÉ (voir .gitignore) — développement local uniquement.
+#
+# Rétablit le chemin relatif vers files_tech_core pour pouvoir l'éditer en
+# parallèle de l'app. F-Droid et la CI ne voient pas ce fichier et résolvent
+# donc la dépendance git épinglée du pubspec.
+#
+# Réactivé le 2026-09-20 : il avait été désactivé quelques heures, le temps que
+# Pass Tech passe en `share_plus 13` comme files_tech_core. Les deux sont
+# désormais alignés, `flutter pub get` résout de nouveau, et l'édition du core
+# à côté refonctionne.
+dependency_overrides:
+  files_tech_core:
+    path: ../files_tech_core

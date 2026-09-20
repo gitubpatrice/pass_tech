@@ -275,6 +275,34 @@ def controler_listes_de_langues():
                    sorted(cles_defaut)))
 
     erreurs.extend(controler_nom_du_service())
+    erreurs.extend(controler_documents_juridiques())
+    return erreurs
+
+
+LEGAL = os.path.join("assets", "legal")
+
+
+def controler_documents_juridiques():
+    """Chaque langue proposée doit avoir SA politique et SES conditions.
+
+    L'écran « À propos » choisissait le fichier par un test binaire
+    `languageCode == 'en'` : l'anglais d'un côté, **tout le reste** renvoyé au
+    français. Tant que l'application ne parlait que deux langues, le défaut
+    était invisible. En ajoutant trois langues, ce même test s'est mis à servir
+    la politique de confidentialité en français à un lecteur allemand.
+
+    Le repli reste l'anglais si un fichier manque — mais alors autant le savoir
+    ici plutôt que de le découvrir sur le téléphone de quelqu'un.
+    """
+    erreurs = []
+    for langue in [GABARIT] + LANGUES:
+        for document in ("PRIVACY", "TERMS"):
+            chemin = os.path.join(LEGAL, "%s.%s.md" % (document, langue))
+            if not os.path.exists(chemin):
+                erreurs.append(
+                    "[juridique] %s manquant : les lecteurs en « %s » "
+                    "recevront ce document dans une autre langue"
+                    % (chemin.replace(os.sep, "/"), langue))
     return erreurs
 
 

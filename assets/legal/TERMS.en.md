@@ -1,6 +1,6 @@
 # Terms of Use — Pass Tech
 
-**Document version**: May 11, 2026 (Pass Tech v2.4.0)
+**Document version**: September 20, 2026 (Pass Tech v2.7.0)
 **App**: Pass Tech
 **Official website**: https://www.files-tech.com
 **Contact**: contact@files-tech.com

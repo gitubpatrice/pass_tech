@@ -1,6 +1,6 @@
 # Conditions d'utilisation — Pass Tech
 
-**Version du document** : 11 mai 2026 (Pass Tech v2.4.0)
+**Version du document** : 20 septembre 2026 (Pass Tech v2.7.0) · 🇬🇧 [English version](TERMS.md)
 **App** : Pass Tech
 **Site officiel** : https://www.files-tech.com
 **Contact** : contact@files-tech.com
@@ -66,7 +66,7 @@ Le nom, les contenus, textes, icônes, visuels et ressources propres au projet r
 
 ## 12. Sécurité
 
-L'utilisateur doit protéger son mot de passe maître, son appareil et éviter d'utiliser Pass Tech sur des appareils rootés/compromis. Voir [SECURITY.md](./SECURITY.md).
+L'utilisateur doit protéger son mot de passe maître, son appareil et éviter d'utiliser Pass Tech sur des appareils rootés/compromis. Voir [SECURITY.fr.md](./SECURITY.fr.md).
 
 ## 13. Modification des conditions
 
