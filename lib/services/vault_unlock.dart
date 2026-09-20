@@ -727,11 +727,22 @@ extension VaultUnlock on VaultService {
       //  - canceled    : annulation par l'OS (app switch, lock écran).
       //    Pas de cleanup non plus.
       //  - timeout     : le prompt a expiré sans interaction. Idem.
-      //  - autre (typiquement `unknown` quand la clé Keystore a été
-      //    invalidée par un ré-enrôlement d'empreinte) : auto-cleanup du
-      //    wrap + `biometricInvalidated` pour que l'UI affiche un message
-      //    clair plutôt que « biométrie invalide » générique sans
-      //    indication de marche à suivre.
+      //  - autre (`unknown`) : verrouillage du capteur après plusieurs
+      //    doigts refusés, matériel indisponible, erreur constructeur, ou
+      //    activité incapable d'héberger l'invite. Transitoire dans tous les
+      //    cas : on le SIGNALE, on ne détruit rien.
+      //
+      // ⚠️ Ce commentaire affirmait jusqu'au 2026-09-20 que `unknown` voulait
+      // typiquement dire « clé Keystore invalidée par un ré-enrôlement ». Deux
+      // relectures indépendantes ont montré que c'est faux, et le dépôt le
+      // savait déjà ailleurs : `BiometricStoragePlugin` attrape lui-même
+      // `KeyPermanentlyInvalidatedException` AVANT toute invite, supprime le
+      // fichier et rend `null` sans jamais lever d'`AuthException`. Ce cas est
+      // traité, inconditionnellement, par la branche `keyB64 == null` plus haut
+      // (SEC F20), dont le commentaire dit d'ailleurs — mesuré sur émulateur —
+      // que « le diagnostic posé dans le `catch on AuthException` n'a JAMAIS
+      // été atteint ». La description fausse a survécu assez longtemps pour
+      // faire écrire un correctif au mauvais endroit.
       _wipeKey();
       switch (e.code) {
         case AuthExceptionCode.userCanceled:
@@ -745,46 +756,32 @@ extension VaultUnlock on VaultService {
           // simplement de choisir de taper son mot de passe.
           return UnlockResult.biometricCanceled;
         default:
-          // 2026-09-20 — GARDE DE PREMIER PLAN, ajoutée avec la montée de
-          // `biometric_storage` en 6.0.0-dev.5.
+          // On NE DÉTRUIT PAS l'enveloppe ici, et on ne consulte pas le cycle
+          // de vie pour en décider.
           //
-          // `unknown` ne signifie plus une seule chose. Jusqu'en 5.0.x, une
-          // authentification demandée alors que l'activité ne pouvait pas
-          // héberger de dialogue — `androidx.biometric` refuse de démarrer
-          // après `onSaveInstanceState` — ne rappelait AUCUN callback : le
-          // résultat Flutter restait pendant, indéfiniment. La 6.0.0-dev.2
-          // corrige ce blocage en le rapportant comme
-          // `AuthException(AuthExceptionCode.unknown)`, et son changelog
-          // precise que c'est atteignable « whenever the app is backgrounded ».
+          // Ce qui parvient réellement dans cette branche — verrouillage du
+          // capteur après cinq doigts refusés, matériel indisponible, erreur
+          // constructeur, activité incapable d'héberger l'invite — est
+          // TRANSITOIRE. Supprimer l'enveloppe désinscrirait l'utilisateur
+          // pour une condition qui disparaît d'elle-même, et il devrait la
+          // réactiver depuis Réglages sans comprendre pourquoi.
           //
-          // Sans ce garde, la correction d'un blocage se serait donc payée
-          // d'une régression : basculer l'application en arrière-plan au
-          // mauvais instant aurait effacé l'enveloppe biométrique, et
-          // l'utilisateur aurait dû la réactiver depuis Réglages sans
-          // comprendre pourquoi.
+          // Un garde de premier plan avait été posé ici le 2026-09-20 pour
+          // éviter cette désinscription. Il était inopérant : l'invite
+          // biométrique est un dialogue SYSTÈME, qui sort l'application de
+          // `resumed` — le dépôt l'atteste en usage réel (`unlock_screen.dart`,
+          // « l'invite est un dialogue système, elle met l'application en
+          // arrière-plan ») et `main.dart` traite `inactive` comme de
+          // l'arrière-plan. La condition était donc toujours fausse : la
+          // branche devenait morte, et rendait `biometricCanceled`, que
+          // l'écran affiche en SILENCE TOTAL. L'utilisateur tapait sur le
+          // bouton empreinte et n'obtenait plus rien — ni invite, ni message.
           //
-          // On ne détruit rien quand l'application n'est pas au premier plan.
-          // Aucune protection n'est perdue : si la clé Keystore est réellement
-          // morte, la tentative suivante — au premier plan, puisqu'il faut
-          // voir l'écran pour la lancer — retombera sur `unknown` et fera le
-          // ménage à ce moment-là.
-          final foreground =
-              SchedulerBinding.instance.lifecycleState ==
-              AppLifecycleState.resumed;
-          if (!foreground) return UnlockResult.biometricCanceled;
-
-          // Cleanup best-effort — la clé Keystore est probablement morte,
-          // tenter de la réutiliser sur la prochaine tentative donnerait
-          // la même erreur. On supprime le flag + le storage entry pour
-          // que le bouton biométrie disparaisse au prochain build du
-          // unlock screen.
-          try {
-            await deleteBiometricKey();
-          } catch (_) {
-            // ignore — le caller verra biometricInvalidated et invitera
-            // l'utilisateur à réactiver depuis Réglages.
-          }
-          return UnlockResult.biometricInvalidated;
+          // `wrongPassword` affiche « Échec biométrique » et laisse le bouton
+          // en place : c'est exactement ce qu'il faut dire d'une condition
+          // transitoire. La vraie clé morte, elle, reste traitée par la
+          // branche `keyB64 == null` plus haut, sans condition.
+          return UnlockResult.wrongPassword;
       }
     } catch (_) {
       // SEC 2026-08-04 (audit GPT F5) — nettoyage COMPLET, pas seulement la

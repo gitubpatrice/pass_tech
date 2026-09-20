@@ -31,11 +31,6 @@ import 'package:cryptography/cryptography.dart' as cg;
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:files_tech_core/files_tech_core.dart';
 import 'package:flutter/foundation.dart';
-// `SchedulerBinding.instance.lifecycleState` uniquement — voir le garde de
-// premier plan dans `vault_unlock.dart`. `scheduler.dart` plutôt que
-// `widgets.dart` : c'est le plus petit binding qui expose l'état de cycle de
-// vie, et ce fichier n'a pas à connaître l'arbre de widgets.
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
