@@ -30,7 +30,7 @@ class VaultRepositoryTest {
     fun setUp() {
         val clock = FakeClock()
         val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), clock)
-        repo = VaultRepository(VaultFiles(dir), keystore, guard, fastParams)
+        repo = VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams)
     }
 
     private fun created(pw: ByteArray = password): VaultSession {

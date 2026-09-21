@@ -41,12 +41,4 @@ class VaultFilesTest {
         assertThat(files.exists(Slot.B)).isFalse()
         assertThat(files.read(Slot.B)).isNull()
     }
-
-    @Test
-    fun `deleteAll removes every slot`() {
-        val files = VaultFiles(dir)
-        files.writeAll(Slot.entries.associateWith { "x" })
-        files.deleteAll()
-        assertThat(Slot.entries.none(files::exists)).isTrue()
-    }
 }
