@@ -28,6 +28,28 @@ class MainActivity : FlutterFragmentActivity() {
     // v4 hardening : KeystoreBridge enregistré via registerKeystoreBridge()
     // (constante CHANNEL_NAME = "com.passtech.pass_tech/keystore").
 
+    /// 2026-09-21 — paquet qui PORTE les alias de lanceur, et qui n'est pas
+    /// forcément celui sous lequel l'application est installée.
+    ///
+    /// Les deux `activity-alias` sont déclarés en `.MainAliasNormal` /
+    /// `.MainAliasDecoy` : le fusionneur de manifeste les étend sur le
+    /// `namespace` du module, jamais sur l'`applicationId`. Or `packageName`
+    /// rend l'applicationId À L'EXÉCUTION. Tant que les deux coïncidaient, les
+    /// construire à partir de `packageName` fonctionnait par coïncidence.
+    ///
+    /// Le suffixe `.debug` ajouté le même jour a brisé cette coïncidence :
+    /// `packageName` valait alors `com.passtech.pass_tech.debug` et le
+    /// composant visé, `…debug.MainAliasNormal`, n'existait pas.
+    /// `setComponentEnabledSetting` levait `IllegalArgumentException`, que
+    /// `panic_service.dart` avale — le camouflage du mode panique échouait
+    /// donc EN SILENCE sur tout build de test, c'est-à-dire sur les seuls
+    /// builds où on peut le tester. Mesuré sur le manifeste fusionné.
+    ///
+    /// Se dérive de cette classe, qui vit par construction dans le
+    /// `namespace` : un renommage du paquet emporte les deux ensemble.
+    private val aliasOwnerPackage: String =
+        MainActivity::class.java.`package`?.name ?: "com.passtech.pass_tech"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // v2.3.9 — FLAG_SECURE n'est PLUS posé à onCreate.
@@ -223,10 +245,14 @@ class MainActivity : FlutterFragmentActivity() {
                         val disguised = call.argument<Boolean>("disguised") ?: false
                         try {
                             val pm = packageManager
+                            // 1er argument : le paquet INSTALLÉ (suffixé ou
+                            // non). 2nd : le nom pleinement qualifié du
+                            // composant, qui vit dans le `namespace`. Les deux
+                            // diffèrent dès qu'un `applicationIdSuffix` existe.
                             val normalAlias = ComponentName(packageName,
-                                "$packageName.MainAliasNormal")
+                                "$aliasOwnerPackage.MainAliasNormal")
                             val decoyAlias  = ComponentName(packageName,
-                                "$packageName.MainAliasDecoy")
+                                "$aliasOwnerPackage.MainAliasDecoy")
                             // Active l'alias désiré, désactive l'autre.
                             pm.setComponentEnabledSetting(
                                 if (disguised) decoyAlias else normalAlias,
@@ -244,7 +270,7 @@ class MainActivity : FlutterFragmentActivity() {
                     "isDisguised" -> {
                         try {
                             val decoyAlias = ComponentName(packageName,
-                                "$packageName.MainAliasDecoy")
+                                "$aliasOwnerPackage.MainAliasDecoy")
                             val state = packageManager.getComponentEnabledSetting(decoyAlias)
                             // ENABLED ou (DEFAULT && manifest enabled=true). Manifest = false.
                             result.success(state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
