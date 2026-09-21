@@ -7,14 +7,16 @@ import com.filestech.pass_tech.core.crypto.LegacyCrypto
 import com.filestech.pass_tech.core.crypto.SecretBytes
 import com.filestech.pass_tech.core.crypto.useThenWipe
 import com.filestech.pass_tech.core.crypto.wipe
-import com.filestech.pass_tech.core.json.DartCastException
+import com.filestech.pass_tech.core.json.ensure
 import com.filestech.pass_tech.core.json.objectOrNull
 import com.filestech.pass_tech.core.json.optInt
 import com.filestech.pass_tech.core.json.optString
+import com.filestech.pass_tech.core.json.orReject
+import com.filestech.pass_tech.core.json.readOrNull
+import com.filestech.pass_tech.core.json.reject
 import com.filestech.pass_tech.core.json.requireString
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.model.EntryJson
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -22,7 +24,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import java.nio.ByteBuffer
-import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.util.Base64
 
@@ -97,11 +98,11 @@ object PtbakCodec {
      * @return the decrypted entries, or `null` if the passphrase is wrong or the file is damaged,
      * forged or not a backup. Those cases are deliberately indistinguishable, as in the Flutter app.
      *
-     * Every check below rejects through [reject], and this is the only place that turns a rejection
-     * into `null`: one exit, so no path can forget to fail closed.
+     * Every check below rejects (see `FileRejected.kt`), and [readOrNull] is the only place that
+     * turns a rejection into `null`: one exit, so no path can forget to fail closed.
      */
     fun import(content: String, passphrase: String): Imported? =
-        try {
+        readOrNull {
             ensure(content.length <= MAX_FILE_CHARS)
             val root = (json.parseToJsonElement(content) as? JsonObject).orReject()
             ensure(root.optString("magic") == MAGIC)
@@ -112,17 +113,6 @@ object PtbakCodec {
                 else -> reject()
             }
             Imported(version, entries)
-        } catch (_: InvalidBackup) {
-            null
-        } catch (_: DartCastException) {
-            null
-        } catch (_: SerializationException) {
-            null
-        } catch (_: CharacterCodingException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            // Base64 decoding of a damaged field.
-            null
         }
 
     private fun importV3(root: JsonObject, passphrase: String): List<Entry> {
@@ -217,14 +207,4 @@ object PtbakCodec {
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes))
             .toString()
-
-    private class InvalidBackup : Exception()
-
-    private fun reject(): Nothing = throw InvalidBackup()
-
-    private fun ensure(condition: Boolean) {
-        if (!condition) reject()
-    }
-
-    private fun <T : Any> T?.orReject(): T = this ?: reject()
 }

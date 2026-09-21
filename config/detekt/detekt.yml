@@ -76,6 +76,13 @@ naming:
 
 style:
   active: true
+  ReturnCount:
+    active: true
+    # The file readers and the vault checks exit early at every failed check: that is how "fail
+    # closed" reads best. A guard clause at the top of a function does not count. Past three, the
+    # function is split, or it uses the single-exit rejection of core/json/FileRejected.kt.
+    max: 3
+    excludeGuardClauses: true
   MagicNumber:
     active: true
     # Compose layout is written in literal dp and sp (`16.dp`): those numbers ARE the design, and
