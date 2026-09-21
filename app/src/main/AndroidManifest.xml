@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      INTERNET serves two documented uses, and only these two (PRIVACY §6): the GitHub update check,
+      and the opt-in breach check (HIBP, k-anonymity). The vault itself never leaves the device.
+      The published permission set is measured on the APK by the "Promises" CI job, against
+      config/expected-permissions.txt, never read from this file: the merged manifest is what ships.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      allowBackup="false" plus both exclusion rule sets: no cloud backup and no device-to-device
+      transfer of anything. The vault keys live in the AndroidKeyStore, bound to this install; a
+      restored copy of the vault files would be unreadable anyway, and a backed-up copy is one more
+      place an attacker could collect them from.
+    -->
+    <application
+        android:name=".PassTechApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="${appLabel}"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PassTech"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

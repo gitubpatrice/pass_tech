@@ -1,0 +1,29 @@
+# Permissions EXPECTED in the Pass Tech release APK.
+#
+# The "Promises" CI job (.github/workflows/promises.yml) compares the MERGED manifest of the release
+# APK against this file, both ways: a permission that appears without being listed here fails the
+# build, and so does one listed here that disappears.
+#
+# Why: the Flutter app once shipped ACCESS_NETWORK_STATE, declared nowhere in the repository. It came
+# with Google ML Kit (QR code scanner) and its telemetry transport, and nobody saw it because nobody
+# looked at the merged manifest. A dependency added on a Tuesday can no longer widen the permission
+# set unless someone writes the line here and owns it.
+#
+# NEVER add a line here to "make the build pass". Every addition comes with its justification in
+# section 10 of the FIVE app/src/main/assets/legal/PRIVACY.{en,fr,de,it,es}.md, which are the
+# documents the app shows.
+
+# GitHub update check, and the opt-in breach check (HIBP, k-anonymity). Both documented in section 6
+# of the privacy policy. Pass Tech does NOT promise "no Internet permission", unlike Agenda Tech,
+# Notes Tech, AI Tech and App Manager Tech.
+android.permission.INTERNET
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────────
+# Expected to arrive with androidx.biometric (optional biometric unlock), in phase 2 of the rewrite:
+#   android.permission.USE_BIOMETRIC
+#   android.permission.USE_FINGERPRINT   (androidx.biometric's own manifest, for API < 28)
+#
+# Removed from the Flutter app on 2026-08-03, not to be reintroduced without an explicit decision:
+#   android.permission.CAMERA
+#   android.permission.ACCESS_NETWORK_STATE
+# ─────────────────────────────────────────────────────────────────────────────────────────────────
