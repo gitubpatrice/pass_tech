@@ -334,11 +334,34 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (go != true || !mounted) return;
 
-    // Refus si pas dans le primary (l'héritage doit refléter le vrai coffre)
-    if (VaultService().isDecoyActive) {
-      SnackUtils.showInfo(messenger, t.heritageDecoyActiveSnack);
-      return;
-    }
+    // AUDIT 2026-09-21 — le refus disparaît, le scope le remplace.
+    //
+    // Il affichait « L'héritage n'est disponible que sur le coffre principal »,
+    // c'est-à-dire qu'il DISAIT à quiconque tenait une session leurre qu'il
+    // n'était pas dans le vrai coffre. Quatre tapes, aucun secret exigé : la
+    // garde s'exécutait avant même la demande de passphrase.
+    //
+    // Ce dépôt avait déjà tiré la leçon trois fois — `deleteVault` (SEC F12),
+    // `deleteDecoyVault` (2026-08-03) et la biométrie (2026-09-20) — et
+    // `vault_service.dart` l'écrit : *un « opération indisponible » sous
+    // contrainte trahit qu'il y a quelque chose à protéger*. L'héritage était
+    // le jumeau resté en arrière, inchangé depuis la v2.0.0.
+    //
+    // L'héritage étant désormais propre à l'emplacement, il n'y a plus rien à
+    // refuser : configurer l'héritage depuis le leurre configure l'héritage DU
+    // leurre, sur ses propres entrées, sans toucher à celui du principal.
+    //
+    // ⚠️ RÉSIDUEL CONNU, relevé par la relecture du même jour — l'héritage du
+    // leurre s'écrit mais ne se LIT jamais : `unlock_screen` force
+    // `HeritageService.primary()` pour proposer l'option comme pour ouvrir
+    // l'instantané. Sans effet sur le déni plausible (l'adversaire devrait
+    // attendre le seuil d'inactivité puis la grâce, sur horloge monotone),
+    // mais un utilisateur qui se croit dans son coffre principal alors qu'il
+    // est dans le leurre reçoit une confirmation pour un dispositif qui
+    // n'existera pas. Énoncé dans THREAT_MODEL.md §8. Le rendre atteignable
+    // demande que l'écran de déverrouillage tente les DEUX instantanés à
+    // travail constant, et ce chemin ne se modifie pas sans mesure sur
+    // appareil : c'est le dead-man.
 
     final pwd = await showDialog<String>(
       context: context,
@@ -347,9 +370,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (pwd == null || pwd.isEmpty || !mounted) return;
 
-    // Vérifie que le password diffère du primary
-    final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
-    if (matchesPrimary) {
+    // Le mot de passe héritier doit différer de celui du coffre que l'on
+    // configure — l'emplacement ACTIF, donc, et non le principal en dur. Voir
+    // `passwordMatchesActiveSlot` : comparer au principal depuis une session
+    // leurre rendait ce contrôle vide ET en faisait un oracle.
+    final matchesVault = await VaultService().passwordMatchesActiveSlot(pwd);
+    if (matchesVault) {
       if (!mounted) return;
       SnackUtils.showError(context, messenger, t.heirSamePasswordSnack);
       return;
@@ -413,7 +439,24 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (!mounted || action == null || action == 'cancel') return;
     if (action == 'disable') {
       final messenger = ScaffoldMessenger.of(context);
-      await HeritageService().disable();
+      // AUDIT 2026-09-21 — `disable()` peut désormais REFUSER, et ce refus doit
+      // être rendu plutôt que remonter en exception non traitée.
+      //
+      // Il exige un coffre ouvert : l'emplacement visé est figé à la
+      // construction du service, et un `lock()` intercalé entre le dialogue et
+      // ce tap le rendrait faux — détruisant l'héritage du PRINCIPAL depuis
+      // une session leurre. Le seul message à ne jamais afficher ici est
+      // « Héritage désactivé ✓ » alors que rien ne l'a été.
+      try {
+        await HeritageService().disable();
+      } on StateError catch (e) {
+        if (!mounted) return;
+        SnackUtils.showError(context, messenger, switch (e.message) {
+          HeritageService.vaultLocked => t.vaultBusyRetry,
+          _ => t.genericError('$e'),
+        });
+        return;
+      }
       if (!mounted) return;
       setState(() {});
       SnackUtils.showInfo(messenger, t.heritageDisabledSnack);
@@ -426,8 +469,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
       if (pwd == null || pwd.isEmpty || !mounted) return;
       final messenger = ScaffoldMessenger.of(context);
-      final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
-      if (matchesPrimary) {
+      // Même correction que dans `_setupHeritage` : l'emplacement ACTIF.
+      // C'est ce chemin-ci que le balayage a relevé comme oracle, parce que
+      // `_manageHeritage` n'a jamais porté de garde de slot du tout.
+      final matchesVault = await VaultService().passwordMatchesActiveSlot(pwd);
+      if (matchesVault) {
         if (!mounted) return;
         SnackUtils.showError(context, messenger, t.heirSamePasswordShortSnack);
         return;
@@ -559,6 +605,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     // et s'il réussit, on refuse le setup (sinon les 2 slots seraient ouverts
     // par le même password).
     final messenger = ScaffoldMessenger.of(context);
+    // Capturé AVANT le premier `await`, comme `messenger` : le parcours se
+    // termine par une navigation, et `context` ne se traverse pas.
+    final nav = Navigator.of(context);
     final matchesPrimary = await VaultService().passwordMatchesPrimary(pwd);
     if (matchesPrimary) {
       if (!mounted) return;
@@ -576,8 +625,33 @@ class _SettingsScreenState extends State<SettingsScreen>
       // fait accompli plutôt que de l'anticiper.
       setState(() => _biometricEnabled = false);
       SnackUtils.showInfo(messenger, t.decoyConfiguredSnack);
-      // Retour au unlock screen
-      Navigator.of(context).popUntil((r) => r.isFirst);
+      // MESURÉ SUR APPAREIL 2026-09-21 — `popUntil((r) => r.isFirst)` ne
+      // ramenait PAS à l'écran de déverrouillage, contrairement à ce que son
+      // commentaire annonçait depuis toujours.
+      //
+      // `unlock_screen` ouvre l'accueil par `pushReplacement` : `HomeScreen`
+      // REMPLACE l'écran de déverrouillage et devient donc la première route.
+      // `popUntil(isFirst)` y revenait, sur un coffre que `lock()` venait de
+      // fermer — l'utilisateur retrouvait l'écran de son coffre avec une liste
+      // VIDE, ce qui ressemble à une perte de données, juste après avoir
+      // confié un secret à l'application.
+      //
+      // Personne ne pouvait le voir en lisant : le défaut est dans ce que la
+      // pile de navigation contient à l'exécution, pas dans cette fonction.
+      // Trouvé en testant sur un Galaxy S9, présent dans la v2.7.0 publiée.
+      //
+      // Conséquence de sécurité, et elle est la vraie : le parcours promet de
+      // « forcer la reconnexion sur le principal » et ne la forçait pas. La
+      // session principale RESTAIT en place — sauf que le service, lui, avait
+      // verrouillé. Un utilisateur qui croyait être passé en session leurre
+      // était en réalité resté dans son vrai coffre.
+      //
+      // On reprend le motif du chemin JUMEAU, `_manageDecoy`, qui traite
+      // correctement `DecoyDeleteOutcome.sessionLocked` vingt lignes plus bas.
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const UnlockScreen()),
+        (_) => false,
+      );
     } on StateError catch (e) {
       // SEC 2026-08-04 (relecture Codex) — `setupDecoyVault` refuse désormais
       // de créer un leurre quand la comparaison avec le mot de passe principal
@@ -586,7 +660,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       // maître : message dédié, pas de sentinel interne à l'écran.
       if (!mounted) return;
       SnackUtils.showError(context, messenger, switch (e.message) {
-        VaultService.vaultBusy => t.vaultBusyRetry,
+        // AUDIT 2026-09-21 — les deux sentinelles rendent le MÊME message
+        // neutre, déjà traduit. Aucune clé nouvelle pour un chemin que rien
+        // n'atteint : ce qui compte est que la prose interne de
+        // `setupDecoyVault` ne puisse plus s'afficher. Si une conception
+        // future rend ce refus atteignable, il lui faudra son propre message,
+        // pensé pour ne rien révéler.
+        VaultService.vaultBusy ||
+        VaultService.decoySetupPrimaryOnly => t.vaultBusyRetry,
         _ => t.genericError('$e'),
       });
     } catch (e) {
@@ -730,8 +811,24 @@ class _SettingsScreenState extends State<SettingsScreen>
     await HapticFeedback.heavyImpact();
     await PanicService.panic();
     if (!mounted) return;
-    // Retour à l'écran de déverrouillage (vault est lock).
-    Navigator.of(context).popUntil((r) => r.isFirst);
+    // AUDIT 2026-09-21 — même défaut que `_setupDecoy`, 160 lignes plus haut,
+    // et sur le geste le plus critique de l'application.
+    //
+    // `popUntil((r) => r.isFirst)` prétendait revenir au déverrouillage. Il
+    // n'y revient pas : `HomeScreen` a REMPLACÉ l'écran de déverrouillage par
+    // `pushReplacement`, c'est donc LUI la première route. Après
+    // `PanicService.panic()`, qui verrouille, on retombait sur l'écran d'un
+    // coffre fermé — liste vide, ce qui ressemble à une perte de données,
+    // juste après avoir appuyé sur « panique ».
+    //
+    // Les six autres sorties après `lock()` utilisaient déjà la bonne forme
+    // (`_lockNow` ci-dessous, `_manageDecoy`, `main.dart`) ; celle-ci était la
+    // dernière restée en arrière. Trouvée en cherchant le jumeau du correctif
+    // du jour, pas par le test.
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const UnlockScreen()),
+      (_) => false,
+    );
   }
 
   Future<void> _revealApp() async {

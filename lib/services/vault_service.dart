@@ -495,11 +495,22 @@ class VaultService {
     // Aucun parcours légitime n'est touché : l'écran de réglages n'est
     // accessible que sur une session ouverte, et le seul point d'appel y
     // configure le leurre depuis le coffre PRINCIPAL.
+    // AUDIT 2026-09-21 — sentinelle, et non plus la prose.
+    //
+    // Ce refus portait son motif EN CLAIR et EN FRANÇAIS dans le message de
+    // l'exception, que `settings_screen` rendait tel quel par
+    // `genericError('$e')`. Aucun chemin d'écran ne l'atteint aujourd'hui — la
+    // tuile n'ouvre `_setupDecoy` que lorsque aucun leurre n'existe, donc
+    // depuis le coffre principal — mais un bandeau annonçant « exige une
+    // session PRINCIPALE ouverte » est un oracle écrit en toutes lettres, et
+    // c'est la famille de défauts que la v2.7.0 a passé la journée à retirer.
+    //
+    // Latent aujourd'hui, atteignable demain : toute conception où la session
+    // leurre se présente comme une installation vierge rouvre ce chemin, parce
+    // que le drapeau vaut alors 'false' et que la tuile route vers
+    // `_setupDecoy`. Poser la sentinelle maintenant coûte trois lignes.
     if (!_isOpen || _activeSlot != _Slot.primary) {
-      throw StateError(
-        'Decoy setup : exige une session PRINCIPALE ouverte, sans quoi la '
-        'comparaison avec le mot de passe principal ne peut pas aboutir',
-      );
+      throw StateError(decoySetupPrimaryOnly);
     }
     if (_unlockGate != null || await getLockoutRemaining() != null) {
       throw StateError(vaultBusy);
@@ -1402,6 +1413,11 @@ class VaultService {
   static const biometricDecoyConflict = 'pt_biometric_decoy_conflict';
   static const biometricPrimaryOnly = 'pt_biometric_primary_only';
 
+  /// AUDIT 2026-09-21 — levée par [setupDecoyVault] quand aucune session
+  /// principale n'est ouverte. Remplace une prose française qui atteignait
+  /// l'écran telle quelle. L'appelant la rend par un message neutre.
+  static const decoySetupPrimaryOnly = 'pt_decoy_setup_primary_only';
+
   Future<VaultDeleteOutcome> deleteVault() async {
     // SEC F12 v2.5.2 — Avant : `deleteVault` ne consultait NI `_activeSlot` NI
     // aucune réauthentification, et son unique appelant l'exposait derrière un
@@ -1427,6 +1443,11 @@ class VaultService {
       // factice. C'est exactement le risque que documente la garde SEC-R3 de
       // `deleteDecoyVault`.
       lock();
+      // Ordre IMPÉRATIF, second du nom : purger l'héritage AVANT d'écraser le
+      // coffre. Interrompu dans cet ordre, il reste un leurre sans héritage —
+      // bénin. Dans l'autre, il resterait un héritage sans leurre, c'est-à-dire
+      // la preuve qu'un leurre a existé.
+      await _purgeDecoyHeritage();
       await _createDummyDecoy();
       await _storage.write(key: _decoyConfiguredKey, value: 'false');
       return VaultDeleteOutcome.decoyOnly;
@@ -1459,6 +1480,10 @@ class VaultService {
       'pt_vault.enc',
       'pt_vault_decoy.enc',
       'pt_heir.enc',
+      // AUDIT 2026-09-21 — l'instantané d'héritage du LEURRE. L'énumération
+      // `pt_*` ci-dessus le couvre déjà ; cette liste est le filet quand elle
+      // échoue, et elle doit donc le nommer aussi.
+      'pt_heir_b.enc',
     ]) {
       _shredSync(File('${dir.path}/$name'));
       _shredSync(File('${dir.path}/${name}_v3.enc.bak'));
@@ -1477,6 +1502,14 @@ class VaultService {
       'pt_heir_threshold_days',
       'pt_heir_grace_start_ts',
       'pt_last_active_ts',
+      // AUDIT 2026-09-21 — les jumelles du leurre. Sans elles, « Tout
+      // supprimer » laissait l'héritage du leurre armé derrière lui, ce qui
+      // est exactement le défaut que SEC F1 a fermé pour le principal.
+      'pt_heir_salt_b',
+      'pt_heir_enabled_b',
+      'pt_heir_threshold_days_b',
+      'pt_heir_grace_start_ts_b',
+      'pt_last_active_ts_b',
     ]) {
       await _storage.delete(key: k);
     }
@@ -1505,6 +1538,57 @@ class VaultService {
     // promet « supprimés définitivement ».
     await shredCachedExports();
     return VaultDeleteOutcome.fullWipe;
+  }
+
+  /// AUDIT 2026-09-21 — détruit l'état d'héritage du LEURRE.
+  ///
+  /// Trouvé par la relecture du correctif qui a rendu l'héritage propre à
+  /// l'emplacement : ce correctif avait ajouté `pt_heir_b.enc` et ses cinq
+  /// clés à la purge TOTALE, mais les trois sorties qui font disparaître le
+  /// seul emplacement leurre rendent AVANT d'atteindre ces listes. Le motif
+  /// est celui que ce dépôt reproduit depuis toujours — le correctif posé sur
+  /// un seul des chemins jumeaux — et il a été reproduit en le corrigeant.
+  ///
+  /// L'enjeu dépasse le résidu. `pt_heir_b.enc` n'a pas de jumeau factice,
+  /// contrairement aux fichiers de coffre : il n'existe QUE si un vrai leurre
+  /// a existé et portait un héritage. Survivant au retrait du leurre, il
+  /// prouve après coup ce que tout le dispositif H1 s'emploie à rendre
+  /// indémontrable — et `deleteDecoyVault` écrase au lieu de supprimer pour
+  /// cette raison précise, vingt lignes plus bas.
+  ///
+  /// La purge vit ICI, dans le service qui détruit l'emplacement, et non dans
+  /// l'écran qui le demande : *une garantie confiée à une couche plus étroite
+  /// que celle qui la promet est une garantie qui tombera* — c'est ce que
+  /// `setupDecoyVault` a acté le 2026-09-20 pour l'exclusion biométrie/leurre.
+  ///
+  /// Best-effort : un échec ne doit jamais empêcher la destruction du leurre,
+  /// qui est l'opération que l'utilisateur a demandée.
+  ///
+  /// ⚠️ Les noms sont répétés ici plutôt qu'importés de `HeritageService` :
+  /// l'importer créerait un cycle avec ce fichier, que `heritage_service.dart`
+  /// importe déjà. `test/heritage_scope_test.dart` vérifie que les deux listes
+  /// ne divergent pas.
+  Future<void> _purgeDecoyHeritage() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      _shredSync(File('${dir.path}/pt_heir_b.enc'));
+      _shredSync(File('${dir.path}/pt_heir_b.enc.tmp'));
+    } catch (_) {
+      /* Répertoire illisible : on continue, la destruction prime. */
+    }
+    for (final k in const [
+      'pt_heir_salt_b',
+      'pt_heir_enabled_b',
+      'pt_heir_threshold_days_b',
+      'pt_heir_grace_start_ts_b',
+      'pt_last_active_ts_b',
+    ]) {
+      try {
+        await _storage.delete(key: k);
+      } catch (_) {
+        /* Stockage sécurisé indisponible : idem. */
+      }
+    }
   }
 
   /// Désactive le VRAI coffre leurre sans toucher au primary. Utilisé depuis
@@ -1538,10 +1622,12 @@ class VaultService {
       // tout CRUD survenant entre l'écrasement et le verrouillage le
       // réécrirait par-dessus le leurre factice qu'on vient de poser.
       lock();
+      await _purgeDecoyHeritage();
       await _createDummyDecoy();
       await _storage.write(key: _decoyConfiguredKey, value: 'false');
       return DecoyDeleteOutcome.sessionLocked;
     }
+    await _purgeDecoyHeritage();
     await _createDummyDecoy();
     await _storage.write(key: _decoyConfiguredKey, value: 'false');
     return DecoyDeleteOutcome.keptSession;

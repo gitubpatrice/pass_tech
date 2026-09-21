@@ -50,12 +50,86 @@ class HeritageService {
   /// [VaultService.vaultBusy].
   static const vaultEmpty = 'pt_heir_vault_empty';
 
+  /// AUDIT 2026-09-21 — levée par [disable] quand aucun coffre n'est ouvert.
+  /// L'emplacement visé est figé à la construction : sans coffre ouvert, il
+  /// n'est plus fiable. L'appelant invite à redéverrouiller.
+  static const vaultLocked = 'pt_heir_vault_locked';
+
   static const _storage = FlutterSecureStorage();
-  static const _saltKey = 'pt_heir_salt';
-  static const _enabledKey = 'pt_heir_enabled';
-  static const _lastActiveKey = 'pt_last_active_ts';
-  static const _thresholdKey = 'pt_heir_threshold_days';
-  static const _graceStartKey = 'pt_heir_grace_start_ts';
+
+  // AUDIT 2026-09-21 — l'héritage devient PROPRE À L'EMPLACEMENT.
+  //
+  // Ces cinq clés étaient GLOBALES, et l'écran des Réglages les rend. Depuis
+  // une session leurre, l'interface affichait donc l'état d'héritage du coffre
+  // PRINCIPAL, ce qui a produit trois oracles distincts, tous vérifiés :
+  //
+  //  - configurer l'héritage depuis le leurre était refusé par un message qui
+  //    NOMMAIT le coffre principal — distingueur direct, atteint en quatre
+  //    tapes sans exiger le moindre secret ;
+  //  - la tuile de seuil affichait « inactivité actuelle : N j », or
+  //    `markActive()` était délibérément sauté en session leurre : depuis le
+  //    principal cette valeur vaut toujours 0, donc toute autre valeur
+  //    désignait le leurre ;
+  //  - « Mettre à jour » acceptait depuis le leurre la passphrase que l'on
+  //    venait de livrer à l'adversaire et la refusait depuis le principal
+  //    (`passwordMatchesPrimary` rend `false` par garde de slot depuis SEC F7),
+  //    en écrasant au passage l'instantané du VRAI coffre.
+  //
+  // Scoper l'état supprime les trois d'un seul geste : il n'y a plus rien à
+  // refuser, donc plus rien à trahir, et plus rien du principal à écraser.
+  // C'est la restauration de ce que `THREAT_MODEL.md` promet déjà dans sa
+  // table « ce qui est réellement garanti » : aucune différence de
+  // comportement entre les deux emplacements.
+  //
+  // Le PRINCIPAL conserve les noms de clés historiques : le parc installé n'a
+  // aucune migration à subir, et un héritage déjà configuré continue de
+  // fonctionner à l'identique.
+  final bool _decoy;
+
+  /// Opère sur l'emplacement actuellement ouvert — sur le principal si aucun
+  /// coffre ne l'est, ce qui est le cas de l'écran de déverrouillage.
+  HeritageService() : _decoy = VaultService().isDecoyActive;
+
+  /// Opère explicitement sur le coffre PRINCIPAL, quel que soit l'emplacement
+  /// ouvert. Réservé au dispositif dead-man lui-même : c'est l'inactivité du
+  /// propriétaire qui arme l'accès de l'héritier, jamais celle d'un leurre
+  /// ouvert sous contrainte.
+  HeritageService.primary() : _decoy = false;
+
+  /// Noms employés pour un emplacement donné — clés de stockage sécurisé et
+  /// fichier d'instantané.
+  ///
+  /// Exposé au test parce que DEUX invariants en dépendent et que rien d'autre
+  /// ne les protège :
+  ///
+  ///  1. le PRINCIPAL garde les noms historiques. Les suffixer rendrait
+  ///     invisible, d'un coup, l'héritage de tout le parc installé — le
+  ///     dispositif dead-man cesserait silencieusement d'exister pour des gens
+  ///     qui comptent dessus ;
+  ///  2. les deux emplacements ne partagent AUCUN nom. En partager un seul
+  ///     rouvre l'oracle que ce scope ferme.
+  ///
+  /// Les accesseurs ci-dessous passent par ici : le test porte donc sur le
+  /// chemin réellement emprunté, et non sur une copie qui pourrait diverger.
+  @visibleForTesting
+  static Map<String, String> nomsPourEmplacement({required bool leurre}) {
+    final s = leurre ? '_b' : '';
+    return {
+      'salt': 'pt_heir_salt$s',
+      'enabled': 'pt_heir_enabled$s',
+      'lastActive': 'pt_last_active_ts$s',
+      'threshold': 'pt_heir_threshold_days$s',
+      'graceStart': 'pt_heir_grace_start_ts$s',
+      'snapshot': 'pt_heir$s.enc',
+    };
+  }
+
+  Map<String, String> get _noms => nomsPourEmplacement(leurre: _decoy);
+  String get _saltKey => _noms['salt']!;
+  String get _enabledKey => _noms['enabled']!;
+  String get _lastActiveKey => _noms['lastActive']!;
+  String get _thresholdKey => _noms['threshold']!;
+  String get _graceStartKey => _noms['graceStart']!;
 
   static const _iterations = 600000; // legacy v1 only (PBKDF2)
   static const _heirVersionV1 = 1; // PBKDF2 + AES-CBC + HMAC-SHA256
@@ -303,6 +377,25 @@ class HeritageService {
   /// l'héritage, le second est réécrit à chaque déverrouillage de toute façon.
   /// Les effacer n'apporterait rien et ferait perdre un réglage.
   Future<void> disable() async {
+    // AUDIT 2026-09-21 — exige un coffre OUVERT, et c'est une garde contre la
+    // perte de données, pas contre un adversaire.
+    //
+    // `_decoy` est figé à la CONSTRUCTION, à partir de `isDecoyActive`, qui
+    // rend `false` dans deux cas qu'il ne faut pas confondre : le principal
+    // est ouvert, ou bien RIEN ne l'est. Si `lock()` s'intercale entre le
+    // dialogue de confirmation et le tap — `main.dart` verrouille sur
+    // `AppLifecycleState.inactive`, que ce dépôt documente comme durant
+    // plusieurs secondes en avant-plan sur Android 14+ — alors une instance
+    // construite depuis une session LEURRE viserait le PRINCIPAL et
+    // détruirait l'instantané d'héritage du propriétaire.
+    //
+    // `disable()` est la seule opération d'héritage sans filet : les trois
+    // autres sont protégées par accident (`setupOrUpdateSnapshot` lève
+    // `vaultEmpty` sur un coffre vide, `setThresholdDays` n'écrit qu'un
+    // réglage, `markActive` réécrit une valeur réécrite en permanence).
+    // Échouer est ici le seul comportement sûr : l'utilisateur redéverrouille
+    // et recommence, il ne perd rien.
+    if (!VaultService().isOpen) throw StateError(vaultLocked);
     VaultService.shredFileSync(await _heirFile());
     await _storage.delete(key: _saltKey);
     await _storage.delete(key: _enabledKey);
@@ -365,7 +458,19 @@ class HeritageService {
 
   Future<File> _heirFile() async {
     final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/pt_heir.enc');
+    // Le principal garde `pt_heir.enc` : aucune migration pour le parc
+    // installé. Le leurre écrit `pt_heir_b.enc`, du même nom neutre que les
+    // fichiers de coffre `pt_vault_a.enc` / `pt_vault_b.enc`.
+    //
+    // ⚠️ RÉSIDUEL ASSUMÉ, à traiter séparément — la seule PRÉSENCE de
+    // `pt_heir_b.enc` prouve à qui obtient une copie du dossier privé (adb,
+    // root) qu'un leurre existe et qu'il porte un héritage. Fermer ce canal
+    // demande le traitement déjà appliqué aux coffres : les deux instantanés
+    // toujours présents, le manquant rempli par un factice chiffré sous un
+    // aléa jamais persisté, tailles rembourrées sur la même échelle. Il vise
+    // un adversaire strictement plus fort que celui du mode leurre, qui n'a
+    // que l'interface. Consigné dans THREAT_MODEL.md.
+    return File('${dir.path}/${_noms['snapshot']}');
   }
 
   // v2.2.0 — shims locaux supprimés. Les callsites utilisent `SecretBytes.*`
