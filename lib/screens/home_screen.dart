@@ -376,7 +376,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(t.homeTitle),
+                  // MESURÉ SUR APPAREIL 2026-09-21 (Galaxy S9, 1080x2220,
+                  // densité 480, échelle de police 1.0) — cette `Row`
+                  // débordait de 5 px sur la droite.
+                  //
+                  // Le titre était un `Text` rigide : logo 28 px + 10 px
+                  // d'espace + le libellé, dans une zone que les quatre
+                  // actions de la barre rétrécissent. `Flexible` laisse le
+                  // texte se réduire, et l'ellipse dit ce qui manque au lieu
+                  // de peindre par-dessus le voisin.
+                  //
+                  // ⚠️ Défaut présent dans la v2.7.0 PUBLIÉE, et invisible
+                  // pour tout le monde : Flutter ne dessine le bandeau rouge
+                  // qu'en build de débogage ; en release il ROGNE EN SILENCE.
+                  // C'est en installant un build de test qu'il est apparu.
+                  Flexible(
+                    child: Text(
+                      t.homeTitle,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
                 ],
               ),
         actions: [
