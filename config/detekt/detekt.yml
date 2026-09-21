@@ -102,6 +102,25 @@ formatting:
   # MaxLineLength above already covers this, with the same limit.
   MaximumLineLength:
     active: false
+  # ONE line length for the whole configuration: 140, the style.MaxLineLength above. The ktlint rules
+  # wrapped in detekt-formatting default to 120 (100 with `android: true`), so a line detekt accepts
+  # was then reported as "Argument should be on a separate line" by its own formatting set.
+  ArgumentListWrapping:
+    maxLineLength: 140
+  ContextReceiverMapping:
+    maxLineLength: 140
+  FunctionReturnTypeSpacing:
+    maxLineLength: 140
+  FunctionSignature:
+    maxLineLength: 140
+  ParameterListWrapping:
+    maxLineLength: 140
+  ParameterWrapping:
+    maxLineLength: 140
+  PropertyWrapping:
+    maxLineLength: 140
+  Wrapping:
+    maxLineLength: 140
   # ktlint's package-name rule hard-codes "no underscore" with no configurable pattern: it duplicates
   # naming.PackageNaming above, which knows the real application id.
   PackageName:
