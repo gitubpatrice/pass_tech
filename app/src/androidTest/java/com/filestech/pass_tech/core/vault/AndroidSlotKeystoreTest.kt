@@ -2,6 +2,7 @@ package com.filestech.pass_tech.core.vault
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.filestech.pass_tech.core.crypto.SecretBytes
+import com.filestech.pass_tech.testing.PrefixedKeystore
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Test
@@ -9,16 +10,16 @@ import org.junit.runner.RunWith
 
 /**
  * The real AndroidKeyStore: only a device can tell whether wrapping works in StrongBox or the TEE,
- * and whether a deleted key really stops unwrapping.
+ * and whether a deleted key really stops unwrapping. Under prefixed aliases: see [PrefixedKeystore].
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidSlotKeystoreTest {
 
-    private val keystore = AndroidSlotKeystore()
+    private val keystore = PrefixedKeystore(AndroidSlotKeystore())
 
     @After
     fun cleanUp() {
-        Slot.entries.forEach(keystore::deleteKey)
+        keystore.deleteCreated()
     }
 
     @Test
