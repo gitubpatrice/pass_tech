@@ -17,6 +17,42 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 
 ### Historique des correctifs récents
 
+- **v2.7.1** (2026-09-21) — Coffre leurre : trois surfaces des Réglages
+  distinguaient une session leurre du vrai coffre.
+  - **L'héritage devient propre à l'emplacement.** Les cinq clés d'héritage et
+    le fichier d'instantané étaient globaux, et l'écran des Réglages les rend :
+    depuis une session leurre, l'interface affichait donc l'état du coffre
+    PRINCIPAL. Le configurer était refusé par un message qui NOMMAIT le coffre
+    principal — quatre tapes, aucun secret exigé, la garde s'exécutait avant
+    même la demande de passphrase. Le compteur « inactivité actuelle » ne
+    pouvait valoir que zéro depuis le principal, donc toute autre valeur
+    désignait le leurre sans une seule tape. Et « Mettre à jour » acceptait
+    depuis le leurre la passphrase qu'on venait de livrer sous contrainte, la
+    refusait depuis le principal, et écrasait au passage le vrai instantané :
+    la garde SEC F7 avait fermé l'oracle sur le SECRET et ouvert, à la même
+    ligne, un oracle sur l'EMPLACEMENT. Scoper l'état supprime les trois d'un
+    seul geste. Le principal garde ses noms de clés historiques : un héritage
+    déjà configuré survit à la mise à jour sans rien perdre.
+  - **Retirer le leurre détruit son héritage**, sur les trois sorties qui le
+    retirent seul, purge AVANT écrasement. `pt_heir_b.enc` n'a pas de jumeau
+    factice : survivant au retrait du leurre, il prouverait après coup qu'un
+    leurre a existé — l'oracle déplacé de l'écran vers le disque.
+  - **`disable()` exige désormais un coffre ouvert.** `isDecoyActive` rend
+    `false` aussi bien quand le principal est ouvert que quand rien ne l'est :
+    un verrouillage automatique intercalé entre le dialogue et le tap aurait
+    détruit l'instantané du propriétaire depuis une session leurre.
+  - **L'application ne revenait pas au déverrouillage** après création d'un
+    leurre, ni après le mode panique. `popUntil(isFirst)` n'y revient pas —
+    `HomeScreen` a remplacé l'écran de déverrouillage — donc le parcours
+    promettait de forcer la reconnexion et ne la forçait pas. Présent dans la
+    2.7.0, trouvé en testant sur appareil.
+  - Les fiches store annonçaient que le mode panique détruit la clé Keystore.
+    C'est faux, et ça l'a toujours été ; le dialogue DANS l'app, lui, était
+    exact.
+  - `THREAT_MODEL.md` énonce désormais les trois oracles de leurre qui
+    restent, ce que fermer chacun coûterait, et ce que scoper l'héritage
+    coûte au repos.
+
 - **v2.7.0** (2026-09-20) — Coffre leurre : deux défauts annulaient la
   protection qu'il promet.
   - **Biométrie ↔ leurre, exclusion mutuelle.** Le déverrouillage biométrique
