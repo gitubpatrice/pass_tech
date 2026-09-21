@@ -121,7 +121,10 @@ jobs:
             echo "        dépendance responsable avant toute chose :"
             echo "        grep -rn <PERMISSION> build/app/intermediates/manifest_merge_blame_file/"
             echo "  '-' = permission disparue : mettre à jour le fichier de"
-            echo "        référence ET PRIVACY.md §10."
+            echo "        référence ET la section 10 des CINQ fichiers"
+            echo "        assets/legal/PRIVACY.{en,fr,de,it,es}.md — ce sont"
+            echo "        EUX que l'application affiche. PRIVACY.md à la"
+            echo "        racine n'est qu'un renvoi vers eux."
             exit 1
           fi
           echo "OK : surface de permissions inchangée."

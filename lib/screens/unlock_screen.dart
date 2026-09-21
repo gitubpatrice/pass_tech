@@ -100,7 +100,11 @@ class UnlockScreenState extends State<UnlockScreen> {
   void initState() {
     super.initState();
     _instancesVivantes++;
-    _heirOptionFuture = HeritageService().shouldShowHeirOption();
+    // Explicitement le PRINCIPAL : c'est l'inactivité du propriétaire qui
+    // arme l'accès de l'héritier. Aucun coffre n'est ouvert à ce stade, donc
+    // le constructeur nu rendrait déjà le principal — on ne s'appuie pas sur
+    // cette coïncidence, qui se briserait au premier changement de `lock()`.
+    _heirOptionFuture = HeritageService.primary().shouldShowHeirOption();
     _disguisedFuture = PanicService.isDisguised();
     _checkLockout();
     _checkBiometric();
@@ -455,12 +459,21 @@ class UnlockScreenState extends State<UnlockScreen> {
         // UX 2026-08-03 — idem : ouverture réussie par mot de passe, on
         // réarme l'invite biométrique pour le cycle suivant.
         _inviteBioDejaTentee = false;
-        // Marque l'utilisateur comme actif uniquement si on est sur PRIMARY.
-        // Le decoy ne reset pas le timer héritage (sinon un attaquant qui
-        // force l'ouverture du leurre prolongerait la vie du dead-man).
-        if (!VaultService().isDecoyActive) {
-          await HeritageService().markActive();
-        }
+        // AUDIT 2026-09-21 — la garde de slot disparaît, le scope la remplace.
+        //
+        // Elle existait pour qu'une ouverture forcée du leurre ne prolonge pas
+        // le dead-man du propriétaire, et cette intention reste entièrement
+        // valable. L'héritage étant désormais propre à l'emplacement,
+        // `markActive()` marque le coffre qui vient de s'ouvrir, et celui-là
+        // seul : le compte à rebours du principal continue de courir pendant
+        // qu'on fouille le leurre. La propriété est conservée par construction.
+        //
+        // Ce qu'elle coûtait : le compteur « inactivité actuelle » des Réglages
+        // ne pouvait valoir autre chose que zéro depuis le principal, puisque
+        // le déverrouillage venait de l'écrire. Toute autre valeur désignait
+        // donc le leurre, sans qu'aucune tape soit nécessaire — il suffisait
+        // de faire défiler.
+        await HeritageService().markActive();
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -557,7 +570,8 @@ class UnlockScreenState extends State<UnlockScreen> {
       );
     } catch (_) {}
 
-    final entries = await HeritageService().unlockAsHeir(pwd);
+    // L'instantané que l'héritier ouvre est celui du coffre PRINCIPAL.
+    final entries = await HeritageService.primary().unlockAsHeir(pwd);
     if (!mounted) return;
     if (entries == null) {
       if (!mounted) return;

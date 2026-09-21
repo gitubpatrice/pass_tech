@@ -13,7 +13,7 @@ account, no server, no tracker, no ads.
 <b>Privacy</b>
 * Anti-phishing per-domain check (minimal AccessibilityService)
 * Decoy vault for plausible deniability (timing-aligned coercion mode)
-* Panic mode: immediate Keystore KEK destruction
+* Panic mode: instant lock, biometrics disarmed, cached exports shredded
 * Launcher camouflage (icon disguised as Calculator)
 * Dead-man's switch (post-inactivity inheritance)
 * FLAG_SECURE active by default on password / card / identity entries

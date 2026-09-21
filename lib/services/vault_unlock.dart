@@ -104,6 +104,53 @@ extension VaultUnlock on VaultService {
     return ok;
   }
 
+  /// AUDIT 2026-09-21 — jumeau de [passwordMatchesPrimary] pour l'emplacement
+  /// ACTIF, et sans comptage d'échecs.
+  ///
+  /// L'héritage est désormais propre à l'emplacement, donc le contrôle « le
+  /// mot de passe héritier doit différer de celui du coffre » doit porter sur
+  /// le coffre que l'on configure. Le faire passer par
+  /// [passwordMatchesPrimary] rendait `false` depuis une session leurre — par
+  /// la garde de slot que SEC F7 a posée vingt lignes plus haut. Le contrôle
+  /// devenait vide, et surtout il devenait un ORACLE : l'adversaire saisissait
+  /// comme mot de passe héritier la passphrase qu'on venait de lui livrer sous
+  /// contrainte, et lisait la réponse. Refus « doit différer » ⇒ il tenait le
+  /// vrai coffre. Acceptation ⇒ il tenait le leurre, donc un vrai coffre
+  /// existait ailleurs.
+  ///
+  /// *La garde SEC F7 a fermé l'oracle sur le SECRET et ouvert, à la même
+  /// ligne, un oracle sur l'EMPLACEMENT.* C'est le motif du correctif qui
+  /// engendre son jumeau, déjà relevé trois fois dans ce dépôt.
+  ///
+  /// Comme pour [passwordMatchesPrimary], une non-correspondance est le
+  /// résultat ATTENDU : la compter comme un échec d'authentification
+  /// verrouillerait l'utilisateur légitime en train de se choisir un mot de
+  /// passe héritier distinct.
+  Future<bool> passwordMatchesActiveSlot(String password) async {
+    if (_unlockGate != null) return false;
+    final gate = _unlockGate = Completer<void>();
+    try {
+      // L'emplacement se lit APRÈS la prise du mutex, jamais avant.
+      //
+      // Le lire d'abord laisserait un `await` entre la lecture et la garde :
+      // un `unlock()` concurrent — double-appui, lien profond, Retour rapide,
+      // le scénario même que SEC-R1 décrit quelques lignes plus bas — peut
+      // s'ouvrir et se refermer dans cette fenêtre, et la comparaison
+      // porterait alors sur l'emplacement précédent. C'est la faute que
+      // `verifyCurrentPasswordLocked` évite en exigeant le mutex de son
+      // appelant ; ce jumeau-ci doit l'éviter de la même façon.
+      if (!_isOpen || _activeSlot == null) return false;
+      if (await getLockoutRemaining() != null) return false;
+      return await _passwordMatchesPrimaryInternal(
+        password,
+        slot: _activeSlot!,
+      );
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      _unlockGate = null;
+    }
+  }
+
   Future<bool> _passwordMatchesPrimaryInternal(
     String password, {
     _Slot slot = _Slot.primary,

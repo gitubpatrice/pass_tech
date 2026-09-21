@@ -18,8 +18,9 @@
 # quelqu'un l'écrive ici, explicitement, en assumant la ligne.
 #
 # ⚠️ Ne JAMAIS ajouter une ligne ici pour « faire passer le build ». L'ajout
-# doit s'accompagner de sa justification dans PRIVACY.md §10, qui est ce que
-# l'utilisateur lit.
+# doit s'accompagner de sa justification dans la section 10 des CINQ fichiers
+# assets/legal/PRIVACY.{en,fr,de,it,es}.md — ce sont EUX que l'application
+# affiche. PRIVACY.md à la racine n'est plus qu'un renvoi vers eux.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Déclarées par Pass Tech elle-même ────────────────────────────────────────
@@ -28,7 +29,7 @@
 android.permission.USE_BIOMETRIC
 
 # Vérification de mise à jour (GitHub Releases) + contrôle HIBP en k-anonymat,
-# tous deux optionnels et documentés dans PRIVACY.md §6.
+# tous deux optionnels et documentés en section 6 des assets/legal/PRIVACY.*.md.
 # NB : Pass Tech ne promet PAS « aucune permission Internet » — contrairement à
 # AI Tech, Notes Tech, Agenda Tech et App Manager Tech. Ne pas lui appliquer ce
 # critère (erreur corrigée dans CLAUDE.md le 2026-08-03).

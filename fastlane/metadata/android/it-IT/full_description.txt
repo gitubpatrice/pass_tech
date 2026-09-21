@@ -14,7 +14,7 @@ cloud, nessun account, nessun server, nessun tracker, nessuna pubblicità.
 * Anti-phishing per dominio (AccessibilityService minimo)
 * Cassaforte esca anti-coercizione (negabilità plausibile, tempi
   allineati)
-* Modalità panico: distruzione immediata della KEK nel Keystore
+* Modalità panico: blocco immediato, biometria disarmata, cache di esportazione distrutta
 * Camuffamento nel launcher (icona travestita da Calcolatrice)
 * Eredità dopo lunga inattività (interruttore dell'uomo morto)
 * FLAG_SECURE attivo di default sulle voci password / carta / identità

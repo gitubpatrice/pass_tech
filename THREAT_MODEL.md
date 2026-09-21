@@ -128,7 +128,7 @@ doivent être les plus claires.
 | **Contenu des fichiers** | Aucune étiquette distinctive ; le mot « decoy » n'apparaît plus sur le disque |
 | **Temps de réponse** | Deux passes Argon2id systématiques, y compris quand le premier emplacement a déjà répondu |
 | **Clés matérielles** | Les deux alias Keystore existent toujours, utilisés ou non |
-| **Fonctionnalités** | Aucune différence de comportement entre les deux emplacements |
+| **Fonctionnalités** | Même surface des deux côtés : entrées, audit, export, et la configuration de l'héritage, propre à chaque emplacement depuis le 2026-09-21. **Exceptions connues et non garanties**, aux points 6 à 8 ci-dessous |
 
 ### Ce qui n'est PAS garanti
 
@@ -166,6 +166,70 @@ doivent être les plus claires.
    couverture qu'elle n'avait pas — le mode panique désarmait bien la
    biométrie pour cette raison précise, mais le chemin du leurre, qui vise la
    même menace, n'avait aucune garde équivalente.
+
+6. **Trois surfaces des Réglages distinguent encore les deux emplacements.**
+   Relevées le 2026-09-21 par un audit dédié, corrigées en partie. Elles ne se
+   ferment pas en changeant les mots : c'est la différence de **comportement**
+   qui parle, et le code de l'application est public.
+
+   - **Activer le déverrouillage biométrique** réussit sur un téléphone sans
+     leurre et échoue dès qu'un leurre existe. Le message de refus ne nomme
+     plus le leurre, mais l'échec lui-même renseigne qui connaît l'application.
+   - **La tuile « Coffre leurre »** affiche l'état *configuré* dès qu'un leurre
+     existe — dans les deux sessions. Elle ne dit pas lequel est ouvert ; elle
+     dit qu'il y en a deux.
+   - **« Supprimer toutes les données »** mène à l'écran de création depuis le
+     coffre principal, et à l'écran de déverrouillage depuis le leurre.
+     L'application annonce une suppression définitive puis redemande un mot de
+     passe : il reste donc un coffre. **Celui-ci ne demande aucune connaissance
+     de l'application** — n'importe qui le lit.
+
+   Les fermer suppose de rendre la session leurre capable des mêmes opérations
+   que le principal, et non d'en simuler le résultat : une simulation se teste
+   — il suffit de verrouiller et de ressaisir ce qu'on vient de configurer.
+
+7. **L'état d'héritage du leurre est visible au forensic.**
+   L'héritage est propre à chaque emplacement depuis le 2026-09-21, ce qui a
+   fermé trois oracles d'interface. En contrepartie, deux traces au repos
+   trahissent le leurre à qui obtient une copie du dossier privé de
+   l'application (adb, appareil rooté) :
+
+   - `pt_last_active_ts_b` est écrit dès la **première ouverture** du leurre,
+     qu'un héritage y soit configuré ou non. C'est la trace la plus commune,
+     et la plus révélatrice : elle prouve qu'un second coffre a été OUVERT.
+   - `pt_heir_b.enc` n'existe que si un héritage a été configuré depuis le
+     leurre. Il disparaît avec lui : les trois sorties qui retirent le leurre
+     purgent cet instantané et ses cinq clés.
+
+   Ces cinq clés `_b` sont le premier état lié au leurre à exister
+   **conditionnellement**. Tout le reste — les deux fichiers de coffre, les
+   deux alias Keystore, `pt_salt_decoy`, `pt_decoy_configured` — est posé
+   systématiquement dès l'installation, précisément pour que le profil de
+   stockage soit constant — un factice créé d'office, un rembourrage apparié.
+   L'état d'héritage ne bénéficie pas encore de ce traitement.
+
+   Cet adversaire-là est strictement plus fort que celui du mode leurre, qui
+   n'a que l'écran : le déni plausible face à une analyse forensique du
+   téléphone n'a jamais été promis, et ne l'est pas davantage ici.
+
+8. **L'héritage configuré depuis le coffre leurre ne sert aucun héritier.**
+   La configuration existe des deux côtés — c'est ce qui supprime le refus qui
+   trahissait le leurre. Mais l'écran de déverrouillage ne propose et n'ouvre
+   que l'instantané du coffre **principal** : celui du leurre s'écrit et ne se
+   lit jamais.
+
+   Sans conséquence pour le déni plausible — l'adversaire ne peut pas le
+   constater, il lui faudrait attendre le seuil d'inactivité, 30 jours au
+   minimum, puis 7 jours de grâce, sur une horloge monotone. **Mais
+   conséquence réelle pour vous** : si vous configurez l'héritage en croyant
+   être dans votre coffre principal alors que vous êtes dans le leurre,
+   l'application confirme, affiche un compte à rebours, et le dispositif
+   n'existera jamais.
+
+   Rendre l'instantané du leurre atteignable suppose que l'écran de
+   déverrouillage tente les deux sans révéler lequel existe — travail constant
+   des deux côtés, comme les passes Argon2id factices du déverrouillage. Ce
+   n'est pas fait.
 
 ---
 

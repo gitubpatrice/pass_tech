@@ -137,8 +137,8 @@ storeFile=../keystore.jks
 
 - [LICENSE](LICENSE) — Apache License 2.0
 - [THREAT_MODEL.md](THREAT_MODEL.md) — what is protected, against whom, and what is not
-- [PRIVACY.md](PRIVACY.md) / [PRIVACY.fr.md](PRIVACY.fr.md) — privacy policy
-- [TERMS.md](TERMS.md) / [TERMS.fr.md](TERMS.fr.md) — terms of use
+- [PRIVACY.md](PRIVACY.md) — privacy policy
+- [TERMS.md](TERMS.md) — terms of use
 - [SECURITY.md](SECURITY.md) — vulnerability reporting policy
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — third-party dependencies
 - [NOTICE](NOTICE) — Apache 2.0 attribution notices

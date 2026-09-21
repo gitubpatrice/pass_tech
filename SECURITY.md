@@ -19,6 +19,38 @@ the security side.
 
 ### Recent fix history
 
+- **v2.7.1** (2026-09-21) — Decoy vault: three settings surfaces told a decoy
+  session apart from the real one.
+  - **Inheritance is now per vault slot.** The five inheritance keys and the
+    snapshot file were global, and the settings screen renders them, so from a
+    decoy session the UI showed the state of the MAIN vault. Setting
+    inheritance up was refused with a message naming the main vault — four
+    taps, no secret required, the guard ran before the passphrase prompt. The
+    "current inactivity" counter could only read zero from the main vault, so
+    any other value identified the decoy without a single tap. And "Update"
+    accepted, from the decoy, the passphrase just handed over under coercion,
+    while refusing it from the main vault and overwriting the real snapshot:
+    the SEC F7 slot guard had closed the oracle on the SECRET and opened one
+    on the SLOT at the same line. Scoping the state removes all three at once.
+    The main vault keeps its historic key names, so inheritance already
+    configured survives the update untouched.
+  - **Removing the decoy destroys its inheritance**, on all three exits that
+    remove the decoy alone, purge before overwrite. `pt_heir_b.enc` has no
+    dummy twin: surviving the decoy's removal it would prove after the fact
+    that a decoy existed, moving the oracle from screen to disk.
+  - **`disable()` now requires an open vault.** `isDecoyActive` reads false
+    both when the main vault is open and when nothing is, so an auto-lock
+    slipping between the dialog and the tap would have destroyed the owner's
+    snapshot from a decoy session.
+  - **The app never returned to the lock screen** after setting up a decoy,
+    nor after panic. `popUntil(isFirst)` does not reach it — `HomeScreen`
+    replaces the unlock screen — so the decoy flow promised to force a fresh
+    login and did not. Present in 2.7.0, found by testing on a device.
+  - The store listings claimed panic mode destroys the Keystore key. It never
+    did, in any version; the in-app dialog was accurate all along.
+  - `THREAT_MODEL.md` now states the three decoy oracles that remain, what
+    each would cost to close, and what scoping inheritance costs at rest.
+
 - **v2.7.0** (2026-09-20) — Decoy vault: two defects undid the protection it
   promises.
   - **Biometrics ↔ decoy, mutual exclusion.** Biometric unlock opens

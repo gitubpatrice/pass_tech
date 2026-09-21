@@ -163,6 +163,27 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            // 2026-09-21 — un build de débogage porte désormais son propre
+            // identifiant, et peut donc COHABITER avec l'application publiée.
+            //
+            // Motif, appris à ses dépens le jour même : sans suffixe, installer
+            // un build de test par-dessus la release échoue sur une signature
+            // incompatible. L'échec est SILENCIEUX pour qui ne lit pas la
+            // sortie d'`adb install` au bon format — une campagne de tests
+            // entière a été menée sur la 2.7.0 publiée en croyant mesurer un
+            // correctif, et seul `dumpsys package` l'a révélé. La seule parade
+            // fiable est de rendre les deux paquets distincts.
+            //
+            // C'est déjà la convention de SMS Tech et d'Agenda Tech
+            // (`com.filestech.sms.debug`, `com.filestech.agenda_tech.debug`).
+            // Le coffre du build de test vit alors dans son propre répertoire
+            // privé : aucune interaction possible avec le coffre réel.
+            //
+            // N'affecte QUE le débogage — la recette de release est intacte.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
     }
 }
 

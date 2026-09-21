@@ -1,0 +1,10 @@
+Schein-Tresor: Drei Signale verrieten ihn aus einer Schein-Sitzung.
+
+Der Nachlass gehört jetzt zum jeweiligen Tresor:
+• Die Einrichtung meldet nicht mehr „nur im Haupttresor".
+• Der Inaktivitätszähler verrät den Schein-Tresor nicht mehr.
+• Das Löschen löscht auch seinen Nachlass, ohne Dateigrößen zu ändern.
+
+Nach dem Einrichten kehrt die App endlich zum Sperrbildschirm zurück.
+
+Der Store-Eintrag behauptete falsch, der Panikmodus zerstöre den Keystore-Schlüssel.

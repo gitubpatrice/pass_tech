@@ -1,0 +1,10 @@
+Coffre leurre : trois signaux le trahissaient depuis une session leurre.
+
+L'héritage devient propre à chaque coffre :
+• Le configurer depuis le leurre ne dit plus « uniquement sur le coffre principal ».
+• Le compteur d'inactivité ne désigne plus le leurre.
+• Supprimer le leurre efface aussi son héritage, sans changer la taille des fichiers.
+
+Après création d'un leurre, l'app revient enfin au déverrouillage.
+
+La fiche annonçait à tort que le mode panique détruit la clé Keystore.
