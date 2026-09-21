@@ -15,16 +15,23 @@ class PrefixedKeystore(private val delegate: SlotKeystore, private val prefix: S
     /** The alias the real Keystore holds for [alias]. */
     fun realAlias(alias: String) = prefix + alias
 
-    override fun ensureKey(alias: String) {
+    override fun ensureAesKey(alias: String) {
         created += alias
-        delegate.ensureKey(realAlias(alias))
+        delegate.ensureAesKey(realAlias(alias))
+    }
+
+    override fun ensureHmacKeys(aliases: Collection<String>) {
+        created += aliases
+        delegate.ensureHmacKeys(aliases.map(::realAlias))
     }
 
     override fun deleteKey(alias: String) = delegate.deleteKey(realAlias(alias))
 
     override fun wrap(alias: String, plain: ByteArray) = delegate.wrap(realAlias(alias), plain)
 
-    override fun unwrapOrNull(alias: String, wrapped: SlotKeystore.Wrapped) = delegate.unwrapOrNull(realAlias(alias), wrapped)
+    override fun unwrap(alias: String, wrapped: SlotKeystore.Wrapped) = delegate.unwrap(realAlias(alias), wrapped)
+
+    override fun hmac(alias: String, data: ByteArray) = delegate.hmac(realAlias(alias), data)
 
     /** Deletes every key this instance created. */
     fun deleteCreated() {

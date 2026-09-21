@@ -15,7 +15,9 @@ enum class Slot(val label: String) {
     ;
 
     val vaultFileName: String get() = "pt_vault_$label.enc"
-    val keystoreAlias: String get() = "pt_kek_$label"
+
+    /** The slot's HMAC key (design v2.2). Versioned: an alias is never reused for another kind of key. */
+    val hardwareKeyAlias: String get() = "pt_v5_hw_$label"
 
     companion object {
         fun fromLabel(label: String): Slot? = entries.firstOrNull { it.label == label }

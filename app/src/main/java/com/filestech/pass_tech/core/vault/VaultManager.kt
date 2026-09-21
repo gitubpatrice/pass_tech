@@ -27,6 +27,8 @@ import javax.inject.Singleton
  *   once the vault has finished reading the password.
  * - A cancelled caller loses nothing: the operation runs to its end and its effect is recorded here
  *   before the call returns. A vault it opened stays open until [lock].
+ * - [updateEntries] and [deleteData] throw [KeystoreUnavailableException] when the secure hardware did
+ *   not answer: nothing was written, and the vault stays open. The other operations say it in their result.
  */
 @Singleton
 class VaultManager @Inject constructor(
@@ -37,7 +39,7 @@ class VaultManager @Inject constructor(
     sealed interface State {
         data object Locked : State
 
-        /** [hasDecoy]: this vault created a decoy that still exists, so it cannot create another one. */
+        /** [hasDecoy]: this vault has a decoy, or cannot rule one out, so it cannot create another one. */
         data class Open(val entries: List<Entry>, val hasDecoy: Boolean) : State
     }
 
@@ -47,6 +49,9 @@ class VaultManager @Inject constructor(
         data object WrongPassword : UnlockOutcome
 
         data class Locked(val remainingMillis: Long) : UnlockOutcome
+
+        /** The secure hardware did not answer: say "retry", never "wrong password". */
+        data object KeystoreUnavailable : UnlockOutcome
     }
 
     sealed interface CreateOutcome {
@@ -59,6 +64,8 @@ class VaultManager @Inject constructor(
         data object Impossible : CreateOutcome
 
         data class Locked(val remainingMillis: Long) : CreateOutcome
+
+        data object KeystoreUnavailable : CreateOutcome
     }
 
     sealed interface DecoyOutcome {
@@ -70,6 +77,9 @@ class VaultManager @Inject constructor(
         data object Impossible : DecoyOutcome
 
         data class Locked(val remainingMillis: Long) : DecoyOutcome
+
+        /** The vault was locked: reopening it completes or drops an interrupted creation. */
+        data object KeystoreUnavailable : DecoyOutcome
     }
 
     sealed interface ChangeOutcome {
@@ -80,6 +90,8 @@ class VaultManager @Inject constructor(
         data object PasswordRefused : ChangeOutcome
 
         data class Locked(val remainingMillis: Long) : ChangeOutcome
+
+        data object KeystoreUnavailable : ChangeOutcome
     }
 
     private val mutex = Mutex()
@@ -101,6 +113,7 @@ class VaultManager @Inject constructor(
                 }
                 VaultRepository.UnlockResult.WrongPassword -> UnlockOutcome.WrongPassword
                 is VaultRepository.UnlockResult.Locked -> UnlockOutcome.Locked(result.remainingMillis)
+                VaultRepository.UnlockResult.KeystoreUnavailable -> UnlockOutcome.KeystoreUnavailable
             }
         }
 
@@ -118,6 +131,7 @@ class VaultManager @Inject constructor(
                 }
                 VaultRepository.CreateResult.Impossible -> CreateOutcome.Impossible
                 is VaultRepository.CreateResult.Locked -> CreateOutcome.Locked(result.remainingMillis)
+                VaultRepository.CreateResult.KeystoreUnavailable -> CreateOutcome.KeystoreUnavailable
             }
         }
 
@@ -134,7 +148,7 @@ class VaultManager @Inject constructor(
             current != null
         }
 
-    /** Returns `null`, doing nothing, if no vault is open. The caller only offers it when [State.Open.hasDecoy] is false. */
+    /** Returns `null`, doing nothing, if no vault is open. Only offered when [State.Open.hasDecoy] is false. */
     suspend fun configureDecoy(password: ByteArray): DecoyOutcome? =
         serialized(password) {
             session?.let { current ->
@@ -146,6 +160,12 @@ class VaultManager @Inject constructor(
                     VaultRepository.DecoyResult.PasswordRefused -> DecoyOutcome.PasswordRefused
                     VaultRepository.DecoyResult.Impossible -> DecoyOutcome.Impossible
                     is VaultRepository.DecoyResult.Locked -> DecoyOutcome.Locked(result.remainingMillis)
+                    VaultRepository.DecoyResult.KeystoreUnavailable -> {
+                        // The creation may have stopped after its journal, and this session does not know it:
+                        // saving from it would erase the journal. Lock; the next opening settles it.
+                        close()
+                        DecoyOutcome.KeystoreUnavailable
+                    }
                 }
             }
         }
@@ -167,6 +187,7 @@ class VaultManager @Inject constructor(
                     VaultRepository.ChangeResult.WrongCurrentPassword -> ChangeOutcome.WrongCurrentPassword
                     VaultRepository.ChangeResult.PasswordRefused -> ChangeOutcome.PasswordRefused
                     is VaultRepository.ChangeResult.Locked -> ChangeOutcome.Locked(result.remainingMillis)
+                    VaultRepository.ChangeResult.KeystoreUnavailable -> ChangeOutcome.KeystoreUnavailable
                 }
             }
         }
@@ -185,11 +206,7 @@ class VaultManager @Inject constructor(
 
     /** Wipes the key and forgets the entries. Waits for the operation in progress, if any. */
     suspend fun lock() {
-        serialized {
-            session?.close()
-            session = null
-            publish()
-        }
+        serialized { close() }
     }
 
     /**
@@ -219,7 +236,13 @@ class VaultManager @Inject constructor(
         publish()
     }
 
+    private fun close() {
+        session?.close()
+        session = null
+        publish()
+    }
+
     private fun publish() {
-        mutableState.value = session?.let { State.Open(it.entries, hasDecoy = repository.decoyOf(it) != null) } ?: State.Locked
+        mutableState.value = session?.let { State.Open(it.entries, hasDecoy = repository.hasDecoy(it)) } ?: State.Locked
     }
 }

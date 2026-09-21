@@ -98,6 +98,18 @@ class VaultManagerTest {
     }
 
     @Test
+    fun `a decoy the Keystore interrupts locks the vault, which then opens as it is on disk`() = runTest {
+        manager.openOrCreate(owner())
+        manager.updateEntries { it + entry("bank") }
+        keystore.unavailable += Slot.B.hardwareKeyAlias
+        assertThat(manager.configureDecoy(decoy())).isEqualTo(DecoyOutcome.KeystoreUnavailable)
+        assertThat(manager.state.value).isEqualTo(State.Locked)
+        keystore.unavailable.clear()
+        assertThat(manager.unlock(owner())).isEqualTo(UnlockOutcome.Opened)
+        assertThat(titles()).containsExactly("bank")
+    }
+
+    @Test
     fun `deleting leaves the vault locked and the entry screen in creation mode`() = runTest {
         manager.openOrCreate(owner())
         assertThat(manager.deleteData()).isTrue()

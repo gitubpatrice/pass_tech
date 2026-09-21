@@ -27,7 +27,7 @@ data class OccupancyMark(
 ) {
 
     fun seal(slot: Slot, keystore: SlotKeystore): SlotKeystore.Wrapped {
-        keystore.ensureKey(KEY_ALIAS)
+        keystore.ensureAesKey(KEY_ALIAS)
         val state = if (occupied) OCCUPIED else FREE
         val create = if (creationRequested) 1 else 0
         val text = "$MAGIC|slot=${slot.label}|state=$state|gen=$generation|create=$create"
@@ -50,9 +50,12 @@ data class OccupancyMark(
 
         fun free(creationRequested: Boolean) = OccupancyMark(occupied = false, newGeneration(), creationRequested)
 
-        /** `null` if the mark does not authenticate, belongs to another slot, or is malformed. */
+        /**
+         * `null` if the mark does not authenticate, belongs to another slot, is malformed, or if the
+         * Keystore did not answer: every one of these reads as UNKNOWN, which is never written over.
+         */
         fun openOrNull(wrapped: SlotKeystore.Wrapped, slot: Slot, keystore: SlotKeystore): OccupancyMark? {
-            val bytes = keystore.unwrapOrNull(KEY_ALIAS, wrapped) ?: return null
+            val bytes = keystore.unwrap(KEY_ALIAS, wrapped).valueOrNull() ?: return null
             val groups = FORMAT.matchEntire(bytes.decodeToString().trimEnd())?.groupValues ?: return null
             return if (groups[1] != slot.label) {
                 null

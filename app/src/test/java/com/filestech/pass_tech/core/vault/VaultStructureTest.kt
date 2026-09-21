@@ -130,6 +130,44 @@ class VaultStructureTest {
     }
 
     @Test
+    fun `a decoy whose key the Keystore cannot derive writes nothing at all`() {
+        val parent = (repo.openOrCreate(owner) as VaultRepository.CreateResult.Created).session
+        val before = Slot.entries.map { files.read(it) }
+        keystore.unavailable += Slot.B.hardwareKeyAlias
+        // The collision check fails first on slot B: the owner tries again once the Keystore answers.
+        assertThat(repo.configureDecoy(parent, decoy)).isEqualTo(VaultRepository.DecoyResult.KeystoreUnavailable)
+        assertThat(Slot.entries.map { files.read(it) }).isEqualTo(before)
+    }
+
+    @Test
+    fun `the decoy key is derived before the parent journals anything`() {
+        val parent = (repo.openOrCreate(owner) as VaultRepository.CreateResult.Created).session
+        val before = Slot.entries.map { files.read(it) }
+        // The collision check passes (one HMAC per slot), then the decoy's own derivation fails.
+        keystore.hmacCalls.clear()
+        keystore.hmacUnavailableAfter = Slot.entries.size
+        assertThat(repo.configureDecoy(parent, decoy)).isEqualTo(VaultRepository.DecoyResult.KeystoreUnavailable)
+        assertThat(Slot.entries.map { files.read(it) }).isEqualTo(before)
+    }
+
+    @Test
+    fun `an unreadable decoy mark is never settled away, nor a second decoy offered over it`() {
+        val parent = (repo.openOrCreate(owner) as VaultRepository.CreateResult.Created).session
+        files.crashOnWrite = 3 // the decoy exists, its confirmation does not
+        assertThrows<SimulatedCrash> { repo.configureDecoy(parent, decoy) }
+        files.crashOnWrite = 0
+        keystore.unavailable += OccupancyMark.KEY_ALIAS
+
+        val reopened = open(owner)
+        assertThat(reopened.meta.pendingChild?.slot).isEqualTo(Slot.B)
+        assertThat(repo.hasDecoy(reopened)).isTrue()
+
+        keystore.unavailable.clear()
+        assertThat(repo.decoyOf(open(owner))?.slot).isEqualTo(Slot.B)
+        assertThat(open(decoy).slot).isEqualTo(Slot.B)
+    }
+
+    @Test
     fun `a crash after the decoy but before its confirmation is completed at the next opening`() {
         val parent = (repo.openOrCreate(owner) as VaultRepository.CreateResult.Created).session
         files.crashOnWrite = 3 // the confirmation in the parent

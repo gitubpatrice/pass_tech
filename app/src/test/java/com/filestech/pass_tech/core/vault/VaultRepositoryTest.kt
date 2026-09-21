@@ -25,6 +25,7 @@ class VaultRepositoryTest {
     private val fastParams = KdfParams(memoryKiB = KdfParams.MIN_MEMORY_KIB, iterations = 1, parallelism = 1)
 
     private val password = "owner password".encodeToByteArray()
+    private val wrong = "not the password".encodeToByteArray()
 
     @BeforeEach
     fun setUp() {
@@ -97,9 +98,58 @@ class VaultRepositoryTest {
     @Test
     fun `every attempt derives against every slot, whichever answers`() {
         created().close()
-        keystore.unwrapCalls.clear()
+        keystore.hmacCalls.clear()
         repo.unlock(password)
-        assertThat(keystore.unwrapCalls.filter { it.startsWith("pt_kek_") }).containsExactly("pt_kek_a", "pt_kek_b", "pt_kek_c")
+        assertThat(keystore.hmacCalls).containsExactly("pt_v5_hw_a", "pt_v5_hw_b", "pt_v5_hw_c")
+    }
+
+    @Test
+    fun `an attempt on a fresh install costs the hardware work of every slot too`() {
+        keystore.hmacCalls.clear()
+        repo.unlock(password)
+        assertThat(keystore.hmacCalls).containsExactly("pt_v5_hw_a", "pt_v5_hw_b", "pt_v5_hw_c")
+    }
+
+    @Test
+    fun `a Keystore that does not answer is never a wrong password, and the attempts still count`() {
+        created().close()
+        keystore.unavailable += Slot.A.hardwareKeyAlias
+        repeat(6) { assertThat(repo.unlock(password)).isEqualTo(VaultRepository.UnlockResult.KeystoreUnavailable) }
+        keystore.unavailable.clear()
+        assertThat(repo.unlock(password)).isInstanceOf(VaultRepository.UnlockResult.Locked::class.java)
+    }
+
+    @Test
+    fun `the creation form creates nothing while a slot cannot be checked`() {
+        created().close()
+        val before = Slot.entries.associateWith { File(dir, it.vaultFileName).readText() }
+        keystore.unavailable += Slot.A.hardwareKeyAlias
+        assertThat(repo.openOrCreate(password)).isEqualTo(VaultRepository.CreateResult.KeystoreUnavailable)
+        assertThat(Slot.entries.associateWith { File(dir, it.vaultFileName).readText() }).isEqualTo(before)
+    }
+
+    @Test
+    fun `a slot key is never re-created under a vault`() {
+        created().close()
+        keystore.deleteKey(Slot.A.hardwareKeyAlias)
+        keystore.hmacKeysCreated.clear()
+        assertThat(repo.openOrCreate("another password".encodeToByteArray())).isInstanceOf(VaultRepository.CreateResult.Created::class.java)
+        assertThat(keystore.hmacKeysCreated).doesNotContain(Slot.A.hardwareKeyAlias)
+    }
+
+    @Test
+    fun `a Keystore that does not answer never resets the lockout`() {
+        created().close()
+        repeat(5) { assertThat(repo.unlock(wrong)).isEqualTo(VaultRepository.UnlockResult.WrongPassword) }
+        val state = File(dir, StateStore.FILE_NAME)
+        val before = state.readText()
+        keystore.unavailable += StateStore.KEY_ALIAS
+        assertThat(repo.unlock(password)).isEqualTo(VaultRepository.UnlockResult.KeystoreUnavailable)
+        assertThat(state.readText()).isEqualTo(before)
+        keystore.unavailable.clear()
+        // The five failures are still there: the sixth locks.
+        assertThat(repo.unlock(wrong)).isEqualTo(VaultRepository.UnlockResult.WrongPassword)
+        assertThat(repo.unlock(password)).isInstanceOf(VaultRepository.UnlockResult.Locked::class.java)
     }
 
     @Test

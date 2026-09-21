@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
 import android.os.SystemClock
-import android.security.keystore.KeyInfo
-import android.security.keystore.KeyProperties
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -18,6 +16,7 @@ import com.filestech.pass_tech.core.vault.VaultManager.State
 import com.filestech.pass_tech.core.vault.VaultManager.UnlockOutcome
 import com.filestech.pass_tech.di.VaultModule
 import com.filestech.pass_tech.testing.PrefixedKeystore
+import com.filestech.pass_tech.testing.keyLevel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -26,9 +25,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.security.KeyStore
-import javax.crypto.SecretKey
-import javax.crypto.SecretKeyFactory
 
 /**
  * The vault as the app builds it (the providers of [VaultModule]), on the real Keystore and the real
@@ -119,8 +115,8 @@ class VaultOnDeviceTest {
         }
         // Fewer than the five free attempts: no lockout delay gets in the measure.
         val wrong = List(WRONG_RUNS) { measure { assertThat(manager.unlock(decoy())).isEqualTo(UnlockOutcome.WrongPassword) } }
-        val levels = (Slot.entries.map { it.keystoreAlias } + OccupancyMark.KEY_ALIAS + StateStore.KEY_ALIAS)
-            .joinToString { "$it=${securityLevel(keystore.realAlias(it))}" }
+        val levels = (Slot.entries.map { it.hardwareKeyAlias } + OccupancyMark.KEY_ALIAS + StateStore.KEY_ALIAS)
+            .joinToString { "$it=${keyLevel(keystore.realAlias(it))}" }
         Log.i(
             TAG,
             "${Build.MODEL} API ${Build.VERSION.SDK_INT} | keys: $levels | create $create ms | save $saves median ${median(saves)} | " +
@@ -137,22 +133,6 @@ class VaultOnDeviceTest {
     }
 
     private fun median(values: List<Long>) = values.sorted()[values.size / 2]
-
-    private fun securityLevel(alias: String): String {
-        val key = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.getKey(alias, null) as SecretKey
-        val info = SecretKeyFactory.getInstance(key.algorithm, "AndroidKeyStore").getKeySpec(key, KeyInfo::class.java) as KeyInfo
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            when (info.securityLevel) {
-                KeyProperties.SECURITY_LEVEL_STRONGBOX -> "StrongBox"
-                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TEE"
-                KeyProperties.SECURITY_LEVEL_SOFTWARE -> "software"
-                else -> "level ${info.securityLevel}"
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            if (info.isInsideSecureHardware) "secure hardware" else "software"
-        }
-    }
 
     private companion object {
         const val TAG = "PassTechVault"

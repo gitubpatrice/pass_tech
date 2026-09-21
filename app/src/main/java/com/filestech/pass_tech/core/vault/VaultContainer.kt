@@ -21,61 +21,59 @@ import kotlinx.serialization.json.putJsonObject
 import java.util.Base64
 
 /**
- * The encrypted file of one vault slot.
- *
- * Same construction as the vault v4 of the Flutter app, which was reviewed and audited:
+ * The encrypted file of one vault slot (design v2.2).
  * ```
- * pwHash   = Argon2id(password, salt, m, t, p)                  (parameters written in the file)
- * secret   = unwrap(KEK of the slot, wrappedSecret)             (AndroidKeyStore, never leaves it)
- * finalKey = HKDF-SHA256(salt, pwHash || secret, "pt:v5", 32)
+ * pwHash   = Argon2id(password, salt, m, t, p)                     32 bytes, parameters in the file
+ * hw       = HMAC-SHA256(slot key, "pt:v5|slot=<label>|" || pwHash)  32 bytes, computed INSIDE the secure hardware
+ * finalKey = HKDF-SHA256(salt, pwHash || hw, "pt:v5", 32)
  * data     = AES-256-GCM(finalKey, nonce, padded payload, AAD)
  * AAD      = "pt:v=5|slot=<label>|kdf=argon2id|m=<m>|t=<t>|p=<p>"
  * ```
- * Version 5 because the payload changed (an object with entries and slot metadata instead of a bare
- * array) and the slot label replaced the Keystore alias in the AAD. The Flutter app never reads
- * these files, nor this app the Flutter ones (the Keystore keys differ anyway): only the `.ptbak`
- * backup crosses between the two.
+ * The slot key ([Slot.hardwareKeyAlias]) never leaves the hardware and takes part in EVERY attempt:
+ * with a copy of the files, or even with code running on the phone, a guess can only be checked on
+ * this phone, through its Keystore, for as long as the key cannot be extracted. The v4 of the Flutter
+ * app wrapped a random secret instead, which does not depend on the password: one unwrap was enough
+ * to take the files elsewhere and test passwords at GPU speed (GPT 5.6 review of the design, v2.2).
+ *
+ * The Flutter app never reads these files, nor this app the Flutter ones: only the `.ptbak` backup,
+ * sealed by its own passphrase and nothing hardware-bound, crosses between the two.
  */
 object VaultContainer {
 
     private const val MAGIC = "PTVAULT"
     private const val VERSION = 5
     private const val SALT_LENGTH = 32
-    private const val SECRET_LENGTH = 32
     private const val KEY_LENGTH = 32
     private val HKDF_INFO = "pt:v5".encodeToByteArray()
 
     private val json = Json
 
     /** Everything in a vault file except the ciphertext. Kept by an open session to save without re-deriving. */
-    class Header(
-        val slot: Slot,
-        val params: KdfParams,
-        val salt: ByteArray,
-        val wrappedSecret: SlotKeystore.Wrapped,
-    )
+    class Header(val slot: Slot, val params: KdfParams, val salt: ByteArray)
 
-    /** A new header for [slot]: fresh salt, fresh hardware secret wrapped by the slot's Keystore key. */
-    fun newHeader(slot: Slot, keystore: SlotKeystore, params: KdfParams = KdfParams.OWASP_MOBILE_2024): Header {
-        keystore.ensureKey(slot)
-        val wrapped = SecretBytes.random(SECRET_LENGTH).useThenWipe { secret -> keystore.wrap(slot, secret) }
-        return Header(slot, params, SecretBytes.random(SALT_LENGTH), wrapped)
-    }
+    /** A new header for [slot]: a fresh salt. Also the synthetic header that spends an attempt's work on an empty slot. */
+    fun newHeader(slot: Slot, params: KdfParams = KdfParams.OWASP_MOBILE_2024) = Header(slot, params, SecretBytes.random(SALT_LENGTH))
 
     /**
-     * Derives the key of a file. ALWAYS runs Argon2id, even when the hardware secret cannot be
-     * unwrapped: the unlock loop must take the same time whatever the slot holds.
-     *
-     * @return the key, or `null` if the Keystore could not unwrap the secret.
+     * Derives the key of a file: Argon2id, then the slot's hardware HMAC, whatever happens, so that every
+     * slot costs the same work. [KeyResult.Done] carries the key; otherwise the reason there is none:
+     * [KeyResult.NoKey] (the slot key is gone, this file opens nothing, ever) or [KeyResult.Unavailable]
+     * (the Keystore did not answer: nothing is known, retry).
      */
-    fun deriveKeyOrNull(header: Header, password: ByteArray, keystore: SlotKeystore): ByteArray? {
-        val pwHash = Argon2id.derive(password, header.salt, header.params)
-        return pwHash.useThenWipe { hash ->
-            keystore.unwrapOrNull(header.slot, header.wrappedSecret)?.useThenWipe { secret ->
-                (hash + secret).useThenWipe { ikm -> HkdfSha256.derive(header.salt, ikm, HKDF_INFO, KEY_LENGTH) }
+    fun deriveKey(header: Header, password: ByteArray, keystore: SlotKeystore): KeyResult<ByteArray> =
+        Argon2id.derive(password, header.salt, header.params).useThenWipe { pwHash ->
+            val hw = hardwareInput(header.slot, pwHash).useThenWipe { keystore.hmac(header.slot.hardwareKeyAlias, it) }
+            if (hw is KeyResult.Done) {
+                hw.value.useThenWipe { tag ->
+                    KeyResult.Done((pwHash + tag).useThenWipe { ikm -> HkdfSha256.derive(header.salt, ikm, HKDF_INFO, KEY_LENGTH) })
+                }
+            } else {
+                hw
             }
         }
-    }
+
+    /** `"pt:v5|slot=<label>|"` in ASCII, then the 32 bytes of pwHash: fixed length, no ambiguity. */
+    private fun hardwareInput(slot: Slot, pwHash: ByteArray): ByteArray = "pt:v5|slot=${slot.label}|".encodeToByteArray() + pwHash
 
     /**
      * Encrypts [paddedPayload] under [key] into the file content, with the slot's [occupancy] mark
@@ -98,11 +96,6 @@ object VaultContainer {
                 put("t", header.params.iterations)
                 put("p", header.params.parallelism)
                 put("salt", encoder.encodeToString(header.salt))
-            }
-            putJsonObject("kek") {
-                put("algo", "AES-GCM-256")
-                put("wrappedSecret", encoder.encodeToString(header.wrappedSecret.ciphertext))
-                put("wrapNonce", encoder.encodeToString(header.wrappedSecret.nonce))
             }
             putJsonObject("cipher") {
                 put("algo", "AES-GCM-256")
@@ -127,7 +120,6 @@ object VaultContainer {
             ensure(root.optString("slot") == expectedSlot.label)
             val occ = root.objectOrNull("occ").orReject()
             val kdf = root.objectOrNull("kdf").orReject()
-            val kek = root.objectOrNull("kek").orReject()
             val cipher = root.objectOrNull("cipher").orReject()
             ensure(kdf.optString("algo") == "argon2id")
             val params = KdfParams.validatedOrNull(
@@ -136,15 +128,7 @@ object VaultContainer {
                 parallelism = kdf.optInt("p").orReject(),
             ).orReject()
             val decoder = Base64.getDecoder()
-            val header = Header(
-                slot = expectedSlot,
-                params = params,
-                salt = decoder.decode(kdf.requireString("salt")),
-                wrappedSecret = SlotKeystore.Wrapped(
-                    ciphertext = decoder.decode(kek.requireString("wrappedSecret")),
-                    nonce = decoder.decode(kek.requireString("wrapNonce")),
-                ),
-            )
+            val header = Header(slot = expectedSlot, params = params, salt = decoder.decode(kdf.requireString("salt")))
             Parsed(
                 occupancy = SlotKeystore.Wrapped(
                     ciphertext = decoder.decode(occ.requireString("data")),

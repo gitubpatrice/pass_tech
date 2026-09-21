@@ -25,6 +25,10 @@ import kotlinx.serialization.json.longOrNull
  *
  * The lock itself is a remaining duration anchored on uptime and persisted, so a reboot does not
  * shorten it either (same principle as 2.7.1).
+ *
+ * Every method throws [com.filestech.pass_tech.core.vault.KeystoreUnavailableException] when the state
+ * cannot be read because the Keystore did not answer. Nothing is then reset nor written: the caller
+ * answers "retry", and the debt is still there next time.
  */
 class BruteForceGuard(
     private val store: StateStore,
