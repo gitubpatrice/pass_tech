@@ -1,0 +1,10 @@
+Cassaforte esca: tre segnali la rivelavano da una sessione esca.
+
+L'eredità diventa propria di ogni cassaforte:
+• Configurarla dall'esca non dice più «solo sulla principale».
+• Il contatore di inattività non indica più l'esca.
+• Eliminare l'esca cancella anche la sua eredità, senza cambiare le dimensioni dei file.
+
+Dopo aver creato un'esca, l'app torna finalmente allo sblocco.
+
+La scheda dichiarava a torto che la modalità panico distrugge la chiave Keystore.
