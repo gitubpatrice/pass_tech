@@ -14,7 +14,7 @@ Cloud, kein Konto, kein Server, kein Tracker, keine Werbung.
 * Phishing-Schutz pro Domain (minimaler AccessibilityService)
 * Schein-Tresor gegen Nötigung (glaubhafte Abstreitbarkeit, zeitlich
   angeglichen)
-* Panikmodus: sofortige Zerstörung des KEK im Keystore
+* Panikmodus: sofortige Sperrung, Biometrie entschärft, Export-Cache vernichtet
 * Launcher-Tarnung (Symbol als Rechner getarnt)
 * Nachlass nach Inaktivität (Totmannschalter)
 * FLAG_SECURE standardmäßig aktiv bei Einträgen vom Typ Passwort /

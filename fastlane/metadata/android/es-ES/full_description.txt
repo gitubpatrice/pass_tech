@@ -14,7 +14,7 @@ nube, sin cuenta, sin servidor, sin rastreadores, sin publicidad.
 * Antiphishing por dominio (AccessibilityService mínimo)
 * Caja fuerte señuelo anticoacción (negación plausible, tiempos
   alineados)
-* Modo pánico: destrucción inmediata de la KEK del Keystore
+* Modo pánico: bloqueo inmediato, biometría desarmada, caché de exportación destruida
 * Camuflaje en el lanzador (icono disfrazado de Calculadora)
 * Herencia tras una larga inactividad (interruptor de hombre muerto)
 * FLAG_SECURE activo por defecto en las entradas de contraseña /

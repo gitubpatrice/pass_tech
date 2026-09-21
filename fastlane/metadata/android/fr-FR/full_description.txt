@@ -13,7 +13,7 @@ Aucun cloud, aucun compte, aucun serveur, aucun tracker, aucune publicité.
 <b>Confidentialité</b>
 * Anti-phishing par domaine (AccessibilityService minimal)
 * Coffre leurre anti-coercition (déni plausible avec timing aligné)
-* Mode panique : destruction immédiate de la KEK Keystore
+* Mode panique : verrouillage immédiat, biométrie désarmée, exports en cache déchiquetés
 * Camouflage launcher (icône déguisée en Calculatrice)
 * Héritage post-inactivité (dead-man's switch)
 * FLAG_SECURE actif par défaut sur les entrées mot de passe / carte /
