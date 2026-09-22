@@ -1,6 +1,8 @@
 package com.filestech.pass_tech
 
+import android.app.ActivityManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.SystemBarStyle
@@ -11,9 +13,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.filestech.pass_tech.core.panic.LauncherDisguise
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.ui.AppViewModel
@@ -25,10 +30,14 @@ import com.filestech.pass_tech.ui.settings.SettingsViewModel
 import com.filestech.pass_tech.ui.splash.SplashViewModel
 import com.filestech.pass_tech.ui.theme.PassTechTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /** A [FragmentActivity]: the system biometric prompt needs one. */
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+
+    @Inject
+    lateinit var disguise: LauncherDisguise
 
     private val app: AppViewModel by viewModels()
     private val entry: EntryViewModel by viewModels()
@@ -78,9 +87,44 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        nameRecentTask()
+    }
+
+    /**
+     * What Recent apps calls this task, and which icon it draws there.
+     *
+     * While the panic disguise is on, both are the calculator's: the recents card is the one place
+     * left where the name of a hidden app still showed, once its owner had come back through the
+     * calculator and gone home. `android:label` and `android:icon` of `<application>` cannot be
+     * changed while the app runs, so Settings › Apps and the share sheet keep saying Pass Tech — the
+     * residual 2.7.1 states in THREAT_MODEL, and this closes one more of its surfaces.
+     *
+     * Read on every resume: the disguise can be turned on, or off, while this activity lives.
+     */
+    private fun nameRecentTask() {
+        val disguised = disguise.disguised() == true
+        val label = getString(if (disguised) R.string.app_disguise_label else R.string.app_name)
+        val icon = if (disguised) R.drawable.ic_launcher_calc else R.mipmap.ic_launcher
+        setTaskDescription(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityManager.TaskDescription.Builder().setLabel(label).setIcon(icon).build()
+            } else {
+                // Before Android 13 the description takes a bitmap, so the vector is drawn into one.
+                val bitmap = ContextCompat.getDrawable(this, icon)?.toBitmap(RECENTS_ICON_PIXELS, RECENTS_ICON_PIXELS)
+                @Suppress("DEPRECATION")
+                ActivityManager.TaskDescription(label, bitmap)
+            },
+        )
+    }
+
     private companion object {
         /** androidx.activity's own defaults for the navigation bar scrim. */
         val LIGHT_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
+
+        /** A recents card icon, drawn from a vector: big enough for the densest screen here. */
+        const val RECENTS_ICON_PIXELS = 192
     }
 }

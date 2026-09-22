@@ -30,6 +30,10 @@ complexity:
     # A stateless Compose "...Content" function takes one lambda per user action. Hoisting them into a
     # holder object would only move the list somewhere the compiler checks less.
     functionThreshold: 12
+    # A view model's constructor is its injection point: every parameter is one collaborator Dagger
+    # checks at compile time. Packing them into a holder would hide them from that check without
+    # removing a single dependency.
+    constructorThreshold: 9
     ignoreDefaultParameters: true
     ignoreAnnotated: ['Composable']
   LongMethod:

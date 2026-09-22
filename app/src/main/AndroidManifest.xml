@@ -27,17 +27,68 @@
         android:theme="@style/Theme.PassTech.Splash"
         android:usesCleartextTraffic="false">
 
+        <!--
+          Not exported: the launcher goes through the aliases below, which carry the MAIN/LAUNCHER
+          filter and their own exported="true" — the system resolves the alias, and its target does
+          not need to be exported. CalculatorActivity reaches this one by an explicit intent inside
+          the same UID, which exported does not govern. Any installed app could otherwise open the
+          unlock screen by component name: no extra is read there, so the impact was small, but the
+          surface was free (2.7.1, audit 2026-08-03).
+        -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTop"
             android:theme="@style/Theme.PassTech.Splash"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- The everyday icon and name. Enabled; the panic mode swaps the two. -->
+        <activity-alias
+            android:name=".MainAliasNormal"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <!--
+          The disguise. Its icon is a SEPARATE drawing: pointing at @mipmap/ic_launcher would leave
+          the Pass Tech logo on the launcher under the name "Calculator", which is more telling than
+          no disguise at all. Its target is the calculator, not MainActivity: tapping it must not
+          open the unlock screen (2.7.1 SEC F2, v2.5.4).
+        -->
+        <!--
+          A task of its own (taskAffinity), which 2.7.1 does not do and pays for. Sharing one, the way
+          two activities of the same app do by default, undid the disguise: coming back out of the
+          calculator replaces the task with the vault, and the launcher then resolves its "Calculator"
+          entry to THAT task and brings the unlock screen to the front. Tapping the calculator icon
+          showed Pass Tech. Found on the emulator; nothing in the code says it.
+        -->
+        <activity
+            android:name=".ui.calculator.CalculatorActivity"
+            android:exported="false"
+            android:icon="@drawable/ic_launcher_calc"
+            android:label="@string/app_disguise_label"
+            android:taskAffinity="${applicationId}.calculator"
+            android:theme="@style/Theme.PassTech" />
+
+        <activity-alias
+            android:name=".MainAliasDecoy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_calc"
+            android:label="@string/app_disguise_label"
+            android:targetActivity=".ui.calculator.CalculatorActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- Clears the clipboard once the delay is over, even while the app is in the background. -->
         <receiver

@@ -298,6 +298,30 @@
     <!-- New in 3.0.0: no slot is provably free. The same words the creation form gives. -->
     <string name="decoy_error_impossible">A decoy vault cannot be created on this phone.</string>
 
+    <!-- Panic mode and its disguise (2.7.1 settings_screen.dart:732-832, CalculatorActivity.kt) -->
+    <!--
+      The name under the launcher icon while the disguise is on. It follows the language of the
+      PHONE, not the one picked inside the app, and that is what we want: the launcher draws it among
+      every other app, and a French "Calculatrice" on a German phone POINTS AT the app it is meant to
+      hide (2.7.0 shipped exactly that). The launcher reads this string with its own configuration,
+      so an Android resource qualifier lands on the right language by itself.
+    -->
+    <string name="app_disguise_label">Calculator</string>
+    <!-- What a division by zero shows. 2.7.1 had this word hard-coded in French, on every phone. -->
+    <string name="calculator_error">Error</string>
+    <string name="settings_section_panic">Panic mode</string>
+    <string name="panic_trigger_title">Activate panic mode</string>
+    <string name="panic_trigger_subtitle">Locks, clears the clipboard, disables biometrics and replaces the app with a working calculator (name + icon)</string>
+    <string name="panic_reveal_title">Restore the Pass Tech name</string>
+    <string name="panic_reveal_subtitle">The app currently looks like a calculator. To get back without coming here: long-press its display for 2 s</string>
+    <string name="panic_reveal_snack">Pass Tech icon restored — relaunch the launcher if it does not appear</string>
+    <string name="panic_dialog_title">Panic mode?</string>
+    <string name="panic_dialog_body">This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Replaces the app with a CALCULATOR on the launcher: name, icon and opening screen. The calculator really works.\n\n⚠ TO COME BACK: long-press for 2 seconds on the calculator\'s DISPLAY (the result area, at the top). Remember this — it is the only way back to your vault while the disguise is active.\n\nNothing is deleted: your master password still opens the vault. You will need it to enable biometrics again. Name and icon can be restored from Settings once you are safe.</string>
+    <string name="panic_dialog_activate">Activate</string>
+    <!-- Shown only when a fingerprint opens THIS vault (design v2.3 §1), and not dismissible. -->
+    <string name="panic_warn_biometric_title">Biometric unlock will be disabled</string>
+    <string name="panic_warn_biometric_body">Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.</string>
+
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
     <string name="settings_section_data">Data</string>
     <string name="settings_backup_encrypted_title">Encrypted backup (.ptbak)</string>

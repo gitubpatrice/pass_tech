@@ -12,6 +12,7 @@ import com.filestech.pass_tech.core.backup.DocumentStore
 import com.filestech.pass_tech.core.backup.ImportParser
 import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
 import com.filestech.pass_tech.core.crypto.KdfParams
+import com.filestech.pass_tech.core.panic.PanicService
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.StateStore
@@ -21,7 +22,9 @@ import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import com.filestech.pass_tech.testing.FakeBiometricKeys
+import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
+import com.filestech.pass_tech.testing.FakeLauncherDisguise
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.ui.components.PromptResult
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.ChangeProblem
@@ -57,6 +60,8 @@ class SettingsViewModelTest {
     private val next = "abricotmarteaunuage2027"
     private val untitled = "Sans titre"
     private val bioKeys = FakeBiometricKeys()
+    private val clipboard = FakeClipboard()
+    private val disguise = FakeLauncherDisguise()
 
     private fun entry(title: String) = com.filestech.pass_tech.core.model.Entry(
         id = title,
@@ -105,6 +110,7 @@ class SettingsViewModelTest {
                             // Storage is never touched here: the tests hand the file's content straight over.
                             documents = NoDocuments,
                             autoLock = AutoLock(vault, MutableStateFlow(AppPreferences.AUTO_LOCK_DEFAULT), FakeClock(), backgroundScope),
+                            panicService = PanicService(vault, clipboard, disguise),
                             io = io,
                         )
                     }
@@ -226,6 +232,25 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `panic locks the vault and disguises the launcher, and revealing puts the name back`() = runTest {
+        opened { settings, vault, _ ->
+            settings.refreshDisguise()
+            assertThat(settings.disguised.value).isFalse()
+
+            settings.panic()
+            testScheduler.advanceUntilIdle()
+            assertThat(vault.state.value).isEqualTo(VaultManager.State.Locked)
+            assertThat(settings.disguised.value).isTrue()
+            // Nothing is deleted: the password still opens the vault.
+            assertThat(vault.unlock(owner.encodeToByteArray())).isEqualTo(VaultManager.UnlockOutcome.Opened)
+
+            settings.reveal()
+            assertThat(settings.nextMessage()).isEqualTo(Message.DisguiseRemoved)
+            assertThat(settings.disguised.value).isFalse()
+        }
+    }
+
+    @Test
     fun `a decoy password follows the same rule as every other password`() {
         assertThat(SettingsViewModel.checkNewPassword("court", "court")).isEqualTo(ChangeProblem.TOO_SHORT)
         assertThat(SettingsViewModel.checkNewPassword("aaaaaaaaaaaa", "aaaaaaaaaaaa")).isEqualTo(ChangeProblem.TOO_WEAK)
@@ -310,6 +335,7 @@ class SettingsViewModelTest {
                             biometricSupport = { true },
                             documents = NoDocuments,
                             autoLock = AutoLock(vault, MutableStateFlow(AppPreferences.AUTO_LOCK_DEFAULT), FakeClock(), backgroundScope),
+                            panicService = PanicService(vault, clipboard, disguise),
                             io = io,
                         )
                     }

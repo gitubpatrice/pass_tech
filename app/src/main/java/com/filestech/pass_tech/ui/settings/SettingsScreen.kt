@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.ContentPasteOff
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Emergency
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Key
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.SettingsBrightness
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -102,6 +104,8 @@ private enum class SettingsDialog {
     DECOY_SETUP,
     DECOY_PASSWORD,
     DECOY_MANAGE,
+    PANIC_BIOMETRIC_WARNING,
+    PANIC_CONFIRM,
     DELETE_ALL,
     DELETE_REAUTH,
     BACKUP_PASSPHRASE,
@@ -121,6 +125,7 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
     val haptics = LocalHapticFeedback.current
     val biometrics by settings.biometrics.collectAsStateWithLifecycle()
     val hasDecoy by settings.hasDecoy.collectAsStateWithLifecycle()
+    val disguised by settings.disguised.collectAsStateWithLifecycle()
     val pending by settings.pending.collectAsStateWithLifecycle()
     val openImport = remember { mutableStateOf(false) }
     Messages(settings, snackbar)
@@ -203,6 +208,36 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
                     title = stringResource(if (hasDecoy) R.string.decoy_tile_configured else R.string.decoy_tile_setup),
                     subtitle = stringResource(R.string.decoy_tile_subtitle),
                 ) { dialog = if (hasDecoy) SettingsDialog.DECOY_MANAGE else SettingsDialog.DECOY_SETUP }
+            }
+            item { SectionTitle(R.string.settings_section_panic) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.Emergency,
+                    title = stringResource(R.string.panic_trigger_title),
+                    subtitle = stringResource(R.string.panic_trigger_subtitle),
+                    chevron = false,
+                    danger = true,
+                ) {
+                    // The fingerprint is only ever mentioned when it opens THIS vault (design v2.3 §1).
+                    dialog = if (biometrics.status == BiometricStatus.THIS_VAULT) {
+                        SettingsDialog.PANIC_BIOMETRIC_WARNING
+                    } else {
+                        SettingsDialog.PANIC_CONFIRM
+                    }
+                }
+            }
+            // Only while the launcher really shows a calculator: on any other phone the tile would
+            // offer to undo something that is not there.
+            if (disguised) {
+                item {
+                    Tile(
+                        icon = Icons.Outlined.Visibility,
+                        title = stringResource(R.string.panic_reveal_title),
+                        subtitle = stringResource(R.string.panic_reveal_subtitle),
+                        chevron = false,
+                        onClick = settings::reveal,
+                    )
+                }
             }
             item { SectionTitle(R.string.settings_section_data) }
             item {
@@ -318,6 +353,8 @@ private fun SettingsDialogs(
         )
         SettingsDialog.DECOY_SETUP, SettingsDialog.DECOY_PASSWORD, SettingsDialog.DECOY_MANAGE ->
             DecoyDialogs(dialog, settings, armedHere, onDialog)
+        SettingsDialog.PANIC_BIOMETRIC_WARNING, SettingsDialog.PANIC_CONFIRM ->
+            PanicDialogs(dialog, settings, haptics, onDialog)
         SettingsDialog.DELETE_ALL -> ConfirmDialog(
             title = R.string.settings_delete_all_dialog_title,
             body = R.string.settings_delete_all_dialog_body,
@@ -474,6 +511,70 @@ private fun DecoyManageDialog(onDelete: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+/**
+ * Panic mode, in two steps: what it costs the fingerprint of THIS vault, then what it does in full.
+ * The first step is skipped when no fingerprint opens this vault — including when one opens another,
+ * which this screen must not hint at (design v2.3 §1).
+ */
+@Composable
+private fun PanicDialogs(
+    dialog: SettingsDialog?,
+    settings: SettingsViewModel,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    onDialog: (SettingsDialog?) -> Unit,
+) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        // Not dismissible by a tap outside: the owner reads what they lose before the vault closes.
+        SettingsDialog.PANIC_BIOMETRIC_WARNING -> AlertDialog(
+            onDismissRequest = {},
+            icon = { Icon(Icons.Outlined.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(R.string.panic_warn_biometric_title)) },
+            text = { Text(stringResource(R.string.panic_warn_biometric_body), fontSize = 13.sp) },
+            dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.action_cancel)) } },
+            confirmButton = {
+                TextButton(onClick = { onDialog(SettingsDialog.PANIC_CONFIRM) }) { Text(stringResource(R.string.action_continue)) }
+            },
+        )
+        SettingsDialog.PANIC_CONFIRM -> PanicDialog(
+            onConfirm = {
+                close()
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                settings.panic()
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+/** What panic mode does, in full, before it does it. Long: it is the one screen nobody reads twice. */
+@Composable
+private fun PanicDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Emergency, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(R.string.panic_dialog_title), color = MaterialTheme.colorScheme.error) },
+        text = {
+            Text(
+                text = stringResource(R.string.panic_dialog_body),
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = DestructiveRed, contentColor = Color.White),
+            ) { Text(stringResource(R.string.panic_dialog_activate)) }
+        },
+    )
+}
+
 /** The dialogs a picked file brings with it: its passphrase, then how much of it is coming in. */
 @Composable
 private fun PickedFileDialogs(pending: SettingsViewModel.Pending?, settings: SettingsViewModel) {
@@ -507,10 +608,16 @@ private fun Messages(settings: SettingsViewModel, snackbar: SnackbarHostState) {
     }
 }
 
-/** Reads the phone's biometric support each time the screen shows, and hands arming ciphers to the system prompt. */
+/**
+ * Reads what the system says each time the screen shows — whether a fingerprint can be read, and
+ * whether the launcher is disguised — and hands arming ciphers to the system prompt.
+ */
 @Composable
 private fun ArmingPrompts(settings: SettingsViewModel) {
-    LaunchedEffect(settings) { settings.refreshBiometricSupport() }
+    LaunchedEffect(settings) {
+        settings.refreshBiometricSupport()
+        settings.refreshDisguise()
+    }
     val activity = LocalActivity.current as? FragmentActivity ?: return
     LaunchedEffect(settings, activity) {
         settings.prompts.collect { cipher -> settings.armResult(activity.authenticate(cipher)) }
@@ -572,6 +679,7 @@ private fun vaultMessageText(resources: Resources, message: Message): String = w
     Message.DecoyCreated -> resources.getString(R.string.decoy_configured_snack)
     Message.DecoyDeleted -> resources.getString(R.string.decoy_deleted_snack)
     Message.DecoyImpossible -> resources.getString(R.string.decoy_error_impossible)
+    Message.DisguiseRemoved -> resources.getString(R.string.panic_reveal_snack)
     else -> fileMessageText(resources, message)
 }
 

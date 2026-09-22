@@ -9,6 +9,7 @@ import com.filestech.pass_tech.core.backup.PtbakCodec
 import com.filestech.pass_tech.core.biometric.BiometricSupport
 import com.filestech.pass_tech.core.di.IoDispatcher
 import com.filestech.pass_tech.core.model.Entry
+import com.filestech.pass_tech.core.panic.PanicService
 import com.filestech.pass_tech.core.password.PasswordPolicy
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.AutoLock
@@ -52,6 +53,7 @@ class SettingsViewModel @Inject constructor(
     private val biometricSupport: BiometricSupport,
     private val documents: DocumentStore,
     private val autoLock: AutoLock,
+    private val panicService: PanicService,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -96,6 +98,9 @@ class SettingsViewModel @Inject constructor(
 
         /** No slot is provably free. The same words a creation gives, and says nothing more. */
         data object DecoyImpossible : Message
+
+        /** The launcher shows Pass Tech again. */
+        data object DisguiseRemoved : Message
 
         data object BackupSaved : Message
 
@@ -240,6 +245,39 @@ class SettingsViewModel @Inject constructor(
             VaultManager.DecoyOutcome.KeystoreUnavailable -> Message.KeystoreUnavailable
             null -> null
         }
+    }
+
+    /**
+     * Whether the launcher currently shows a calculator. Read each time the screen shows, like the
+     * biometric support: the answer lives in the system, not in a setting of ours.
+     *
+     * `null`, "the system did not answer", counts as NOT disguised for this tile only: the cost of a
+     * hidden button is one trip through the settings, while showing "restore the Pass Tech name" on a
+     * phone that shows Pass Tech already would be a puzzle.
+     */
+    private val mutableDisguised = MutableStateFlow(false)
+    val disguised: StateFlow<Boolean> = mutableDisguised.asStateFlow()
+
+    fun refreshDisguise() {
+        mutableDisguised.value = panicService.disguised() == true
+    }
+
+    /**
+     * Panic mode (2.7.1, `settings_screen.dart:732-832`): the screen has already asked, and warned
+     * about the fingerprint if one opens THIS vault. Not [operate]: the vault locks under it, the
+     * screen goes with it, and a spinner left behind would outlive them both.
+     */
+    fun panic() {
+        viewModelScope.launch {
+            panicService.panic()
+            mutableDisguised.value = true
+        }
+    }
+
+    fun reveal() = operate {
+        val done = panicService.reveal()
+        refreshDisguise()
+        if (done) Message.DisguiseRemoved else null
     }
 
     /** Deletes it, with no re-authentication, as 2.7.1 does: the vault is open and nothing of it is lost. */

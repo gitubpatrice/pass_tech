@@ -280,6 +280,21 @@
     <string name="decoy_deleted_snack">Coffre leurre supprimé</string>
     <string name="decoy_error_impossible">Impossible de créer un coffre leurre sur ce téléphone.</string>
 
+    <!-- Panic mode and its disguise (2.7.1 settings_screen.dart:732-832, CalculatorActivity.kt) -->
+    <string name="app_disguise_label">Calculatrice</string>
+    <string name="calculator_error">Erreur</string>
+    <string name="settings_section_panic">Mode panique</string>
+    <string name="panic_trigger_title">Activer le mode panique</string>
+    <string name="panic_trigger_subtitle">Verrouille, vide le presse-papiers, désactive la biométrie et remplace l\'app par une calculatrice fonctionnelle (nom + icône)</string>
+    <string name="panic_reveal_title">Restaurer le nom Pass Tech</string>
+    <string name="panic_reveal_subtitle">L\'app se présente actuellement comme une calculatrice. Pour y revenir sans passer par ici : appui long de 2 s sur son affichage</string>
+    <string name="panic_reveal_snack">Icône Pass Tech restaurée — relancez le launcher si elle n\'apparaît pas</string>
+    <string name="panic_dialog_title">Mode panique ?</string>
+    <string name="panic_dialog_body">Cette action effectue immédiatement :\n\n• Verrouillage du coffre\n• Vidage du presse-papiers\n• Désactivation du déverrouillage biométrique\n• Remplacement de l\'app par une CALCULATRICE sur le launcher : nom, icône et écran d\'ouverture. La calculatrice fonctionne réellement.\n\n⚠ POUR REVENIR : appui long de 2 secondes sur l\'AFFICHAGE de la calculatrice (la zone du résultat, en haut). Retenez-le — c\'est le seul chemin vers votre coffre tant que le camouflage est actif.\n\nRien n\'est supprimé : votre mot de passe maître ouvre toujours le coffre. Il vous servira à réactiver la biométrie. Le nom et l\'icône se restaurent depuis les Réglages quand vous serez en sécurité.</string>
+    <string name="panic_dialog_activate">Activer</string>
+    <string name="panic_warn_biometric_title">La biométrie sera désactivée</string>
+    <string name="panic_warn_biometric_body">Le mode panique supprime l\'enrôlement biométrique — sinon quelqu\'un pourrait ouvrir votre coffre en vous faisant poser le doigt.\n\nAprès activation, SEUL votre mot de passe maître ouvrira le coffre. Il n\'est récupérable par aucun moyen.\n\nAssurez-vous de le connaître avant de continuer.</string>
+
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
     <string name="settings_section_data">Données</string>
     <string name="settings_backup_encrypted_title">Sauvegarde chiffrée (.ptbak)</string>
