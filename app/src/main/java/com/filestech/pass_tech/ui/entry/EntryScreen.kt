@@ -53,6 +53,7 @@ import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
 import com.filestech.pass_tech.ui.components.HeaderBadge
 import com.filestech.pass_tech.ui.components.PasswordField
 import com.filestech.pass_tech.ui.components.StrengthGauge
+import com.filestech.pass_tech.ui.components.countdownText
 import com.filestech.pass_tech.ui.entry.EntryViewModel.Problem
 
 /** The creation or unlock form, laid out as the 2.7.1 setup and unlock screens. */
@@ -252,19 +253,3 @@ private fun LockedBox(millis: Long) {
         )
     }
 }
-
-/** 2.7.1 format: under a minute in seconds, round minutes alone, otherwise minutes and seconds. */
-@Composable
-private fun countdownText(millis: Long): String {
-    val total = ((millis + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).toInt()
-    val minutes = total / SECONDS_PER_MINUTE
-    val seconds = total % SECONDS_PER_MINUTE
-    return when {
-        minutes == 0 -> stringResource(R.string.unit_seconds_short, seconds)
-        seconds == 0 -> stringResource(R.string.unit_minutes_short, minutes)
-        else -> stringResource(R.string.unit_minutes_seconds_short, minutes, seconds)
-    }
-}
-
-private const val MILLIS_PER_SECOND = 1_000L
-private const val SECONDS_PER_MINUTE = 60

@@ -34,6 +34,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -217,6 +219,7 @@ private fun CharacterOptions(state: GeneratorState) {
         onValueChange = { state.changeLength(it.roundToInt()) },
         valueRange = PasswordGenerator.MIN_LENGTH.toFloat()..PasswordGenerator.MAX_LENGTH.toFloat(),
         steps = PasswordGenerator.MAX_LENGTH - PasswordGenerator.MIN_LENGTH - 1,
+        colors = NoTicks(),
     )
     Spacer(Modifier.height(8.dp))
     OptionsHeader(stringResource(R.string.generator_chars_header))
@@ -239,6 +242,7 @@ private fun PassphraseOptions(state: GeneratorState) {
         onValueChange = { state.changeWords(it.roundToInt()) },
         valueRange = GeneratorState.MIN_WORDS.toFloat()..GeneratorState.MAX_WORDS.toFloat(),
         steps = GeneratorState.MAX_WORDS - GeneratorState.MIN_WORDS - 1,
+        colors = NoTicks(),
     )
     Spacer(Modifier.height(8.dp))
     OptionsHeader(stringResource(R.string.generator_options_header))
@@ -261,6 +265,10 @@ private fun PassphraseOptions(state: GeneratorState) {
     Spacer(Modifier.height(8.dp))
     Hint(Icons.Outlined.Lightbulb, stringResource(R.string.generator_phrase_hint))
 }
+
+/** 55 tick marks turned the length track into a dotted line (seen on a Galaxy S24): steps, no marks. */
+@Composable
+private fun NoTicks() = SliderDefaults.colors(activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent)
 
 @Composable
 private fun OptionsHeader(text: String) {

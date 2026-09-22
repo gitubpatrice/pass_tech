@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -69,7 +70,13 @@ import com.filestech.pass_tech.ui.entries.EntryLook
  * sort and lock.
  */
 @Composable
-internal fun HomeTopBar(ui: HomeViewModel.UiState, home: HomeViewModel, onGenerator: () -> Unit, onLock: () -> Unit) {
+internal fun HomeTopBar(
+    ui: HomeViewModel.UiState,
+    home: HomeViewModel,
+    onGenerator: () -> Unit,
+    onLock: () -> Unit,
+    onSettings: () -> Unit,
+) {
     TopAppBar(
         title = { if (ui.searchOpen) SearchField(ui.query.search, home::setSearch) else Brand() },
         actions = {
@@ -86,6 +93,7 @@ internal fun HomeTopBar(ui: HomeViewModel.UiState, home: HomeViewModel, onGenera
             IconButton(onClick = onLock) {
                 Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.home_tooltip_lock))
             }
+            MoreMenu(onSettings)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
     )
@@ -140,6 +148,26 @@ private fun SearchField(value: String, onChange: (String) -> Unit) {
         modifier = Modifier.focusRequester(focus),
     )
     LaunchedEffect(Unit) { focus.requestFocus() }
+}
+
+/** 2.7.1's ⋮: Settings, then About (which comes with its screen). */
+@Composable
+private fun MoreMenu(onSettings: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_settings)) },
+                onClick = {
+                    open = false
+                    onSettings()
+                },
+            )
+        }
+    }
 }
 
 @Composable

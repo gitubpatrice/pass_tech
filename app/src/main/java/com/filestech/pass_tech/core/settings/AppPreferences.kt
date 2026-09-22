@@ -55,12 +55,31 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         store.edit { it[CLIPBOARD_CLEAR] = seconds }
     }
 
+    /** 2.7.1: `theme_mode`, the system's by default. */
+    val theme: Flow<Theme> = data.map { prefs -> Theme.entries.firstOrNull { it.key == prefs[THEME] } ?: Theme.SYSTEM }
+
+    suspend fun setTheme(theme: Theme) {
+        store.edit { it[THEME] = theme.key }
+    }
+
+    /**
+     * FLAG_SECURE on every screen (2.7.1: `screenshot_protection_enabled`, on by default). Anything but
+     * an explicit `false` reads as on.
+     */
+    val screenshotProtection: Flow<Boolean> = data.map { it[SCREENSHOT_PROTECTION] != false }
+
+    suspend fun setScreenshotProtection(enabled: Boolean) {
+        store.edit { it[SCREENSHOT_PROTECTION] = enabled }
+    }
+
     /** The order of the home list, kept from one opening to the next (2.7.1: `sort_mode`). */
     val sortMode: Flow<EntryQuery.Sort> = data.map { EntryQuery.Sort.fromKey(it[SORT_MODE]) }
 
     suspend fun setSortMode(sort: EntryQuery.Sort) {
         store.edit { it[SORT_MODE] = sort.key }
     }
+
+    enum class Theme(val key: String) { SYSTEM("system"), LIGHT("light"), DARK("dark") }
 
     companion object {
         /** The vault never locks by itself. */
@@ -82,5 +101,7 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         private val AUTO_LOCK = intPreferencesKey("auto_lock_seconds")
         private val CLIPBOARD_CLEAR = intPreferencesKey("clipboard_clear")
         private val SORT_MODE = stringPreferencesKey("sort_mode")
+        private val THEME = stringPreferencesKey("theme_mode")
+        private val SCREENSHOT_PROTECTION = booleanPreferencesKey("screenshot_protection_enabled")
     }
 }

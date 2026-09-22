@@ -40,6 +40,8 @@ import com.filestech.pass_tech.ui.entry.EntryViewModel
 import com.filestech.pass_tech.ui.generator.GeneratorScreen
 import com.filestech.pass_tech.ui.home.HomeScreen
 import com.filestech.pass_tech.ui.home.HomeViewModel
+import com.filestech.pass_tech.ui.settings.SettingsScreen
+import com.filestech.pass_tech.ui.settings.SettingsViewModel
 import com.filestech.pass_tech.ui.splash.SplashScreen
 import com.filestech.pass_tech.ui.splash.SplashViewModel
 import kotlinx.coroutines.launch
@@ -49,7 +51,14 @@ import kotlinx.coroutines.launch
  * reminder follows a creation over whichever screen is up (the home, by then).
  */
 @Composable
-fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewModel, home: HomeViewModel, splash: SplashViewModel) {
+fun PassTechApp(
+    app: AppViewModel,
+    entry: EntryViewModel,
+    entries: EntriesViewModel,
+    home: HomeViewModel,
+    settings: SettingsViewModel,
+    splash: SplashViewModel,
+) {
     val vaultState by app.vaultState.collectAsStateWithLifecycle()
     val locking by app.locking.collectAsStateWithLifecycle()
     val entryState by entry.state.collectAsStateWithLifecycle()
@@ -64,7 +73,7 @@ fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewMo
             when {
                 // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
                 locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                state is VaultManager.State.Open -> OpenVault(state, entries, home, snackbar, onLock = app::lock)
+                state is VaultManager.State.Open -> OpenVault(state, Screens(entries, home, settings), snackbar, onLock = app::lock)
                 else -> EntryScreen(entry)
             }
             if (showSplash == true && !splashDismissed) {
@@ -82,13 +91,8 @@ fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewMo
 
 /** The home, or the screen on top of it: an entry's detail or the editor. */
 @Composable
-private fun OpenVault(
-    state: VaultManager.State.Open,
-    entries: EntriesViewModel,
-    home: HomeViewModel,
-    snackbar: SnackbarHostState,
-    onLock: () -> Unit,
-) {
+private fun OpenVault(state: VaultManager.State.Open, screens: Screens, snackbar: SnackbarHostState, onLock: () -> Unit) {
+    val (entries, home, settings) = screens
     val stack by entries.stack.collectAsStateWithLifecycle()
     when (val top = stack.lastOrNull()) {
         null -> HomeScreen(
@@ -97,6 +101,7 @@ private fun OpenVault(
             snackbar = snackbar,
             onGenerator = { entries.openGenerator() },
             onLock = onLock,
+            onSettings = entries::openSettings,
             onOpen = { entries.openDetail(it.id) },
             onAdd = entries::openNew,
             onToggleFavorite = { entries.toggleFavorite(it.id) },
@@ -134,8 +139,12 @@ private fun OpenVault(
             onUse = if (top.target != null) ({ entries.useGenerated(top) }) else null,
             onCopy = entries::copyGenerated,
         )
+        Screen.Settings -> SettingsScreen(settings, snackbar, onBack = { entries.close(Screen.Settings) })
     }
 }
+
+/** The view models of the screens of an open vault. */
+private data class Screens(val entries: EntriesViewModel, val home: HomeViewModel, val settings: SettingsViewModel)
 
 /** One message at a time: a new one replaces the one showing, as 2.7.1's snack bars do. */
 @Composable

@@ -83,6 +83,7 @@ fun HomeScreen(
     snackbar: SnackbarHostState,
     onGenerator: () -> Unit,
     onLock: () -> Unit,
+    onSettings: () -> Unit,
     onOpen: (Entry) -> Unit,
     onAdd: (EntryType) -> Unit,
     onToggleFavorite: (Entry) -> Unit,
@@ -96,7 +97,7 @@ fun HomeScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { PtSnackbarHost(snackbar) },
-        topBar = { HomeTopBar(ui, home, onGenerator, onLock) },
+        topBar = { HomeTopBar(ui, home, onGenerator, onLock, onSettings) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { choosingType = true },

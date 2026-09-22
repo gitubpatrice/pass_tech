@@ -195,4 +195,57 @@
         <item quantity="many">%1$d d\'entrées</item>
         <item quantity="other">%1$d entrées</item>
     </plurals>
+
+    <!-- Settings -->
+    <string name="action_settings">Paramètres</string>
+    <string name="action_more">Plus d\'options</string>
+    <string name="action_disable">Désactiver</string>
+    <string name="action_continue">Continuer</string>
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_section_appearance">Apparence</string>
+    <string name="settings_section_clipboard">Presse-papiers</string>
+    <string name="settings_section_security">Sécurité</string>
+    <string name="settings_section_danger">Zone dangereuse</string>
+    <string name="settings_theme_title">Thème</string>
+    <string name="settings_theme_choose_title">Choisir le thème</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
+    <string name="settings_clipboard_title">Effacer automatiquement</string>
+    <string name="settings_clipboard_dialog_title">Effacer le presse-papiers après</string>
+    <string name="settings_clipboard_15s">15 secondes</string>
+    <string name="settings_clipboard_30s">30 secondes</string>
+    <string name="settings_clipboard_60s">60 secondes</string>
+    <string name="settings_clipboard_never">Jamais</string>
+    <string name="settings_screenshot_protection_title">Bloquer les captures d\'écran</string>
+    <string name="settings_screenshot_protection_subtitle">Activé par défaut (recommandé). Bloque captures, enregistrement écran, vignette Recent Apps et projection externe. Désactivez UNIQUEMENT si vous avez besoin de coller du texte depuis une autre app sur Samsung — Knox bloque le presse-papier inter-apps quand la protection est active.</string>
+    <string name="settings_screenshot_protection_confirm_off_title">Désactiver la protection ?</string>
+    <string name="settings_screenshot_protection_confirm_off_body">Sans protection, vos mots de passe peuvent apparaître dans les captures d\'écran, l\'aperçu des apps récentes et les enregistrements écran. À n\'utiliser que temporairement pour coller un texte depuis une autre app.</string>
+    <string name="settings_change_master_title">Changer le mot de passe maître</string>
+    <string name="settings_auto_lock_title">Verrouillage automatique</string>
+    <string name="settings_auto_lock_dialog_title">Verrouiller l\'app après</string>
+    <string name="settings_auto_lock_immediate">Immédiatement</string>
+    <string name="settings_auto_lock_1min">1 minute</string>
+    <string name="settings_auto_lock_5min">5 minutes</string>
+    <string name="settings_auto_lock_15min">15 minutes</string>
+    <string name="settings_auto_lock_30min">30 minutes</string>
+    <string name="settings_auto_lock_never">Jamais</string>
+    <string name="settings_lock_now">Verrouiller maintenant</string>
+    <string name="settings_delete_all_title">Supprimer toutes les données</string>
+    <string name="settings_delete_all_subtitle">Action irréversible</string>
+    <string name="settings_delete_all_dialog_title">Supprimer toutes les données ?</string>
+    <string name="settings_delete_all_dialog_body">Toutes vos entrées et le coffre-fort seront supprimés définitivement.</string>
+    <string name="settings_delete_all_confirm">Tout supprimer</string>
+    <string name="reauth_title">Confirmez votre identité</string>
+    <string name="reauth_body">Saisissez votre mot de passe maître pour continuer.</string>
+    <string name="change_password_dialog_title">Nouveau mot de passe</string>
+    <string name="change_password_current_label">Mot de passe actuel</string>
+    <string name="change_password_new_label">Nouveau mot de passe (min. 12)</string>
+    <string name="change_password_confirm_label">Confirmer</string>
+    <string name="change_password_error_current_required">Saisissez votre mot de passe actuel.</string>
+    <string name="change_password_error_wrong_current">Mot de passe actuel incorrect.</string>
+    <string name="change_password_cta">Modifier</string>
+    <string name="change_password_done">Mot de passe modifié ✓</string>
+    <string name="change_password_refused">Ce mot de passe ne peut pas être utilisé. Choisissez-en un autre.</string>
+    <string name="settings_locked_retry">Trop de tentatives. Réessayez dans %1$s.</string>
 </resources>

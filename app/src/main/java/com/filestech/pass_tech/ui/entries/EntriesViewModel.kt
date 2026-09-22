@@ -44,6 +44,8 @@ class EntriesViewModel @Inject constructor(
 
         /** [target]: the editor whose password "Use" fills, or `null` when opened from the home. */
         class Generator(val state: GeneratorState, val target: EntryForm?) : Screen
+
+        data object Settings : Screen
     }
 
     sealed interface Message {
@@ -81,6 +83,8 @@ class EntriesViewModel @Inject constructor(
     fun openNew(type: EntryType) = push(Screen.Edit(EntryForm.new(type)))
 
     fun openEditor(entry: Entry) = push(Screen.Edit(EntryForm.edit(entry)))
+
+    fun openSettings() = push(Screen.Settings)
 
     fun openGenerator(target: EntryForm? = null) = push(Screen.Generator(GeneratorState(), target))
 
