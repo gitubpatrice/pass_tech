@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Link
@@ -88,6 +89,7 @@ fun EntryEditScreen(
     onSave: () -> Unit,
     onLeave: () -> Unit,
     onSecretAdded: () -> Unit,
+    onGenerate: () -> Unit,
 ) {
     var confirmLeave by remember { mutableStateOf(false) }
     val leave = { if (form.hasChanges) confirmLeave = true else onLeave() }
@@ -155,7 +157,7 @@ fun EntryEditScreen(
                 )
             }
             when (form.type) {
-                EntryType.PASSWORD -> PasswordFields(form, onSecretAdded)
+                EntryType.PASSWORD -> PasswordFields(form, onSecretAdded, onGenerate)
                 EntryType.NOTE -> NoteFields(form)
                 EntryType.CARD -> CardFields(form)
             }
@@ -174,7 +176,7 @@ fun EntryEditScreen(
 }
 
 @Composable
-private fun PasswordFields(form: EntryForm, onSecretAdded: () -> Unit) {
+private fun PasswordFields(form: EntryForm, onSecretAdded: () -> Unit, onGenerate: () -> Unit) {
     LabelledField(stringResource(R.string.entry_edit_field_username)) {
         TextInput(
             value = form.username,
@@ -190,6 +192,15 @@ private fun PasswordFields(form: EntryForm, onSecretAdded: () -> Unit) {
             value = form.password,
             onValueChange = { form.password = it },
             label = stringResource(R.string.entry_edit_field_password),
+            extraAction = {
+                IconButton(onClick = onGenerate) {
+                    Icon(
+                        Icons.Filled.AutoFixHigh,
+                        contentDescription = stringResource(R.string.entry_edit_tooltip_generate),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            },
         )
     }
     LabelledField(stringResource(R.string.entry_edit_field_url_optional)) {

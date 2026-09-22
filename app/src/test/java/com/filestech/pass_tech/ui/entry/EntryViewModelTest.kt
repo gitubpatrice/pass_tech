@@ -8,6 +8,7 @@ import com.filestech.pass_tech.core.vault.VaultFiles
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
+import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.ui.entry.EntryViewModel.Problem
 import com.google.common.truth.Truth.assertThat
@@ -83,6 +84,20 @@ class EntryViewModelTest {
             assertThat(vault.state.value).isInstanceOf(VaultManager.State.Open::class.java)
             viewModel.backupReminderSeen()
             assertThat(viewModel.state.value.backupReminder).isFalse()
+        }
+    }
+
+    @Test
+    fun `a view model created while the vault is open still reads the form, for the system splash waits for it`() = runTest {
+        entry { viewModel, vault ->
+            viewModel.settled()
+            assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
+            // The activity recreated in the background: a new view model, the vault still open.
+            val recreated = EntryViewModel(vault, FakeClock())
+            assertThat(recreated.settled().mode).isEqualTo(EntryMode.UNLOCK)
+            // The same read goes on with the lockout: let it end before the test does.
+            vault.lockoutRemainingMillis()
+            testScheduler.advanceUntilIdle()
         }
     }
 

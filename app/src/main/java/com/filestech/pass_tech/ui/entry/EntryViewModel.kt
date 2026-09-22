@@ -50,6 +50,10 @@ class EntryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // A view model created while the vault is open (the activity recreated in the background)
+            // would otherwise wait for the next lock to read the form, and the system splash waits for
+            // it (2026-09-22). A locked vault is read by the collection below.
+            if (vault.state.value != VaultManager.State.Locked) refresh()
             vault.state.filter { it == VaultManager.State.Locked }.collect { refresh() }
         }
     }

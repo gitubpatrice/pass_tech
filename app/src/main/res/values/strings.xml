@@ -162,4 +162,48 @@
     <string name="entry_detail_card_label">CARD</string>
     <string name="entry_detail_card_holder_label">CARDHOLDER</string>
     <string name="entry_detail_card_expiry_label">EXPIRES</string>
+
+    <!-- Home toolbar, filters and generator -->
+    <string name="home_search_hint">Search…</string>
+    <string name="home_search_open">Search</string>
+    <string name="home_search_close">Close the search</string>
+    <string name="home_search_clear">Clear</string>
+    <string name="home_empty_no_result">No result</string>
+    <string name="home_tooltip_generator">Generator</string>
+    <string name="home_tooltip_sort">Sort</string>
+    <string name="home_filter_all">All</string>
+    <string name="home_filter_favorites">Favorites</string>
+    <string name="home_filter_passwords">Passwords</string>
+    <string name="home_filter_notes">Notes</string>
+    <string name="home_filter_cards">Bank cards</string>
+    <string name="home_sort_recent">Recent</string>
+    <string name="home_sort_oldest">Oldest</string>
+    <string name="home_sort_alpha">A → Z</string>
+    <string name="home_sort_alpha_desc">Z → A</string>
+    <string name="home_entry_count_none">No entry</string>
+    <string name="generator_title">Generator</string>
+    <string name="generator_use">Use</string>
+    <string name="generator_strength_suffix">%1$s · %2$d bits</string>
+    <string name="generator_generate">Generate</string>
+    <string name="generator_copy">Copy</string>
+    <string name="generator_copied_snack">Copied ✓</string>
+    <string name="generator_mode_chars">Characters</string>
+    <string name="generator_mode_phrase">Phrase</string>
+    <string name="generator_length">Length: %1$d</string>
+    <string name="generator_chars_header">Characters</string>
+    <string name="generator_chars_upper">A–Z  Uppercase</string>
+    <string name="generator_chars_lower">a–z  Lowercase</string>
+    <string name="generator_chars_digits">0–9  Digits</string>
+    <string name="generator_chars_symbols">!@#  Symbols</string>
+    <string name="generator_phrase_words">Number of words: %1$d</string>
+    <string name="generator_options_header">Options</string>
+    <string name="generator_phrase_append_number">Append a number 10–99</string>
+    <string name="generator_phrase_separator">Separator</string>
+    <string name="generator_phrase_hint">A passphrase is easier to remember than a complex password, and can be just as strong.</string>
+    <string name="entry_edit_tooltip_generate">Generate</string>
+    <!-- 0 has its own string: "No entry", as 2.7.1's ICU =0 case. -->
+    <plurals name="home_entry_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
 </resources>

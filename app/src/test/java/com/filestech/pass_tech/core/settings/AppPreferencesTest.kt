@@ -3,6 +3,7 @@ package com.filestech.pass_tech.core.settings
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import com.filestech.pass_tech.core.model.EntryQuery
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,13 @@ class AppPreferencesTest {
             writeRaw(raw)
             assertThat(preferences.autoLockSeconds.first()).isEqualTo(AppPreferences.AUTO_LOCK_DEFAULT)
         }
+    }
+
+    @Test
+    fun `the sort is kept, and starts as recent`() = withStore { preferences, _ ->
+        assertThat(preferences.sortMode.first()).isEqualTo(EntryQuery.Sort.RECENT)
+        preferences.setSortMode(EntryQuery.Sort.ALPHA_DESC)
+        assertThat(preferences.sortMode.first()).isEqualTo(EntryQuery.Sort.ALPHA_DESC)
     }
 
     @Test

@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.filestech.pass_tech.core.model.EntryQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -53,6 +55,13 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         store.edit { it[CLIPBOARD_CLEAR] = seconds }
     }
 
+    /** The order of the home list, kept from one opening to the next (2.7.1: `sort_mode`). */
+    val sortMode: Flow<EntryQuery.Sort> = data.map { EntryQuery.Sort.fromKey(it[SORT_MODE]) }
+
+    suspend fun setSortMode(sort: EntryQuery.Sort) {
+        store.edit { it[SORT_MODE] = sort.key }
+    }
+
     companion object {
         /** The vault never locks by itself. */
         const val NEVER = -1
@@ -72,5 +81,6 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         private val SPLASH_SHOWN = booleanPreferencesKey("splash_shown")
         private val AUTO_LOCK = intPreferencesKey("auto_lock_seconds")
         private val CLIPBOARD_CLEAR = intPreferencesKey("clipboard_clear")
+        private val SORT_MODE = stringPreferencesKey("sort_mode")
     }
 }

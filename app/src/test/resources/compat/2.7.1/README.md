@@ -14,4 +14,5 @@ Passphrase of every backup: `Correct horse — batterie agrafée ✓ 2026`
 | `ptbak_v1.ptbak` | legacy v1, PBKDF2 100k + AES-CBC + HMAC over iv, data, old schema |
 | `ptbak_v1.expected.json` | what 2.7.1 imports from `ptbak_v1.ptbak` |
 | `argon2id_kat.json` | Argon2id outputs of `KdfService.argon2id` |
+| `diceware_fr_words.txt` | the passphrase words of `lib/services/diceware_fr.dart`, in file order, duplicates kept (extracted from the source, not run) |
 | `totp.json` | `TotpService.generateCode` (with the second it ran in) and `validate`, on awkward secrets |

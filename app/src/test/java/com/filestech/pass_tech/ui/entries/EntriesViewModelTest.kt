@@ -167,6 +167,29 @@ class EntriesViewModelTest {
     }
 
     @Test
+    fun `Use puts the generated password into the editor's field and closes the generator`() = runTest {
+        opened { (viewModel) ->
+            viewModel.openNew(EntryType.PASSWORD)
+            val editor = viewModel.editor()
+            viewModel.openGenerator(editor.form)
+            val generator = viewModel.stack.value.last() as Screen.Generator
+            viewModel.useGenerated(generator)
+            assertThat(editor.form.password).isEqualTo(generator.state.password)
+            assertThat(editor.form.password).isNotEmpty()
+            assertThat(viewModel.stack.value).containsExactly(editor)
+        }
+    }
+
+    @Test
+    fun `the generator opened from the home fills nothing`() = runTest {
+        opened { (viewModel) ->
+            viewModel.openGenerator()
+            val generator = viewModel.stack.value.single() as Screen.Generator
+            assertThat(generator.target).isNull()
+        }
+    }
+
+    @Test
     fun `locking drops every screen, an entry being typed included`() = runTest {
         opened { (viewModel, vault) ->
             viewModel.openNew(EntryType.PASSWORD)

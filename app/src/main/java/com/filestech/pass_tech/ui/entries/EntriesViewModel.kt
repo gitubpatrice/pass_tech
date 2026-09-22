@@ -9,6 +9,7 @@ import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.model.EntryType
 import com.filestech.pass_tech.core.vault.KeystoreUnavailableException
 import com.filestech.pass_tech.core.vault.VaultManager
+import com.filestech.pass_tech.ui.generator.GeneratorState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,9 @@ import javax.inject.Inject
  * not in the activity's saved state, and is dropped every time the vault locks: an entry being typed
  * does not outlive the lock.
  */
+// One function per user action on the screens above the home (open, save, delete, star, copy, generate):
+// splitting them would split one stack across classes.
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class EntriesViewModel @Inject constructor(
     private val vault: VaultManager,
@@ -37,6 +41,9 @@ class EntriesViewModel @Inject constructor(
 
         /** Compared by identity: two editors are two screens, even on the same entry. */
         class Edit(val form: EntryForm) : Screen
+
+        /** [target]: the editor whose password "Use" fills, or `null` when opened from the home. */
+        class Generator(val state: GeneratorState, val target: EntryForm?) : Screen
     }
 
     sealed interface Message {
@@ -48,6 +55,8 @@ class EntriesViewModel @Inject constructor(
         data object TitleRequired : Message
 
         data object SecretAdded : Message
+
+        data object GeneratedCopied : Message
 
         /** Nothing was written: the secure hardware did not answer. */
         data object KeystoreUnavailable : Message
@@ -72,6 +81,19 @@ class EntriesViewModel @Inject constructor(
     fun openNew(type: EntryType) = push(Screen.Edit(EntryForm.new(type)))
 
     fun openEditor(entry: Entry) = push(Screen.Edit(EntryForm.edit(entry)))
+
+    fun openGenerator(target: EntryForm? = null) = push(Screen.Generator(GeneratorState(), target))
+
+    /** "Use": the generated password goes into the editor's password field, and the generator closes. */
+    fun useGenerated(screen: Screen.Generator) {
+        screen.target?.password = screen.state.password
+        close(screen)
+    }
+
+    fun copyGenerated(value: String) {
+        clipboard.copy(value)
+        send(Message.GeneratedCopied)
+    }
 
     fun close(screen: Screen) {
         mutableStack.update { stack -> stack.filterNot { it === screen } }

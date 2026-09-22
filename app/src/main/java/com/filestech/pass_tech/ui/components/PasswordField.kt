@@ -65,6 +65,7 @@ fun PasswordField(
     readOnly: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Password,
     leadingIcon: ImageVector? = Icons.Outlined.Lock,
+    extraAction: (@Composable () -> Unit)? = null,
 ) {
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
@@ -75,11 +76,15 @@ fun PasswordField(
         isError = isError,
         leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(20.dp)) } },
         trailingIcon = {
-            IconButton(onClick = { visible = !visible }) {
-                Icon(
-                    imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                    contentDescription = stringResource(if (visible) R.string.hide_password else R.string.show_password),
-                )
+            Row {
+                IconButton(onClick = { visible = !visible }) {
+                    Icon(
+                        imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = stringResource(if (visible) R.string.hide_password else R.string.show_password),
+                    )
+                }
+                // 2.7.1: the wand that opens the generator, after the eye.
+                extraAction?.invoke()
             }
         },
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),

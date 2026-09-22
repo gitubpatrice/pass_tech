@@ -37,7 +37,9 @@ import com.filestech.pass_tech.ui.entries.EntryDetailScreen
 import com.filestech.pass_tech.ui.entries.EntryEditScreen
 import com.filestech.pass_tech.ui.entry.EntryScreen
 import com.filestech.pass_tech.ui.entry.EntryViewModel
+import com.filestech.pass_tech.ui.generator.GeneratorScreen
 import com.filestech.pass_tech.ui.home.HomeScreen
+import com.filestech.pass_tech.ui.home.HomeViewModel
 import com.filestech.pass_tech.ui.splash.SplashScreen
 import com.filestech.pass_tech.ui.splash.SplashViewModel
 import kotlinx.coroutines.launch
@@ -47,7 +49,7 @@ import kotlinx.coroutines.launch
  * reminder follows a creation over whichever screen is up (the home, by then).
  */
 @Composable
-fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewModel, splash: SplashViewModel) {
+fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewModel, home: HomeViewModel, splash: SplashViewModel) {
     val vaultState by app.vaultState.collectAsStateWithLifecycle()
     val locking by app.locking.collectAsStateWithLifecycle()
     val entryState by entry.state.collectAsStateWithLifecycle()
@@ -62,7 +64,7 @@ fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewMo
             when {
                 // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
                 locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                state is VaultManager.State.Open -> OpenVault(state, entries, snackbar, onLock = app::lock)
+                state is VaultManager.State.Open -> OpenVault(state, entries, home, snackbar, onLock = app::lock)
                 else -> EntryScreen(entry)
             }
             if (showSplash == true && !splashDismissed) {
@@ -80,12 +82,20 @@ fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewMo
 
 /** The home, or the screen on top of it: an entry's detail or the editor. */
 @Composable
-private fun OpenVault(state: VaultManager.State.Open, entries: EntriesViewModel, snackbar: SnackbarHostState, onLock: () -> Unit) {
+private fun OpenVault(
+    state: VaultManager.State.Open,
+    entries: EntriesViewModel,
+    home: HomeViewModel,
+    snackbar: SnackbarHostState,
+    onLock: () -> Unit,
+) {
     val stack by entries.stack.collectAsStateWithLifecycle()
     when (val top = stack.lastOrNull()) {
         null -> HomeScreen(
             entries = state.entries,
+            home = home,
             snackbar = snackbar,
+            onGenerator = { entries.openGenerator() },
             onLock = onLock,
             onOpen = { entries.openDetail(it.id) },
             onAdd = entries::openNew,
@@ -115,6 +125,14 @@ private fun OpenVault(state: VaultManager.State.Open, entries: EntriesViewModel,
             onSave = { entries.save(top) },
             onLeave = { entries.close(top) },
             onSecretAdded = entries::secretAdded,
+            onGenerate = { entries.openGenerator(top.form) },
+        )
+        is Screen.Generator -> GeneratorScreen(
+            state = top.state,
+            snackbar = snackbar,
+            onBack = { entries.close(top) },
+            onUse = if (top.target != null) ({ entries.useGenerated(top) }) else null,
+            onCopy = entries::copyGenerated,
         )
     }
 }
@@ -143,6 +161,7 @@ private fun Message.text(resources: Resources): String = when (this) {
     is Message.Deleted -> resources.getString(R.string.home_deleted_snack, title)
     Message.TitleRequired -> resources.getString(R.string.entry_edit_title_required)
     Message.SecretAdded -> resources.getString(R.string.entry_edit_secret_added)
+    Message.GeneratedCopied -> resources.getString(R.string.generator_copied_snack)
     Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
 }
 

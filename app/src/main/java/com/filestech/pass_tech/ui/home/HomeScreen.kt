@@ -1,6 +1,5 @@
 package com.filestech.pass_tech.ui.home
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -42,8 +40,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -56,14 +52,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.model.Entry
+import com.filestech.pass_tech.core.model.EntryQuery
 import com.filestech.pass_tech.core.model.EntryType
 import com.filestech.pass_tech.ui.components.PtCard
 import com.filestech.pass_tech.ui.components.PtSnackbarHost
@@ -81,7 +79,9 @@ import com.filestech.pass_tech.ui.theme.FavoriteAmberDark
 @Composable
 fun HomeScreen(
     entries: List<Entry>,
+    home: HomeViewModel,
     snackbar: SnackbarHostState,
+    onGenerator: () -> Unit,
     onLock: () -> Unit,
     onOpen: (Entry) -> Unit,
     onAdd: (EntryType) -> Unit,
@@ -90,12 +90,13 @@ fun HomeScreen(
 ) {
     var choosingType by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Entry?>(null) }
-    val sorted = remember(entries) { entries.sortedByDescending { it.updatedAt } }
+    val ui by home.state.collectAsStateWithLifecycle()
+    val shown = remember(entries, ui.query) { ui.query.apply(entries) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { PtSnackbarHost(snackbar) },
-        topBar = { HomeTopBar(onLock) },
+        topBar = { HomeTopBar(ui, home, onGenerator, onLock) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { choosingType = true },
@@ -104,21 +105,27 @@ fun HomeScreen(
             )
         },
     ) { padding ->
-        if (sorted.isEmpty()) {
-            EmptyState(Modifier.padding(padding), onAdd = { onAdd(EntryType.PASSWORD) })
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(padding),
-                contentPadding = PaddingValues(start = 12.dp, top = 4.dp, end = 12.dp, bottom = 80.dp),
-            ) {
-                items(sorted, key = { it.id }) { entry ->
-                    SwipeableEntry(
-                        entry = entry,
-                        onOpen = { onOpen(entry) },
-                        onToggleFavorite = { onToggleFavorite(entry) },
-                        onDelete = { deleting = entry },
-                    )
-                }
+        Column(Modifier.padding(padding)) {
+            FilterRow(ui.query.filter, home::setFilter)
+            Text(
+                text = if (shown.isEmpty()) {
+                    stringResource(R.string.home_entry_count_none)
+                } else {
+                    pluralStringResource(R.plurals.home_entry_count, shown.size, shown.size)
+                },
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 2.dp, end = 16.dp, bottom = 4.dp),
+            )
+            if (shown.isEmpty()) {
+                EmptyState(
+                    searching = ui.query.search.isNotEmpty(),
+                    // 2.7.1: the hint and the Add button only on the unfiltered list.
+                    offerAdd = ui.query.search.isEmpty() && ui.query.filter == EntryQuery.Filter.All,
+                    onAdd = { onAdd(EntryType.PASSWORD) },
+                )
+            } else {
+                EntryList(shown, onOpen, onToggleFavorite, onDelete = { deleting = it })
             }
         }
     }
@@ -145,28 +152,17 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeTopBar(onLock: () -> Unit) {
-    TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(R.drawable.pass_tech_logo_damier),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(6.dp)),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.app_name), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        },
-        actions = {
-            IconButton(onClick = onLock) {
-                Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.home_tooltip_lock))
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-    )
+private fun EntryList(entries: List<Entry>, onOpen: (Entry) -> Unit, onToggleFavorite: (Entry) -> Unit, onDelete: (Entry) -> Unit) {
+    LazyColumn(contentPadding = PaddingValues(start = 12.dp, top = 4.dp, end = 12.dp, bottom = 80.dp)) {
+        items(entries, key = { it.id }) { entry ->
+            SwipeableEntry(
+                entry = entry,
+                onOpen = { onOpen(entry) },
+                onToggleFavorite = { onToggleFavorite(entry) },
+                onDelete = { onDelete(entry) },
+            )
+        }
+    }
 }
 
 /** The swipe only triggers the action: the card always springs back into place. */
@@ -337,8 +333,8 @@ private fun AddChoice(icon: ImageVector, color: Color, title: Int, subtitle: Int
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier, onAdd: () -> Unit) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+private fun EmptyState(searching: Boolean, offerAdd: Boolean, onAdd: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Icon(
                 Icons.Outlined.Lock,
@@ -347,15 +343,20 @@ private fun EmptyState(modifier: Modifier, onAdd: () -> Unit) {
                 modifier = Modifier.size(64.dp),
             )
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.home_empty_no_entry), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.home_empty_hint), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(16.dp))
-            // 2.7.1 (U12 v2.4.3): an Add button right there, not only the one at the bottom.
-            FilledTonalButton(onClick = onAdd) {
-                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.action_add))
+            Text(
+                stringResource(if (searching) R.string.home_empty_no_result else R.string.home_empty_no_entry),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (offerAdd) {
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.home_empty_hint), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(16.dp))
+                // 2.7.1 (U12 v2.4.3): an Add button right there, not only the one at the bottom.
+                FilledTonalButton(onClick = onAdd) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.action_add))
+                }
             }
         }
     }
