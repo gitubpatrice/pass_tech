@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Libellés repris de l'app Flutter (2.7.1, lib/l10n/app_fr.arb) sauf mention contraire. -->
+
+    <string name="splash_tagline">La protection maximale\npour vos mots de passe.</string>
+    <string name="splash_skip_hint">Toucher l\'écran pour continuer</string>
+    <string name="splash_skip_label">Continuer</string>
+    <string name="splash_logo_content_description">Logo Pass Tech</string>
+
+    <string name="show_password">Afficher le mot de passe</string>
+    <string name="hide_password">Masquer le mot de passe</string>
+    <string name="strength_weak">Faible</string>
+    <string name="strength_medium">Moyen</string>
+    <string name="strength_strong">Fort</string>
+    <string name="strength_very_strong">Très fort</string>
+
+    <string name="setup_title">Créer votre coffre-fort</string>
+    <string name="setup_subtitle">Choisissez un mot de passe maître fort.\nIl chiffre toutes vos données en local.</string>
+    <string name="setup_master_label">Mot de passe maître</string>
+    <string name="setup_master_helper">Minimum 12 caractères</string>
+    <string name="setup_confirm_label">Confirmer le mot de passe</string>
+    <string name="setup_create_cta">Créer le coffre-fort</string>
+    <string name="setup_encrypting">Chiffrement en cours…</string>
+    <string name="setup_error_min">Minimum 12 caractères</string>
+    <string name="password_too_weak">Mot de passe trop devinable — évitez les répétitions, les suites et les mots courants. Allongez-le plutôt que d\'ajouter des symboles.</string>
+    <string name="setup_error_mismatch">Les mots de passe ne correspondent pas</string>
+    <string name="setup_warning">Ce mot de passe ne peut pas être récupéré. Si vous l\'oubliez, vos données seront inaccessibles.</string>
+    <string name="setup_error_impossible">Impossible de créer un coffre sur ce téléphone.</string>
+
+    <string name="backup_reminder_title">Pensez à votre sauvegarde</string>
+    <string name="backup_reminder_body">Votre coffre n\'existe que sur ce téléphone. Ni cloud, ni compte, ni récupération : perdre le téléphone ou oublier le mot de passe maître, c\'est perdre les données.\n\nDès vos premières entrées saisies, exportez une sauvegarde chiffrée (.ptbak) depuis Réglages → Données. C\'est le seul filet qui existe.</string>
+    <string name="action_ok">OK</string>
+
+    <string name="unlock_master_label">Mot de passe maître</string>
+    <string name="unlock_enter_master">Entrez votre mot de passe maître</string>
+    <string name="unlock_too_many_attempts">Trop de tentatives — verrouillé</string>
+    <string name="unlock_try_again_in">Réessayez dans</string>
+    <string name="unit_seconds_short">%1$ds</string>
+    <string name="unit_minutes_short">%1$dmin</string>
+    <string name="unit_minutes_seconds_short">%1$dmin %2$ds</string>
+    <string name="unlock_cta">Déverrouiller</string>
+    <string name="unlock_decrypting">Déchiffrement…</string>
+    <string name="unlock_wrong_password">Mot de passe incorrect</string>
+
+    <string name="keystore_unavailable">La puce de sécurité du téléphone n\'a pas répondu. Réessayez.</string>
+
+    <string name="home_tooltip_lock">Verrouiller</string>
+    <string name="home_empty_no_entry">Aucune entrée</string>
+</resources>

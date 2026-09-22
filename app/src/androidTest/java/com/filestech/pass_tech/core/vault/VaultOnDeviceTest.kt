@@ -50,7 +50,7 @@ class VaultOnDeviceTest {
         val context: Context = object : ContextWrapper(target) {
             override fun getFilesDir(): File = sandbox
         }
-        val repository = VaultModule.vaultRepository(context, keystore, VaultModule.stateStore(context, keystore))
+        val repository = VaultModule.vaultRepository(context, keystore, VaultModule.stateStore(context, keystore), VaultModule.clock())
         manager = VaultManager(repository, Dispatchers.IO)
     }
 

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The system splash shows no icon, only the background colour, for the moment it takes to read which
+  screen comes first (as SMS Tech does). Android 12+ would otherwise crop the logo into a circle.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

@@ -2,4 +2,58 @@
 <resources>
     <!-- The product name is not translated. -->
     <string name="app_name" translatable="false">Pass Tech</string>
+
+    <!-- Wording carried over from the Flutter app (2.7.1, lib/l10n/app_en.arb) unless noted. -->
+
+    <!-- Splash, first launch only -->
+    <string name="splash_tagline">Maximum protection for your passwords.</string>
+    <string name="splash_skip_hint">Tap the screen to continue</string>
+    <string name="splash_skip_label">Continue</string>
+    <string name="splash_logo_content_description">Pass Tech logo</string>
+
+    <!-- Password fields -->
+    <string name="show_password">Show password</string>
+    <string name="hide_password">Hide password</string>
+    <string name="strength_weak">Weak</string>
+    <string name="strength_medium">Medium</string>
+    <string name="strength_strong">Strong</string>
+    <string name="strength_very_strong">Very strong</string>
+
+    <!-- Vault creation -->
+    <string name="setup_title">Create your vault</string>
+    <string name="setup_subtitle">Pick a strong master password.\nIt encrypts all your data locally.</string>
+    <string name="setup_master_label">Master password</string>
+    <string name="setup_master_helper">Minimum 12 characters</string>
+    <string name="setup_confirm_label">Confirm password</string>
+    <string name="setup_create_cta">Create vault</string>
+    <string name="setup_encrypting">Encrypting…</string>
+    <string name="setup_error_min">Minimum 12 characters</string>
+    <string name="password_too_weak">Password too guessable — avoid repetition, sequences and common words. Make it longer rather than adding symbols.</string>
+    <string name="setup_error_mismatch">Passwords do not match</string>
+    <string name="setup_warning">This password cannot be recovered. If you forget it, your data will be inaccessible.</string>
+    <!-- New in 3.0.0: no slot is provably free. Deliberately says nothing more. -->
+    <string name="setup_error_impossible">A vault cannot be created on this phone.</string>
+
+    <string name="backup_reminder_title">Remember your backup</string>
+    <string name="backup_reminder_body">Your vault exists only on this phone. No cloud, no account, no recovery: losing the phone or forgetting the master password means losing the data.\n\nAs soon as you have entered your first items, export an encrypted backup (.ptbak) from Settings → Data. It is the only safety net there is.</string>
+    <string name="action_ok">OK</string>
+
+    <!-- Unlock -->
+    <string name="unlock_master_label">Master password</string>
+    <string name="unlock_enter_master">Enter your master password</string>
+    <string name="unlock_too_many_attempts">Too many attempts — locked</string>
+    <string name="unlock_try_again_in">Try again in</string>
+    <string name="unit_seconds_short">%1$ds</string>
+    <string name="unit_minutes_short">%1$dmin</string>
+    <string name="unit_minutes_seconds_short">%1$dmin %2$ds</string>
+    <string name="unlock_cta">Unlock</string>
+    <string name="unlock_decrypting">Decrypting…</string>
+    <string name="unlock_wrong_password">Wrong password</string>
+
+    <!-- New in 3.0.0: the secure hardware did not answer. Never "wrong password" (design v2.2). -->
+    <string name="keystore_unavailable">The phone\'s security chip did not answer. Please try again.</string>
+
+    <!-- Home -->
+    <string name="home_tooltip_lock">Lock</string>
+    <string name="home_empty_no_entry">No entry</string>
 </resources>

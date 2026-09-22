@@ -104,6 +104,9 @@ class VaultManager @Inject constructor(
 
     suspend fun entryMode(): VaultRepository.EntryMode = serialized { repository.entryMode() }
 
+    /** See [VaultRepository.lockoutRemainingMillis]. */
+    suspend fun lockoutRemainingMillis(): Long = serialized { repository.lockoutRemainingMillis() }
+
     suspend fun unlock(password: ByteArray): UnlockOutcome =
         serialized(password) {
             when (val result = repository.unlock(password)) {

@@ -2,6 +2,7 @@ package com.filestech.pass_tech.di
 
 import android.content.Context
 import com.filestech.pass_tech.core.security.BruteForceGuard
+import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.state.SystemClockSource
 import com.filestech.pass_tech.core.vault.AndroidSlotKeystore
@@ -37,13 +38,22 @@ abstract class VaultModule {
         fun stateStore(@ApplicationContext context: Context, keystore: SlotKeystore): StateStore =
             StateStore(File(context.filesDir, StateStore.FILE_NAME), keystore)
 
+        /** Uptime for the lockout and every countdown, never the wall clock. */
+        @Provides
+        fun clock(): Clock = SystemClockSource
+
         @Provides
         @Singleton
-        fun vaultRepository(@ApplicationContext context: Context, keystore: SlotKeystore, state: StateStore): VaultRepository =
+        fun vaultRepository(
+            @ApplicationContext context: Context,
+            keystore: SlotKeystore,
+            state: StateStore,
+            clock: Clock,
+        ): VaultRepository =
             VaultRepository(
                 files = VaultFiles(context.filesDir),
                 keystore = keystore,
-                guard = BruteForceGuard.forVault(state, SystemClockSource),
+                guard = BruteForceGuard.forVault(state, clock),
                 // Until biometric unlock lands, nothing is ever armed, so there is nothing to purge.
                 biometrics = BiometricBinding.NONE,
             )

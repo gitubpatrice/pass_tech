@@ -126,6 +126,13 @@ class VaultRepository(
     fun statuses(): Map<Slot, SlotStatus> = Slot.entries.associateWith(::status)
 
     /**
+     * How long the lockout still lasts, 0 if an attempt may be made now: lets the unlock screen show
+     * its countdown before anyone types. 0 as well if the state cannot be read; the attempt then says so.
+     */
+    fun lockoutRemainingMillis(): Long =
+        unavailableAs(0L) { (guard.gate() as? BruteForceGuard.Gate.Locked)?.remainingMillis ?: 0L }
+
+    /**
      * The creation form shows on a fresh install, and after any deletion, whichever vault it came
      * from: the screen that follows a deletion never tells whether another vault survived (oracle E).
      */

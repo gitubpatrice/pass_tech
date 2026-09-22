@@ -17,6 +17,7 @@ navigation-compose = "2.10.1"
 # Aligned on the kotlinx-serialization-core that lifecycle already resolves transitively.
 kotlinxSerialization = "1.7.3"
 datastore = "1.1.1"
+splashscreen = "1.2.0"
 biometric = "1.1.0"
 
 # Hilt (2.60 requires AGP 9)
@@ -62,6 +63,7 @@ androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-mani
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "splashscreen" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
