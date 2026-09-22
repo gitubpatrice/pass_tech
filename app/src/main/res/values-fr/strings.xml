@@ -262,6 +262,5 @@
     <string name="settings_biometric_enable_failed">Activation biométrique échouée.</string>
     <string name="settings_biometric_decoy_conflict">Le déverrouillage biométrique est indisponible sur ce coffre. Seul votre mot de passe maître l\'ouvre.</string>
     <string name="settings_biometric_new_enrollment_warning">Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.</string>
-    <string name="settings_biometric_another_vault">Le déverrouillage biométrique ouvre un autre coffre que celui-ci.</string>
     <string name="change_password_done_biometric_reset">Mot de passe changé. Le déverrouillage biométrique a été désactivé — réactivez-le dans Réglages.</string>
 </resources>

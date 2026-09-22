@@ -134,8 +134,9 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
                     if (on) settings.setScreenshotProtection(true) else dialog = SettingsDialog.SCREENSHOTS_OFF
                 }
             }
-            // Offered when the phone can authenticate, and kept while something is armed, to disarm it.
-            if (biometrics.available || biometrics.status != BiometricStatus.OFF) {
+            // Offered when the phone can authenticate, and kept while THIS vault is armed, to turn it off.
+            // Never for a vault armed elsewhere: its tile would differ from a phone where nothing is armed.
+            if (biometrics.available || biometrics.status == BiometricStatus.THIS_VAULT) {
                 item {
                     BiometricTile(
                         status = biometrics.status,
@@ -283,9 +284,14 @@ private fun ArmingPrompts(settings: SettingsViewModel) {
 }
 
 /**
- * On when a fingerprint opens THIS vault. When it opens another one, the owner is told so and may cut it
- * (design v2 §9): only someone who knows this vault's password sees it, and it tells an attacker nothing
- * they did not arm themselves. The note under it is 2.7.1's, for phones that do not invalidate the key.
+ * On when a fingerprint opens THIS vault, off in every other case, and the screen says nothing more.
+ *
+ * Design v2 §9 had this tile warn the owner that a fingerprint opens ANOTHER vault. Patrice dropped that
+ * warning on 2026-09-22, after both reviewers called it an oracle: a vault must never tell anything about
+ * a vault that is not itself, even to someone who knows this one's password. Turning the switch on arms
+ * this vault instead, which is the only thing the owner needs here.
+ *
+ * The note under it is 2.7.1's, for phones that do not invalidate the key at a new enrolment.
  */
 @Composable
 private fun BiometricTile(status: BiometricStatus, onEnable: () -> Unit, onDisable: () -> Unit) {
@@ -301,17 +307,6 @@ private fun BiometricTile(status: BiometricStatus, onEnable: () -> Unit, onDisab
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier = Modifier.clickable { change(!on) },
             )
-            if (status == BiometricStatus.ANOTHER_VAULT) {
-                Text(
-                    text = stringResource(R.string.settings_biometric_another_vault),
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(start = 56.dp, end = 16.dp),
-                )
-                TextButton(onClick = onDisable, modifier = Modifier.padding(start = 44.dp)) {
-                    Text(stringResource(R.string.action_disable))
-                }
-            }
             Text(
                 text = stringResource(R.string.settings_biometric_new_enrollment_warning),
                 style = MaterialTheme.typography.bodySmall,

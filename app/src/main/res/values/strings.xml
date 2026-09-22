@@ -275,6 +275,5 @@
     <string name="settings_biometric_enable_failed">Biometric activation failed.</string>
     <string name="settings_biometric_decoy_conflict">Biometric unlock is unavailable on this vault. Only your master password opens it.</string>
     <string name="settings_biometric_new_enrollment_warning">If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.</string>
-    <string name="settings_biometric_another_vault">Biometric unlock opens a vault other than this one.</string>
     <string name="change_password_done_biometric_reset">Password changed. Biometric unlock has been disabled — re-enable it in Settings.</string>
 </resources>

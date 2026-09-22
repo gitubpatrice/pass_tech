@@ -153,7 +153,7 @@ class VaultBiometricsTest {
     }
 
     @Test
-    fun `the decoy may arm itself, its parent is told a fingerprint opens another vault, and keeps it on a password change`() {
+    fun `the decoy may arm itself, and a password change in its parent leaves it armed`() {
         val parent = withDecoy(created())
         parent.close()
         val decoy = opened(decoyPassword)
@@ -163,6 +163,8 @@ class VaultBiometricsTest {
         decoy.close()
 
         val real = opened(owner)
+        // Known here, never shown: the settings screen says nothing about a vault armed elsewhere
+        // (Patrice, 2026-09-22). What it decides is the purge below, not a line on a screen.
         assertThat(repo.biometricStatus(real)).isEqualTo(BiometricStatus.ANOTHER_VAULT)
         val changed = repo.changePassword(real, owner.copyOf(), "a new password".encodeToByteArray())
         assertThat((changed as VaultRepository.ChangeResult.Changed).biometricsDisarmed).isFalse()
