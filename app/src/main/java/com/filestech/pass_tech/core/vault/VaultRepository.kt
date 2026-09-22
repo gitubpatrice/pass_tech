@@ -89,6 +89,20 @@ class VaultRepository(
         data object KeystoreUnavailable : DecoyResult
     }
 
+    sealed interface DecoyDeleteResult {
+        /** The decoy is gone; the returned session is the updated PARENT. */
+        data class Deleted(val parent: VaultSession) : DecoyDeleteResult
+
+        /** This vault has no decoy any more: nothing to delete. */
+        data object NotConfigured : DecoyDeleteResult
+
+        /**
+         * A decoy may exist and could not be proven: its mark cannot be read, or its creation is still
+         * journalled, or the Keystore did not answer. Nothing was written.
+         */
+        data object KeystoreUnavailable : DecoyDeleteResult
+    }
+
     sealed interface CheckResult {
         data object Correct : CheckResult
 
@@ -241,6 +255,30 @@ class VaultRepository(
                     if (target == null) DecoyResult.Impossible else createDecoy(session, target, password)
                 }
             }
+        }
+
+    /**
+     * Deletes the decoy this vault created (2.7.1: Settings › Decoy vault › Delete). No password is
+     * asked: the vault is open, the decoy holds nothing of the owner's, and an attacker who already
+     * has this session can empty the decoy by hand anyway.
+     *
+     * The decoy's slot becomes a dummy at the largest bucket on disk, so the phone looks exactly as it
+     * would had the decoy never been created. It does NOT ask for the creation form afterwards, unlike
+     * a deletion of one's own data: this vault stays open, and its owner has not lost anything.
+     *
+     * Only a decoy whose mark PROVES the slot is still its own is erased ([decoyOf]). A mark that
+     * cannot be read keeps its journal, and this answers "try again": erasing on a guess could
+     * overwrite a vault that was never this one's decoy.
+     */
+    fun deleteDecoy(session: VaultSession): DecoyDeleteResult =
+        unavailableAs(DecoyDeleteResult.KeystoreUnavailable) {
+            val child = decoyOf(session)
+                ?: return if (hasDecoy(session)) DecoyDeleteResult.KeystoreUnavailable else DecoyDeleteResult.NotConfigured
+            // As at every other deletion (design v2 §9): what a decoy's own session armed opens nothing now.
+            biometrics.purge()
+            val updated = session.with(meta = session.meta.copy(child = null))
+            write(updated, erase = child.slot)
+            DecoyDeleteResult.Deleted(updated)
         }
 
     /** Re-authentication inside an open vault. Counted by the lockout like any other check. */
@@ -492,7 +530,7 @@ class VaultRepository(
      * than the new bucket or when the creation mode ends; a missing slot file becomes a dummy. An
      * occupied or unknown slot is copied as it is, never touched.
      */
-    private fun write(session: VaultSession, clearCreationRequests: Boolean = false) {
+    private fun write(session: VaultSession, clearCreationRequests: Boolean = false, erase: Slot? = null) {
         val statuses = statuses()
         val plain = VaultPayload(session.entries, session.meta).toBytes()
         val bucket = maxOf(Padding.bucketFor(plain.size), largestBucketOnDisk(except = session.slot))
@@ -502,18 +540,27 @@ class VaultRepository(
         }
         val updates = mutableMapOf(session.slot to content)
         for (slot in Slot.entries - session.slot) {
-            val status = statuses.getValue(slot)
-            if (status == SlotStatus.Missing) {
-                updates[slot] = dummy(slot, bucket, creationRequested = false)
-            } else if (status is SlotStatus.Marked && !status.mark.occupied) {
-                val keepRequest = status.mark.creationRequested && !clearCreationRequests
-                if (bucketOf(slot) < bucket || keepRequest != status.mark.creationRequested) {
-                    updates[slot] = dummy(slot, bucket, keepRequest)
-                }
-            }
+            dummyRequest(slot, statuses.getValue(slot), bucket, clearCreationRequests, erase)
+                ?.let { creationRequested -> updates[slot] = dummy(slot, bucket, creationRequested) }
         }
         files.writeAll(updates)
     }
+
+    /**
+     * Whether [slot] is rewritten as a dummy by this save, and with which creation request. `null`
+     * leaves its file exactly as it is: an occupied slot, or one whose mark cannot be read, is never
+     * touched — except [erase], the decoy this vault is deleting on purpose.
+     */
+    private fun dummyRequest(slot: Slot, status: SlotStatus, bucket: Int, clearCreationRequests: Boolean, erase: Slot?): Boolean? =
+        when {
+            slot == erase -> false
+            status == SlotStatus.Missing -> false
+            status !is SlotStatus.Marked || status.mark.occupied -> null
+            else -> {
+                val keepRequest = status.mark.creationRequested && !clearCreationRequests
+                if (bucketOf(slot) < bucket || keepRequest != status.mark.creationRequested) keepRequest else null
+            }
+        }
 
     /**
      * A slot file nobody can open: random key, never stored, over padding only. Indistinguishable

@@ -263,6 +263,23 @@
     <string name="settings_biometric_decoy_conflict">Le déverrouillage biométrique est indisponible sur ce coffre. Seul votre mot de passe maître l\'ouvre.</string>
     <string name="settings_biometric_new_enrollment_warning">Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.</string>
     <string name="change_password_done_biometric_reset">Mot de passe changé. Le déverrouillage biométrique a été désactivé — réactivez-le dans Réglages.</string>
+    <!-- Decoy vault (2.7.1 settings_screen.dart:522-730) -->
+    <string name="settings_section_decoy">Coffre leurre (anti-coercition)</string>
+    <string name="decoy_tile_setup">Configurer un coffre leurre</string>
+    <string name="decoy_tile_configured">Coffre leurre configuré</string>
+    <string name="decoy_tile_subtitle">Un 2e mot de passe ouvre un faux coffre. Si quelqu\'un vous force à ouvrir l\'app, donnez le faux.</string>
+    <string name="decoy_dialog_title">Coffre leurre</string>
+    <string name="decoy_setup_body">Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec un mot de passe différent.\n\nUsage : si quelqu\'un vous force à ouvrir Pass Tech (frontière, agression, contrôle), vous donnez le mot de passe du leurre. L\'app affiche alors un faux coffre — il est cryptographiquement impossible de prouver l\'existence du vrai.\n\nÀ retenir :\n• Le mot de passe du leurre doit être différent du vrai\n• Remplissez le leurre avec quelques entrées crédibles\n• Le déverrouillage biométrique sera désactivé, et le restera tant qu\'un leurre existe : l\'empreinte ouvre directement le vrai coffre, elle annulerait le leurre</string>
+    <string name="decoy_setup_biometric_warning">Configurer un coffre leurre désactivera le déverrouillage biométrique. L\'empreinte ouvre directement le vrai coffre : elle annulerait le leurre dans la situation même où il sert. Vous déverrouillerez avec votre mot de passe principal.</string>
+    <string name="decoy_configure">Configurer</string>
+    <string name="decoy_password_dialog_title">Mot de passe du coffre leurre</string>
+    <string name="decoy_password_label">Mot de passe du leurre (min. 12)</string>
+    <string name="decoy_configured_snack">Coffre leurre configuré ✓</string>
+    <string name="decoy_manage_body">Le coffre leurre est actif.\n\nVous pouvez le supprimer (action silencieuse pour l\'attaquant — il pensera juste qu\'il s\'est trompé de mot de passe).</string>
+    <string name="decoy_delete">Supprimer le leurre</string>
+    <string name="decoy_deleted_snack">Coffre leurre supprimé</string>
+    <string name="decoy_error_impossible">Impossible de créer un coffre leurre sur ce téléphone.</string>
+
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
     <string name="settings_section_data">Données</string>
     <string name="settings_backup_encrypted_title">Sauvegarde chiffrée (.ptbak)</string>

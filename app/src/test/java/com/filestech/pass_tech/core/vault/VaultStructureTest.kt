@@ -262,6 +262,83 @@ class VaultStructureTest {
     }
 
     @Test
+    fun `deleting the decoy frees its slot and its password opens nothing`() {
+        val parent = ownerWithDecoy()
+        val saved = repo.save(parent, listOf(entry("bank")))
+        val result = repo.deleteDecoy(saved)
+
+        assertThat(result).isInstanceOf(VaultRepository.DecoyDeleteResult.Deleted::class.java)
+        assertThat(occupied()).containsExactly(Slot.A)
+        assertThat(repo.unlock(decoy)).isEqualTo(VaultRepository.UnlockResult.WrongPassword)
+        // The parent is untouched, entries included, and no longer knows about a decoy.
+        val reopened = open(owner)
+        assertThat(reopened.entries.map { it.title }).containsExactly("bank")
+        assertThat(repo.hasDecoy(reopened)).isFalse()
+        assertThat(repo.decoyOf(reopened)).isNull()
+    }
+
+    @Test
+    fun `deleting the decoy does not ask for the creation form, unlike deleting one's own data`() {
+        val parent = ownerWithDecoy()
+        repo.deleteDecoy(parent)
+        assertThat(repo.entryMode()).isEqualTo(VaultRepository.EntryMode.UNLOCK)
+    }
+
+    @Test
+    fun `deleting the decoy purges biometrics, as every other deletion does`() {
+        val parent = ownerWithDecoy()
+        val before = biometricPurges
+        repo.deleteDecoy(parent)
+        assertThat(biometricPurges).isEqualTo(before + 1)
+    }
+
+    @Test
+    fun `the freed slot takes the largest bucket, so no file shrinks`() {
+        val parent = ownerWithDecoy()
+        val big = repo.save(parent, (1..400).map { entry("entry number $it with a long enough title") })
+        val bigSize = File(dir, Slot.A.vaultFileName).length()
+        repo.deleteDecoy(big)
+        assertThat(Slot.entries.map { File(dir, it.vaultFileName).length() }.toSet()).containsExactly(bigSize)
+    }
+
+    @Test
+    fun `the freed slot can hold a new decoy`() {
+        val parent = ownerWithDecoy()
+        val deleted = (repo.deleteDecoy(parent) as VaultRepository.DecoyDeleteResult.Deleted).parent
+        assertThat(repo.configureDecoy(deleted, attacker)).isInstanceOf(VaultRepository.DecoyResult.Created::class.java)
+        assertThat(open(attacker).slot).isEqualTo(Slot.B)
+        assertThat(open(owner).slot).isEqualTo(Slot.A)
+    }
+
+    @Test
+    fun `a decoy whose mark cannot be read is never erased on a guess`() {
+        val parent = ownerWithDecoy()
+        val before = Slot.entries.map { files.read(it) }
+        keystore.unreadable += OccupancyMark.KEY_ALIAS
+
+        assertThat(repo.deleteDecoy(parent)).isEqualTo(VaultRepository.DecoyDeleteResult.KeystoreUnavailable)
+        assertThat(Slot.entries.map { files.read(it) }).isEqualTo(before)
+        keystore.unreadable.clear()
+        assertThat(open(decoy).slot).isEqualTo(Slot.B)
+    }
+
+    @Test
+    fun `a vault with no decoy has none to delete, and writes nothing`() {
+        val alone = (repo.openOrCreate(owner) as VaultRepository.CreateResult.Created).session
+        val before = Slot.entries.map { files.read(it) }
+        assertThat(repo.deleteDecoy(alone)).isEqualTo(VaultRepository.DecoyDeleteResult.NotConfigured)
+        assertThat(Slot.entries.map { files.read(it) }).isEqualTo(before)
+    }
+
+    @Test
+    fun `from inside the decoy, deleting a decoy never reaches the parent`() {
+        ownerWithDecoy().close()
+        val inDecoy = open(decoy)
+        assertThat(repo.deleteDecoy(inDecoy)).isEqualTo(VaultRepository.DecoyDeleteResult.NotConfigured)
+        assertThat(open(owner).slot).isEqualTo(Slot.A)
+    }
+
+    @Test
     fun `a changed password opens the vault, the old one no longer does`() {
         val parent = ownerWithDecoy()
         val new = "new owner password".encodeToByteArray()

@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -34,6 +37,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.SettingsBrightness
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -95,6 +99,9 @@ private enum class SettingsDialog {
     AUTO_LOCK,
     SCREENSHOTS_OFF,
     CHANGE_PASSWORD,
+    DECOY_SETUP,
+    DECOY_PASSWORD,
+    DECOY_MANAGE,
     DELETE_ALL,
     DELETE_REAUTH,
     BACKUP_PASSPHRASE,
@@ -113,6 +120,7 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
     val haptics = LocalHapticFeedback.current
     val biometrics by settings.biometrics.collectAsStateWithLifecycle()
+    val hasDecoy by settings.hasDecoy.collectAsStateWithLifecycle()
     val pending by settings.pending.collectAsStateWithLifecycle()
     val openImport = remember { mutableStateOf(false) }
     Messages(settings, snackbar)
@@ -186,6 +194,16 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
                     settings.lockNow()
                 }
             }
+            // Always shown, on every phone and from every vault: a tile that appeared only where a decoy
+            // is possible would answer the one question the whole design exists to leave open.
+            item { SectionTitle(R.string.settings_section_decoy) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.ShieldMoon,
+                    title = stringResource(if (hasDecoy) R.string.decoy_tile_configured else R.string.decoy_tile_setup),
+                    subtitle = stringResource(R.string.decoy_tile_subtitle),
+                ) { dialog = if (hasDecoy) SettingsDialog.DECOY_MANAGE else SettingsDialog.DECOY_SETUP }
+            }
             item { SectionTitle(R.string.settings_section_data) }
             item {
                 Tile(
@@ -228,6 +246,7 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
         dialog = dialog,
         settings = settings,
         haptics = haptics,
+        armedHere = biometrics.status == BiometricStatus.THIS_VAULT,
         onDialog = { dialog = it },
     )
     if (ui.busy) BusyDialog()
@@ -241,6 +260,7 @@ private fun SettingsDialogs(
     dialog: SettingsDialog?,
     settings: SettingsViewModel,
     haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    armedHere: Boolean,
     onDialog: (SettingsDialog?) -> Unit,
 ) {
     val close = { onDialog(null) }
@@ -296,6 +316,8 @@ private fun SettingsDialogs(
             },
             onDismiss = close,
         )
+        SettingsDialog.DECOY_SETUP, SettingsDialog.DECOY_PASSWORD, SettingsDialog.DECOY_MANAGE ->
+            DecoyDialogs(dialog, settings, armedHere, onDialog)
         SettingsDialog.DELETE_ALL -> ConfirmDialog(
             title = R.string.settings_delete_all_dialog_title,
             body = R.string.settings_delete_all_dialog_body,
@@ -336,6 +358,120 @@ private fun SettingsDialogs(
         null -> Unit
     }
     PickedFileDialogs(pending, settings)
+}
+
+/**
+ * The decoy vault, in three steps (2.7.1, `settings_screen.dart:522-730`): what it is, the password
+ * that will open it, and later the one action it offers, deleting it.
+ *
+ * Unlike 2.7.1, the vault stays open once the decoy exists. 2.7.1 locked and said "unlock again to
+ * continue"; here the creation hands back the parent, whole, and its tile turns into "set up". The
+ * owner still has to unlock the decoy to fill it, which the explanation asks them to do.
+ */
+@Composable
+private fun DecoyDialogs(dialog: SettingsDialog?, settings: SettingsViewModel, armedHere: Boolean, onDialog: (SettingsDialog?) -> Unit) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        SettingsDialog.DECOY_SETUP -> DecoySetupDialog(
+            armedHere = armedHere,
+            onContinue = { onDialog(SettingsDialog.DECOY_PASSWORD) },
+            onDismiss = close,
+        )
+        SettingsDialog.DECOY_PASSWORD -> DecoyPasswordDialog(
+            onValid = { password ->
+                close()
+                settings.configureDecoy(password)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.DECOY_MANAGE -> DecoyManageDialog(
+            onDelete = {
+                close()
+                settings.deleteDecoy()
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+/** What a decoy is for, before anything is asked. The only warning is about THIS vault (design v2.3 §1). */
+@Composable
+private fun DecoySetupDialog(armedHere: Boolean, onContinue: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.ShieldMoon, contentDescription = null) },
+        title = { Text(stringResource(R.string.decoy_dialog_title)) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (armedHere) {
+                    Text(
+                        text = stringResource(R.string.decoy_setup_biometric_warning),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                    )
+                }
+                Text(stringResource(R.string.decoy_setup_body), fontSize = 13.sp)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onContinue) { Text(stringResource(R.string.decoy_configure)) } },
+    )
+}
+
+/** The decoy's password, typed twice, under the same rule as every other password of the app. */
+@Composable
+private fun DecoyPasswordDialog(onValid: (String) -> Unit, onDismiss: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var problem by remember { mutableStateOf<ChangeProblem?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.decoy_password_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasswordField(password, { password = it }, stringResource(R.string.decoy_password_label), leadingIcon = null)
+                PasswordField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it },
+                    label = stringResource(R.string.change_password_confirm_label),
+                    leadingIcon = null,
+                )
+                problem?.let { Text(stringResource(changeProblemLabel(it)), color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = {
+                problem = SettingsViewModel.checkNewPassword(password, confirmation)
+                if (problem == null) onValid(password)
+            }) { Text(stringResource(R.string.decoy_configure)) }
+        },
+    )
+}
+
+/** The decoy exists: the one thing left to do with it is to delete it, and 2.7.1 asks for nothing else. */
+@Composable
+private fun DecoyManageDialog(onDelete: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.ShieldMoon, contentDescription = null) },
+        title = { Text(stringResource(R.string.decoy_dialog_title)) },
+        text = { Text(stringResource(R.string.decoy_manage_body), fontSize = 13.sp) },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = DestructiveRed, contentColor = Color.White),
+            ) { Text(stringResource(R.string.decoy_delete)) }
+        },
+    )
 }
 
 /** The dialogs a picked file brings with it: its passphrase, then how much of it is coming in. */
@@ -419,15 +555,23 @@ private fun BiometricTile(status: BiometricStatus, onEnable: () -> Unit, onDisab
 private fun messageText(resources: Resources, message: Message): String = when (message) {
     Message.PasswordChanged -> resources.getString(R.string.change_password_done)
     Message.PasswordChangedBiometricsReset -> resources.getString(R.string.change_password_done_biometric_reset)
+    Message.WrongPassword -> resources.getString(R.string.change_password_error_wrong_current)
+    Message.PasswordRefused -> resources.getString(R.string.change_password_refused)
+    is Message.Locked -> resources.getString(R.string.settings_locked_retry, countdownText(resources, message.remainingMillis))
+    Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
+    else -> vaultMessageText(resources, message)
+}
+
+/** What the vault itself answered about its fingerprint and its decoy. */
+private fun vaultMessageText(resources: Resources, message: Message): String = when (message) {
     Message.BiometricsEnabled -> resources.getString(R.string.settings_biometric_enabled)
     Message.BiometricsDisabled -> resources.getString(R.string.settings_biometric_disabled)
     Message.BiometricsCanceled -> resources.getString(R.string.settings_biometric_enable_canceled)
     Message.BiometricsFailed -> resources.getString(R.string.settings_biometric_enable_failed)
     Message.BiometricsRefused -> resources.getString(R.string.settings_biometric_decoy_conflict)
-    Message.WrongPassword -> resources.getString(R.string.change_password_error_wrong_current)
-    Message.PasswordRefused -> resources.getString(R.string.change_password_refused)
-    is Message.Locked -> resources.getString(R.string.settings_locked_retry, countdownText(resources, message.remainingMillis))
-    Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
+    Message.DecoyCreated -> resources.getString(R.string.decoy_configured_snack)
+    Message.DecoyDeleted -> resources.getString(R.string.decoy_deleted_snack)
+    Message.DecoyImpossible -> resources.getString(R.string.decoy_error_impossible)
     else -> fileMessageText(resources, message)
 }
 

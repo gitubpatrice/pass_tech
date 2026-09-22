@@ -276,6 +276,28 @@
     <string name="settings_biometric_decoy_conflict">Biometric unlock is unavailable on this vault. Only your master password opens it.</string>
     <string name="settings_biometric_new_enrollment_warning">If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.</string>
     <string name="change_password_done_biometric_reset">Password changed. Biometric unlock has been disabled — re-enable it in Settings.</string>
+    <!-- Decoy vault (2.7.1 settings_screen.dart:522-730) -->
+    <string name="settings_section_decoy">Decoy vault (anti-coercion)</string>
+    <string name="decoy_tile_setup">Set up a decoy vault</string>
+    <string name="decoy_tile_configured">Decoy vault set up</string>
+    <string name="decoy_tile_subtitle">A second password opens a fake vault. If someone forces you to open the app, give the fake one.</string>
+    <string name="decoy_dialog_title">Decoy vault</string>
+    <!-- Third bullet reworded for 3.0.0: biometrics stays off for as long as the decoy exists, it is not
+         merely turned off once. -->
+    <string name="decoy_setup_body">A decoy vault is a second, fully separate vault unlocked with a different password.\n\nUse case: if someone forces you to open Pass Tech (border, assault, control), you give the decoy password. The app then shows a fake vault — it is cryptographically impossible to prove the real one exists.\n\nKeep in mind:\n• The decoy password must differ from the real one\n• Fill the decoy with a few credible entries\n• Biometric unlock will be turned off, and stays off for as long as a decoy exists: the fingerprint opens the real vault directly, which would defeat the decoy</string>
+    <!-- Shown only when a fingerprint opens THIS vault: no vault ever says anything about another (design v2.3 §1). -->
+    <string name="decoy_setup_biometric_warning">Setting up a decoy vault will turn off biometric unlock. The fingerprint opens the real vault directly, so it would defeat the decoy in the very situation the decoy is for. You can still unlock with your master password.</string>
+    <string name="decoy_configure">Set up</string>
+    <string name="decoy_password_dialog_title">Decoy vault password</string>
+    <string name="decoy_password_label">Decoy password (min. 12)</string>
+    <!-- 2.7.1 added "unlock again to continue": it locked the vault, this does not. -->
+    <string name="decoy_configured_snack">Decoy vault set up ✓</string>
+    <string name="decoy_manage_body">The decoy vault is active.\n\nYou can delete it (silent action for the attacker — they will think they mistyped the password).</string>
+    <string name="decoy_delete">Delete the decoy</string>
+    <string name="decoy_deleted_snack">Decoy vault deleted</string>
+    <!-- New in 3.0.0: no slot is provably free. The same words the creation form gives. -->
+    <string name="decoy_error_impossible">A decoy vault cannot be created on this phone.</string>
+
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
     <string name="settings_section_data">Data</string>
     <string name="settings_backup_encrypted_title">Encrypted backup (.ptbak)</string>

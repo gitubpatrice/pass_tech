@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -89,6 +90,13 @@ class SettingsViewModel @Inject constructor(
         /** This vault has a decoy, or cannot rule one out: the same words from every vault (2.7.1). */
         data object BiometricsRefused : Message
 
+        data object DecoyCreated : Message
+
+        data object DecoyDeleted : Message
+
+        /** No slot is provably free. The same words a creation gives, and says nothing more. */
+        data object DecoyImpossible : Message
+
         data object BackupSaved : Message
 
         data object ExportSaved : Message
@@ -138,6 +146,15 @@ class SettingsViewModel @Inject constructor(
     val biometrics: StateFlow<BiometricUi> = combine(biometricAvailable, vault.state) { available, vaultState ->
         BiometricUi(available, (vaultState as? VaultManager.State.Open)?.biometrics ?: BiometricStatus.OFF)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, BiometricUi())
+
+    /**
+     * Whether this vault already has a decoy, or cannot rule one out: the tile then offers to delete
+     * it instead of creating one. Read from the open vault, never from a setting: a vault only ever
+     * knows about the decoy it made itself (design v2 §3).
+     */
+    val hasDecoy: StateFlow<Boolean> = vault.state
+        .map { (it as? VaultManager.State.Open)?.hasDecoy == true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val promptChannel = Channel<Cipher>(Channel.CONFLATED)
 
@@ -206,6 +223,32 @@ class SettingsViewModel @Inject constructor(
             is ChangeOutcome.Locked -> Message.Locked(outcome.remainingMillis)
             ChangeOutcome.KeystoreUnavailable -> Message.KeystoreUnavailable
             // Locked in the meantime: the screen is gone with the vault.
+            null -> null
+        }
+    }
+
+    /**
+     * Creates the decoy vault (2.7.1, `settings_screen.dart:522-677`). The chosen password is refused
+     * if it opens a vault that already exists — the current one included, and never said which.
+     */
+    fun configureDecoy(password: String) = operate {
+        when (val outcome = vault.configureDecoy(password.encodeToByteArray())) {
+            VaultManager.DecoyOutcome.Created -> Message.DecoyCreated
+            VaultManager.DecoyOutcome.PasswordRefused -> Message.PasswordRefused
+            VaultManager.DecoyOutcome.Impossible -> Message.DecoyImpossible
+            is VaultManager.DecoyOutcome.Locked -> Message.Locked(outcome.remainingMillis)
+            VaultManager.DecoyOutcome.KeystoreUnavailable -> Message.KeystoreUnavailable
+            null -> null
+        }
+    }
+
+    /** Deletes it, with no re-authentication, as 2.7.1 does: the vault is open and nothing of it is lost. */
+    fun deleteDecoy() = operate {
+        when (vault.deleteDecoy()) {
+            VaultManager.DecoyDeleteOutcome.Deleted -> Message.DecoyDeleted
+            // The tile already went back to "set up": nothing to say.
+            VaultManager.DecoyDeleteOutcome.NotConfigured -> null
+            VaultManager.DecoyDeleteOutcome.KeystoreUnavailable -> Message.KeystoreUnavailable
             null -> null
         }
     }
@@ -396,13 +439,14 @@ class SettingsViewModel @Inject constructor(
         private const val PLAIN_MIME = "application/json"
 
         /** The change dialog's checks, in 2.7.1's order: current given, the rule on the new one, the confirmation. */
-        fun checkChange(current: String, new: String, confirmation: String): ChangeProblem? = when {
-            current.isEmpty() -> ChangeProblem.CURRENT_REQUIRED
-            else -> when (PasswordPolicy.check(new)) {
-                PasswordPolicy.Rejection.TOO_SHORT -> ChangeProblem.TOO_SHORT
-                PasswordPolicy.Rejection.TOO_WEAK -> ChangeProblem.TOO_WEAK
-                null -> if (new != confirmation) ChangeProblem.MISMATCH else null
-            }
+        fun checkChange(current: String, new: String, confirmation: String): ChangeProblem? =
+            if (current.isEmpty()) ChangeProblem.CURRENT_REQUIRED else checkNewPassword(new, confirmation)
+
+        /** The same rule everywhere a password is chosen: the creation form, the change dialog, the decoy. */
+        fun checkNewPassword(new: String, confirmation: String): ChangeProblem? = when (PasswordPolicy.check(new)) {
+            PasswordPolicy.Rejection.TOO_SHORT -> ChangeProblem.TOO_SHORT
+            PasswordPolicy.Rejection.TOO_WEAK -> ChangeProblem.TOO_WEAK
+            null -> if (new != confirmation) ChangeProblem.MISMATCH else null
         }
     }
 }

@@ -99,6 +99,21 @@ class VaultManagerTest {
     }
 
     @Test
+    fun `deleting the decoy leaves the vault open and its tile back to not configured`() = runTest {
+        manager.openOrCreate(owner())
+        manager.updateEntries { it + entry("bank") }
+        manager.configureDecoy(decoy())
+        assertThat(manager.deleteDecoy()).isEqualTo(VaultManager.DecoyDeleteOutcome.Deleted)
+
+        assertThat(open().hasDecoy).isFalse()
+        assertThat(titles()).containsExactly("bank")
+        assertThat(manager.deleteDecoy()).isEqualTo(VaultManager.DecoyDeleteOutcome.NotConfigured)
+        manager.lock()
+        assertThat(manager.unlock(decoy())).isEqualTo(UnlockOutcome.WrongPassword)
+        assertThat(manager.unlock(owner())).isEqualTo(UnlockOutcome.Opened)
+    }
+
+    @Test
     fun `a decoy the Keystore interrupts locks the vault, which then opens as it is on disk`() = runTest {
         manager.openOrCreate(owner())
         manager.updateEntries { it + entry("bank") }
@@ -125,6 +140,7 @@ class VaultManagerTest {
         manager.lock()
         assertThat(manager.updateEntries { it + entry("lost") }).isFalse()
         assertThat(manager.configureDecoy(decoy())).isNull()
+        assertThat(manager.deleteDecoy()).isNull()
         assertThat(manager.verifyPassword(owner())).isNull()
         assertThat(manager.changePassword(owner(), decoy())).isNull()
         assertThat(manager.unlock(owner())).isEqualTo(UnlockOutcome.Opened)

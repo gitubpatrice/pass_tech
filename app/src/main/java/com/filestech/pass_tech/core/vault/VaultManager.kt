@@ -98,6 +98,16 @@ class VaultManager @Inject constructor(
         data object KeystoreUnavailable : DecoyOutcome
     }
 
+    sealed interface DecoyDeleteOutcome {
+        data object Deleted : DecoyDeleteOutcome
+
+        /** There was no decoy left to delete: the screen simply shows the tile again. */
+        data object NotConfigured : DecoyDeleteOutcome
+
+        /** Nothing was written: a decoy may exist that this call could not prove. */
+        data object KeystoreUnavailable : DecoyDeleteOutcome
+    }
+
     sealed interface ChangeOutcome {
         /** [biometricsDisarmed]: a fingerprint opened this vault, and must be enabled again (2.7.1 says so). */
         data class Changed(val biometricsDisarmed: Boolean) : ChangeOutcome
@@ -229,6 +239,25 @@ class VaultManager @Inject constructor(
                         close()
                         DecoyOutcome.KeystoreUnavailable
                     }
+                }
+            }
+        }
+
+    /** Returns `null`, doing nothing, if no vault is open. See [VaultRepository.deleteDecoy]. */
+    suspend fun deleteDecoy(): DecoyDeleteOutcome? =
+        serialized {
+            session?.let { current ->
+                when (val result = repository.deleteDecoy(current)) {
+                    is VaultRepository.DecoyDeleteResult.Deleted -> {
+                        advance(result.parent)
+                        DecoyDeleteOutcome.Deleted
+                    }
+                    // Whatever the screen showed, the state it reads is republished: the tile follows.
+                    VaultRepository.DecoyDeleteResult.NotConfigured -> {
+                        publish()
+                        DecoyDeleteOutcome.NotConfigured
+                    }
+                    VaultRepository.DecoyDeleteResult.KeystoreUnavailable -> DecoyDeleteOutcome.KeystoreUnavailable
                 }
             }
         }

@@ -182,6 +182,57 @@ class SettingsViewModelTest {
         }
     }
 
+    @Test
+    fun `the decoy tile follows the vault, and its password opens the decoy and nothing else`() = runTest {
+        opened { settings, vault, _ ->
+            assertThat(settings.hasDecoy.value).isFalse()
+            settings.configureDecoy("cerisetambourlune2028")
+            assertThat(settings.nextMessage()).isEqualTo(Message.DecoyCreated)
+            assertThat(settings.hasDecoy.first { it }).isTrue()
+
+            settings.idle()
+            vault.lock()
+            assertThat(vault.unlock("cerisetambourlune2028".encodeToByteArray())).isEqualTo(VaultManager.UnlockOutcome.Opened)
+            // Inside the decoy the tile reads "set up": a vault only knows the decoy it made itself.
+            assertThat(settings.hasDecoy.first { !it }).isFalse()
+        }
+    }
+
+    @Test
+    fun `a decoy password that opens a vault is refused, with words that do not say which`() = runTest {
+        opened { settings, _, _ ->
+            settings.configureDecoy(owner)
+            assertThat(settings.nextMessage()).isEqualTo(Message.PasswordRefused)
+            assertThat(settings.hasDecoy.value).isFalse()
+        }
+    }
+
+    @Test
+    fun `deleting the decoy keeps the vault open and frees its password`() = runTest {
+        opened { settings, vault, _ ->
+            settings.configureDecoy("cerisetambourlune2028")
+            assertThat(settings.nextMessage()).isEqualTo(Message.DecoyCreated)
+            settings.idle()
+
+            settings.deleteDecoy()
+            assertThat(settings.nextMessage()).isEqualTo(Message.DecoyDeleted)
+            assertThat(settings.hasDecoy.first { !it }).isFalse()
+            assertThat(vault.state.value).isInstanceOf(VaultManager.State.Open::class.java)
+            // Deleting a decoy is not deleting one's own data: no creation form follows.
+            assertThat(vault.entryMode()).isEqualTo(VaultRepository.EntryMode.UNLOCK)
+            vault.lock()
+            assertThat(vault.unlock("cerisetambourlune2028".encodeToByteArray())).isEqualTo(VaultManager.UnlockOutcome.WrongPassword)
+        }
+    }
+
+    @Test
+    fun `a decoy password follows the same rule as every other password`() {
+        assertThat(SettingsViewModel.checkNewPassword("court", "court")).isEqualTo(ChangeProblem.TOO_SHORT)
+        assertThat(SettingsViewModel.checkNewPassword("aaaaaaaaaaaa", "aaaaaaaaaaaa")).isEqualTo(ChangeProblem.TOO_WEAK)
+        assertThat(SettingsViewModel.checkNewPassword(next, next + "x")).isEqualTo(ChangeProblem.MISMATCH)
+        assertThat(SettingsViewModel.checkNewPassword(next, next)).isNull()
+    }
+
     /** Turns the switch on, and answers the prompt with [result]. */
     private suspend fun SettingsViewModel.enable(result: (Cipher) -> PromptResult) {
         enableBiometrics()
