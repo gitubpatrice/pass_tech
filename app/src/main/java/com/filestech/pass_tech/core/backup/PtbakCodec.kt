@@ -95,6 +95,14 @@ object PtbakCodec {
     }
 
     /**
+     * Whether a file the owner picked is a backup: its name, or its own magic word, as 2.7.1 decides it.
+     * Only the passphrase then tells whether it really is one.
+     */
+    fun looksLikeBackup(fileName: String, content: String): Boolean =
+        fileName.endsWith(".ptbak", ignoreCase = true) ||
+            readOrNull { (json.parseToJsonElement(content) as? JsonObject).orReject().optString("magic") } == MAGIC
+
+    /**
      * @return the decrypted entries, or `null` if the passphrase is wrong or the file is damaged,
      * forged or not a backup. Those cases are deliberately indistinguishable, as in the Flutter app.
      *

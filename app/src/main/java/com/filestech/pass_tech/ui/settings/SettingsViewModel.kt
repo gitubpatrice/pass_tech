@@ -1,10 +1,17 @@
 package com.filestech.pass_tech.ui.settings
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.filestech.pass_tech.core.backup.DocumentStore
+import com.filestech.pass_tech.core.backup.ImportParser
+import com.filestech.pass_tech.core.backup.PtbakCodec
 import com.filestech.pass_tech.core.biometric.BiometricSupport
+import com.filestech.pass_tech.core.di.IoDispatcher
+import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.password.PasswordPolicy
 import com.filestech.pass_tech.core.settings.AppPreferences
+import com.filestech.pass_tech.core.vault.AutoLock
 import com.filestech.pass_tech.core.vault.KeystoreUnavailableException
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultManager.ArmOutcome
@@ -14,15 +21,19 @@ import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import com.filestech.pass_tech.core.vault.VaultRepository.CheckResult
 import com.filestech.pass_tech.ui.components.PromptResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import javax.crypto.Cipher
 import javax.inject.Inject
 
@@ -38,6 +49,9 @@ class SettingsViewModel @Inject constructor(
     private val vault: VaultManager,
     private val preferences: AppPreferences,
     private val biometricSupport: BiometricSupport,
+    private val documents: DocumentStore,
+    private val autoLock: AutoLock,
+    @IoDispatcher private val io: CoroutineDispatcher,
 ) : ViewModel() {
 
     data class UiState(
@@ -74,6 +88,26 @@ class SettingsViewModel @Inject constructor(
 
         /** This vault has a decoy, or cannot rule one out: the same words from every vault (2.7.1). */
         data object BiometricsRefused : Message
+
+        data object BackupSaved : Message
+
+        data object ExportSaved : Message
+
+        data object FileWriteError : Message
+
+        data object ImportUnreadable : Message
+
+        data object ImportTooLarge : Message
+
+        /** The file was read, and refused: the parser says why, the screen says it in words. */
+        class ImportFailed(val problem: ImportParser.Problem) : Message
+
+        data object ImportNoEntry : Message
+
+        /** A wrong passphrase and a damaged backup are the same answer, as in 2.7.1. */
+        data object WrongPassphrase : Message
+
+        class Imported(val added: Int, val skipped: Int) : Message
 
         data object WrongPassword : Message
 
@@ -197,6 +231,149 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** A file the owner picked, waiting for something only they can give. */
+    sealed interface Pending {
+        /** An encrypted backup: its passphrase is needed before anything can be read. */
+        class Passphrase(val content: String) : Pending
+
+        /** What a file holds, waiting for the owner to confirm the merge. Cleared when the vault locks. */
+        class Confirm(val entries: List<Entry>, val format: ImportParser.Format?) : Pending
+    }
+
+    /** Where a file is to be written: the system asks the owner, the app never chooses a folder. */
+    class SaveRequest(val kind: Kind, val suggestedName: String, val mimeType: String)
+
+    enum class Kind { BACKUP, PLAIN }
+
+    private val mutablePending = MutableStateFlow<Pending?>(null)
+    val pending: StateFlow<Pending?> = mutablePending.asStateFlow()
+
+    private val saveChannel = Channel<SaveRequest>(Channel.CONFLATED)
+
+    /** Where the screen must ask the system to create a document. */
+    val saveRequests: Flow<SaveRequest> = saveChannel.receiveAsFlow()
+
+    /** Kept only between the passphrase dialog and the moment the file is written. */
+    private var backupPassphrase: String? = null
+
+    // After the fields it touches, never before: on a phone this collection starts inside the
+    // constructor (Main is immediate there), and it crashed on a field that did not exist yet.
+    init {
+        // A file read but not yet merged never outlives the vault it was going into.
+        viewModelScope.launch {
+            vault.state.collect { state ->
+                if (state == VaultManager.State.Locked) {
+                    mutablePending.value = null
+                    backupPassphrase = null
+                }
+            }
+        }
+    }
+
+    /** The passphrase of a backup, then the system asks where to write it. */
+    fun startBackup(passphrase: String) {
+        backupPassphrase = passphrase
+        saveChannel.trySend(SaveRequest(Kind.BACKUP, "pass_tech_${today()}.ptbak", BACKUP_MIME))
+    }
+
+    /**
+     * The master password, then the system asks where to write the plain export (2.7.1: the warning
+     * first, then this). A failed check counts against the lockout, like every other check.
+     */
+    fun startPlainExport(master: String) = operate {
+        when (val check = vault.verifyPassword(master.encodeToByteArray())) {
+            CheckResult.Correct -> {
+                saveChannel.trySend(SaveRequest(Kind.PLAIN, "pass_tech_export.json", PLAIN_MIME))
+                null
+            }
+            CheckResult.Wrong -> Message.WrongPassword
+            is CheckResult.Locked -> Message.Locked(check.remainingMillis)
+            CheckResult.KeystoreUnavailable -> Message.KeystoreUnavailable
+            null -> null
+        }
+    }
+
+    /** Writes into the document the owner chose. The passphrase is forgotten either way. */
+    fun saveTo(kind: Kind, uri: Uri) = operate {
+        val passphrase = backupPassphrase
+        backupPassphrase = null
+        val content = when (kind) {
+            Kind.BACKUP -> passphrase?.let { vault.exportBackup(it) }
+            Kind.PLAIN -> vault.exportPlain()
+        }
+        when {
+            // Locked in the meantime: the screen is gone with the vault.
+            content == null -> null
+            !withContext(io) { documents.write(uri, content) } -> Message.FileWriteError
+            kind == Kind.BACKUP -> Message.BackupSaved
+            else -> Message.ExportSaved
+        }
+    }
+
+    /**
+     * Reads the file the owner picked. [untitled] is the title given to an entry that has none, in the
+     * language the app speaks now: it is written into the vault (2.7.1 v2.7.0).
+     */
+    fun importFrom(uri: Uri, untitled: String) = operate {
+        when (val read = withContext(io) { documents.read(uri, ImportParser.MAX_FILE_CHARS.toLong()) }) {
+            is DocumentStore.Read.TooLarge -> Message.ImportTooLarge
+            DocumentStore.Read.Unreadable -> Message.ImportUnreadable
+            is DocumentStore.Read.Text -> readFile(read.name, read.content, untitled)
+        }
+    }
+
+    /** What a file holds, once it is read: the half of the import that does not touch storage. */
+    internal suspend fun readFile(name: String, content: String, untitled: String): Message? {
+        if (PtbakCodec.looksLikeBackup(name, content)) {
+            mutablePending.value = Pending.Passphrase(content)
+            return null
+        }
+        val result = withContext(io) { ImportParser.parse(content, untitled) }
+        return when {
+            result.problem != null -> Message.ImportFailed(result.problem)
+            result.entries.isEmpty() -> Message.ImportNoEntry
+            else -> {
+                mutablePending.value = Pending.Confirm(result.entries, result.format)
+                null
+            }
+        }
+    }
+
+    /** Opens the backup the owner picked. A wrong passphrase and a damaged file answer the same way. */
+    fun openBackup(passphrase: String) = operate {
+        val content = (mutablePending.value as? Pending.Passphrase)?.content ?: return@operate null
+        mutablePending.value = null
+        val imported = withContext(io) { PtbakCodec.import(content, passphrase) }
+        when {
+            imported == null -> Message.WrongPassphrase
+            imported.entries.isEmpty() -> Message.ImportNoEntry
+            else -> {
+                mutablePending.value = Pending.Confirm(imported.entries, null)
+                null
+            }
+        }
+    }
+
+    /** Merges what was read, once the owner has seen how many entries and in which format. */
+    fun confirmImport() = operate {
+        val entries = (mutablePending.value as? Pending.Confirm)?.entries ?: return@operate null
+        mutablePending.value = null
+        try {
+            vault.importEntries(entries)?.let { Message.Imported(it.added, it.skipped) }
+        } catch (_: KeystoreUnavailableException) {
+            Message.KeystoreUnavailable
+        }
+    }
+
+    fun cancelImport() {
+        mutablePending.value = null
+    }
+
+    /** Announced before the system picker opens, so that the trip out of the app does not lock the vault. */
+    fun expectFilePicker() = autoLock.systemScreenExpected()
+
+    private fun today(): String = LocalDate.now().toString()
+
     private fun save(write: suspend () -> Unit) {
         viewModelScope.launch { write() }
     }
@@ -215,6 +392,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     companion object {
+        private const val BACKUP_MIME = "application/octet-stream"
+        private const val PLAIN_MIME = "application/json"
+
         /** The change dialog's checks, in 2.7.1's order: current given, the rule on the new one, the confirmation. */
         fun checkChange(current: String, new: String, confirmation: String): ChangeProblem? = when {
             current.isEmpty() -> ChangeProblem.CURRENT_REQUIRED

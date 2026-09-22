@@ -1,5 +1,7 @@
 package com.filestech.pass_tech.core.vault
 
+import com.filestech.pass_tech.core.backup.PlainExport
+import com.filestech.pass_tech.core.backup.PtbakCodec
 import com.filestech.pass_tech.core.crypto.wipe
 import com.filestech.pass_tech.core.di.IoDispatcher
 import com.filestech.pass_tech.core.model.Entry
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.UUID
 import javax.crypto.Cipher
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -107,6 +110,8 @@ class VaultManager @Inject constructor(
 
         data object KeystoreUnavailable : ChangeOutcome
     }
+
+    class ImportOutcome(val added: Int, val skipped: Int)
 
     sealed interface ArmStart {
         /** The system prompt authenticates [cipher], then [armBiometrics] takes it. */
@@ -332,6 +337,46 @@ class VaultManager @Inject constructor(
                 VaultRepository.BiometricUnlockResult.KeystoreUnavailable -> BiometricOutcome.KeystoreUnavailable
             }
         }
+
+    /**
+     * Merges [incoming] into the open vault, in ONE write (2.7.1 saved the vault once per entry).
+     *
+     * An entry whose title AND username already exist in the vault, whatever their case, is skipped:
+     * importing the same file twice adds nothing. Duplicates INSIDE one file are both kept, as in 2.7.1,
+     * which compares against the vault as it was before the import.
+     *
+     * An id that would collide gets a new one (2.7.1 kept the file's id, so an entry could share an id
+     * with one already there, and deleting either deleted both). Returns `null` if no vault is open.
+     */
+    suspend fun importEntries(incoming: List<Entry>, newId: () -> String = { UUID.randomUUID().toString() }): ImportOutcome? {
+        var outcome: ImportOutcome? = null
+        val saved = updateEntries { current ->
+            val known = current.mapTo(mutableSetOf()) { it.title.lowercase() to it.username.lowercase() }
+            val ids = current.mapTo(mutableSetOf()) { it.id }
+            val kept = mutableListOf<Entry>()
+            var skipped = 0
+            for (entry in incoming) {
+                if (entry.title.lowercase() to entry.username.lowercase() in known) {
+                    skipped++
+                } else {
+                    kept += if (ids.add(entry.id)) entry else entry.copy(id = newId().also(ids::add))
+                }
+            }
+            outcome = ImportOutcome(added = kept.size, skipped = skipped)
+            current + kept
+        }
+        return if (saved) outcome else null
+    }
+
+    /**
+     * The open vault as an encrypted backup, sealed with [passphrase] and nothing else: no Keystore key,
+     * so it opens on any phone, including the Flutter app 2.7.1. `null` if no vault is open.
+     */
+    suspend fun exportBackup(passphrase: String): String? =
+        serialized { session?.let { PtbakCodec.export(it.entries, passphrase) } }
+
+    /** Every secret in clear, for the owner who confirmed twice (2.7.1). `null` if no vault is open. */
+    suspend fun exportPlain(): String? = serialized { session?.let { PlainExport.encode(it.entries) } }
 
     /** Wipes the key and forgets the entries. Waits for the operation in progress, if any. */
     suspend fun lock() {

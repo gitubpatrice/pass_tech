@@ -168,4 +168,76 @@ class AutoLockTest {
             assertThat(settled(setup.vault)).isEqualTo(VaultManager.State.Locked)
         }
     }
+
+    @Test
+    fun `a file picker keeps the vault open, even with the immediate delay`() = runTest {
+        opened(seconds = 0) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            autoLock.wentToBackground()
+            clock.now += 20_000
+            advanceTimeBy(20_000)
+            // No background timer either: the picker is still in front of the owner.
+            assertThat(settled(vault).isOpen()).isTrue()
+            autoLock.cameToForeground()
+            assertThat(settled(vault).isOpen()).isTrue()
+        }
+    }
+
+    @Test
+    fun `a picker left for too long locks all the same`() = runTest {
+        opened(seconds = 0) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            autoLock.wentToBackground()
+            clock.now += 121_000
+            advanceTimeBy(121_000)
+            autoLock.cameToForeground()
+            assertThat(settled(vault)).isEqualTo(VaultManager.State.Locked)
+        }
+    }
+
+    @Test
+    fun `a picker announced covers one trip, and only the next one`() = runTest {
+        opened(seconds = 0) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            autoLock.wentToBackground()
+            clock.now += 5_000
+            advanceTimeBy(5_000)
+            autoLock.cameToForeground()
+            assertThat(settled(vault).isOpen()).isTrue()
+
+            // The trip after it is an ordinary one.
+            autoLock.wentToBackground()
+            clock.now += 5_000
+            advanceTimeBy(5_000)
+            autoLock.cameToForeground()
+            assertThat(settled(vault)).isEqualTo(VaultManager.State.Locked)
+        }
+    }
+
+    @Test
+    fun `an announcement that no picker follows protects nothing`() = runTest {
+        opened(seconds = 0) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            // The picker never opened; half a minute later the owner leaves the app for good.
+            clock.now += 31_000
+            advanceTimeBy(31_000)
+            autoLock.wentToBackground()
+            clock.now += 1_000
+            advanceTimeBy(1_000)
+            autoLock.cameToForeground()
+            assertThat(settled(vault)).isEqualTo(VaultManager.State.Locked)
+        }
+    }
+
+    @Test
+    fun `a longer delay is not shortened by a picker`() = runTest {
+        opened(seconds = 1800) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            autoLock.wentToBackground()
+            clock.now += 200_000
+            advanceTimeBy(200_000)
+            autoLock.cameToForeground()
+            assertThat(settled(vault).isOpen()).isTrue()
+        }
+    }
 }

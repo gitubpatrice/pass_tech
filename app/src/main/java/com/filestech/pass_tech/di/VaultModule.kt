@@ -1,6 +1,8 @@
 package com.filestech.pass_tech.di
 
 import android.content.Context
+import com.filestech.pass_tech.core.backup.AndroidDocumentStore
+import com.filestech.pass_tech.core.backup.DocumentStore
 import com.filestech.pass_tech.core.biometric.AndroidBiometricKeys
 import com.filestech.pass_tech.core.biometric.BiometricSupport
 import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
@@ -32,6 +34,10 @@ abstract class VaultModule {
 
     @Binds
     abstract fun slotKeystore(impl: AndroidSlotKeystore): SlotKeystore
+
+    /** The documents the owner picks, through the system picker: nothing else reaches storage. */
+    @Binds
+    abstract fun documentStore(impl: AndroidDocumentStore): DocumentStore
 
     companion object {
 

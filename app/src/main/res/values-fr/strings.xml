@@ -263,4 +263,69 @@
     <string name="settings_biometric_decoy_conflict">Le déverrouillage biométrique est indisponible sur ce coffre. Seul votre mot de passe maître l\'ouvre.</string>
     <string name="settings_biometric_new_enrollment_warning">Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.</string>
     <string name="change_password_done_biometric_reset">Mot de passe changé. Le déverrouillage biométrique a été désactivé — réactivez-le dans Réglages.</string>
+    <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <string name="settings_section_data">Données</string>
+    <string name="settings_backup_encrypted_title">Sauvegarde chiffrée (.ptbak)</string>
+    <string name="settings_backup_encrypted_subtitle">Recommandé — restaurable avec votre passphrase</string>
+    <string name="settings_import_title">Importer un fichier</string>
+    <string name="settings_import_subtitle">CSV, Bitwarden JSON ou .ptbak</string>
+    <string name="settings_export_plain_title">Exporter (JSON non chiffré)</string>
+    <string name="settings_export_plain_subtitle">⚠️ mots de passe en clair</string>
+
+    <string name="passphrase_dialog_encrypt_title">Sauvegarde chiffrée</string>
+    <string name="passphrase_dialog_decrypt_title">Restaurer la sauvegarde</string>
+    <string name="passphrase_dialog_confirm_helper">Choisissez une passphrase pour chiffrer la sauvegarde. Vous en aurez besoin pour restaurer.</string>
+    <string name="passphrase_dialog_enter_helper">Entrez la passphrase utilisée lors de la sauvegarde.</string>
+    <string name="passphrase_label_min">Passphrase (min. 12)</string>
+    <string name="passphrase_label">Passphrase</string>
+    <string name="passphrase_confirm_label">Confirmer</string>
+    <string name="passphrase_error_empty">Passphrase vide</string>
+    <string name="passphrase_error_min">Minimum 12 caractères</string>
+    <string name="passphrase_error_mismatch">Les passphrases ne correspondent pas</string>
+    <string name="passphrase_encrypt_cta">Chiffrer</string>
+    <string name="passphrase_decrypt_cta">Déchiffrer</string>
+
+    <string name="import_untitled_entry">Sans titre</string>
+    <string name="import_confirm_title">Confirmer l\'import</string>
+    <plurals name="import_confirm_body">
+        <item quantity="one">%1$d entrée détectée\nFormat : %2$s\n\nLes doublons (même titre + identifiant) seront ignorés.</item>
+        <item quantity="other">%1$d entrées détectées\nFormat : %2$s\n\nLes doublons (même titre + identifiant) seront ignorés.</item>
+    </plurals>
+    <string name="import_cta">Importer</string>
+    <plurals name="import_done">
+        <item quantity="one">%1$d entrée importée%2$s</item>
+        <item quantity="other">%1$d entrées importées%2$s</item>
+    </plurals>
+    <string name="import_done_none">Aucune entrée importée%1$s</string>
+    <plurals name="import_skipped_suffix">
+        <item quantity="one">" • %1$d doublon ignoré"</item>
+        <item quantity="other">" • %1$d doublons ignorés"</item>
+    </plurals>
+    <string name="import_no_entry">Aucune entrée détectée</string>
+    <string name="import_read_error">Lecture du fichier impossible</string>
+    <string name="import_wrong_passphrase">Passphrase incorrecte ou fichier corrompu</string>
+    <string name="import_format_encrypted_backup">Sauvegarde chiffrée</string>
+    <string name="import_format_csv">CSV (Chrome / Edge / autre)</string>
+    <string name="import_format_bitwarden">Bitwarden JSON</string>
+    <string name="import_format_pass_tech">Pass Tech JSON</string>
+    <string name="import_error_too_large">Fichier trop volumineux (max 50 Mo)</string>
+    <string name="import_error_empty_file">Fichier vide</string>
+    <string name="import_error_json_unknown">Format JSON non reconnu</string>
+    <string name="import_error_json_invalid">JSON invalide</string>
+    <string name="import_error_csv_invalid">CSV invalide</string>
+    <string name="import_error_csv_empty">CSV vide</string>
+    <string name="import_error_csv_no_password_column">Colonne « password » introuvable dans le CSV</string>
+    <string name="import_error_cell_too_large">Cellule CSV trop volumineuse (max 64 Ko)</string>
+
+    <string name="export_plain_dialog_title">Export NON CHIFFRÉ</string>
+    <string name="export_plain_warning_headline">Le fichier exporté contiendra TOUS vos mots de passe EN CLAIR (lisibles par n\'importe qui).</string>
+    <string name="export_plain_warning_bullet1">• Toute application ayant accès au stockage pourra le lire.</string>
+    <string name="export_plain_warning_bullet2">• Si vous le partagez via cloud (Drive, Mail…), il y restera.</string>
+    <string name="export_plain_warning_bullet3">• Supprimez-le IMMÉDIATEMENT après usage.</string>
+    <string name="export_plain_warning_tip">Préférez « Sauvegarde chiffrée (.ptbak) » sauf migration vers un autre gestionnaire.</string>
+    <string name="export_plain_confirm">Exporter en clair</string>
+    <string name="backup_saved">Sauvegarde enregistrée</string>
+    <string name="export_saved">Export enregistré</string>
+    <string name="file_write_error">Enregistrement du fichier impossible</string>
 </resources>
+

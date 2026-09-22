@@ -276,4 +276,68 @@
     <string name="settings_biometric_decoy_conflict">Biometric unlock is unavailable on this vault. Only your master password opens it.</string>
     <string name="settings_biometric_new_enrollment_warning">If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.</string>
     <string name="change_password_done_biometric_reset">Password changed. Biometric unlock has been disabled — re-enable it in Settings.</string>
+    <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <string name="settings_section_data">Data</string>
+    <string name="settings_backup_encrypted_title">Encrypted backup (.ptbak)</string>
+    <string name="settings_backup_encrypted_subtitle">Recommended — restorable with your passphrase</string>
+    <string name="settings_import_title">Import a file</string>
+    <string name="settings_import_subtitle">CSV, Bitwarden JSON or .ptbak</string>
+    <string name="settings_export_plain_title">Export (unencrypted JSON)</string>
+    <string name="settings_export_plain_subtitle">⚠️ passwords in clear text</string>
+
+    <string name="passphrase_dialog_encrypt_title">Encrypted backup</string>
+    <string name="passphrase_dialog_decrypt_title">Restore backup</string>
+    <string name="passphrase_dialog_confirm_helper">Pick a passphrase to encrypt the backup. You will need it to restore.</string>
+    <string name="passphrase_dialog_enter_helper">Enter the passphrase used when the backup was made.</string>
+    <string name="passphrase_label_min">Passphrase (min. 12)</string>
+    <string name="passphrase_label">Passphrase</string>
+    <string name="passphrase_confirm_label">Confirm</string>
+    <string name="passphrase_error_empty">Empty passphrase</string>
+    <string name="passphrase_error_min">Minimum 12 characters</string>
+    <string name="passphrase_error_mismatch">Passphrases do not match</string>
+    <string name="passphrase_encrypt_cta">Encrypt</string>
+    <string name="passphrase_decrypt_cta">Decrypt</string>
+
+    <string name="import_untitled_entry">Untitled</string>
+    <string name="import_confirm_title">Confirm import</string>
+    <plurals name="import_confirm_body">
+        <item quantity="one">1 entry detected\nFormat: %2$s\n\nDuplicates (same title + username) will be ignored.</item>
+        <item quantity="other">%1$d entries detected\nFormat: %2$s\n\nDuplicates (same title + username) will be ignored.</item>
+    </plurals>
+    <string name="import_cta">Import</string>
+    <plurals name="import_done">
+        <item quantity="one">1 entry imported%2$s</item>
+        <item quantity="other">%1$d entries imported%2$s</item>
+    </plurals>
+    <string name="import_done_none">No entry imported%1$s</string>
+    <plurals name="import_skipped_suffix">
+        <item quantity="one">" • %1$d duplicate ignored"</item>
+        <item quantity="other">" • %1$d duplicates ignored"</item>
+    </plurals>
+    <string name="import_no_entry">No entry detected</string>
+    <string name="import_read_error">Cannot read the file</string>
+    <string name="import_wrong_passphrase">Wrong password or corrupted file</string>
+    <string name="import_format_encrypted_backup">Encrypted backup</string>
+    <string name="import_format_csv">CSV (Chrome / Edge / other)</string>
+    <string name="import_format_bitwarden">Bitwarden JSON</string>
+    <string name="import_format_pass_tech">Pass Tech JSON</string>
+    <string name="import_error_too_large">File too large (max 50 MB)</string>
+    <string name="import_error_empty_file">Empty file</string>
+    <string name="import_error_json_unknown">Unrecognised JSON format</string>
+    <string name="import_error_json_invalid">Invalid JSON</string>
+    <string name="import_error_csv_invalid">Invalid CSV</string>
+    <string name="import_error_csv_empty">Empty CSV</string>
+    <string name="import_error_csv_no_password_column">No \"password\" column found in the CSV</string>
+    <string name="import_error_cell_too_large">CSV cell too large (max 64 KB)</string>
+
+    <string name="export_plain_dialog_title">UNENCRYPTED export</string>
+    <string name="export_plain_warning_headline">The exported file will contain ALL your passwords IN CLEAR TEXT (readable by anyone).</string>
+    <string name="export_plain_warning_bullet1">• Any app with storage access will be able to read it.</string>
+    <string name="export_plain_warning_bullet2">• If you share it via cloud (Drive, Mail…), it will stay there.</string>
+    <string name="export_plain_warning_bullet3">• Delete it IMMEDIATELY after use.</string>
+    <string name="export_plain_warning_tip">Prefer \"Encrypted backup (.ptbak)\" unless migrating to another manager.</string>
+    <string name="export_plain_confirm">Export in clear</string>
+    <string name="backup_saved">Backup saved</string>
+    <string name="export_saved">Export saved</string>
+    <string name="file_write_error">Could not save the file</string>
 </resources>

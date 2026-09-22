@@ -61,6 +61,25 @@ class AutoLock internal constructor(
     private var leftAt: Long? = null
     private var timer: Job? = null
 
+    /** When a system screen was announced, on [Clock.elapsedMillis]; `null` when none is expected. */
+    private var systemScreenAt: Long? = null
+
+    /** Whether the trip the app is on was announced. */
+    private var systemScreenTrip = false
+
+    /**
+     * Announces that the system is about to take the screen, at the owner's request: the file picker.
+     * The app leaves the foreground for a moment it asked for, so the vault does not lock at once, as it
+     * would with the immediate delay (2.7.1 locks there, and the import is lost with it).
+     *
+     * It buys a short delay, never an open vault: past [SYSTEM_SCREEN_GRACE_MILLIS] away, a lock that was
+     * due happens all the same. And it only covers the very next trip, within [ANNOUNCE_GRACE_MILLIS]:
+     * a picker that never opens protects nothing.
+     */
+    fun systemScreenExpected() {
+        systemScreenAt = clock.elapsedMillis()
+    }
+
     override fun onStop(owner: LifecycleOwner) = wentToBackground()
 
     override fun onStart(owner: LifecycleOwner) = cameToForeground()
@@ -70,6 +89,11 @@ class AutoLock internal constructor(
         val at = clock.elapsedMillis()
         leftAt = at
         timer?.cancel()
+        val announced = systemScreenAt
+        systemScreenAt = null
+        systemScreenTrip = announced != null && at - announced <= ANNOUNCE_GRACE_MILLIS
+        // No timer on an announced trip: the picker would otherwise lock the vault behind it.
+        if (systemScreenTrip) return
         val seconds = delaySeconds.value
         if (seconds == AppPreferences.NEVER) return
         timer = scope.launch {
@@ -88,6 +112,10 @@ class AutoLock internal constructor(
         timer = null
         val at = leftAt ?: return
         leftAt = null
+        val announced = systemScreenTrip
+        systemScreenTrip = false
+        // Back from a file picker: a lock that was due waits, but only for a moment.
+        if (announced && clock.elapsedMillis() - at <= SYSTEM_SCREEN_GRACE_MILLIS) return
         if (isDue(at)) {
             mutableLocking.value = true
             scope.launch {
@@ -113,5 +141,11 @@ class AutoLock internal constructor(
 
         /** How often the background timer looks at the clock again. */
         const val CHECK_MILLIS = 15_000L
+
+        /** How long an announced system screen may keep a due lock waiting. */
+        const val SYSTEM_SCREEN_GRACE_MILLIS = 2 * 60 * 1_000L
+
+        /** How long an announcement lasts before the next trip counts as an ordinary one. */
+        const val ANNOUNCE_GRACE_MILLIS = 30 * 1_000L
     }
 }
