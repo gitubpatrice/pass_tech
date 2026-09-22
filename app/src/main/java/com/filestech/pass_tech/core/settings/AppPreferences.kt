@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -29,7 +30,28 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         store.edit { it[SPLASH_SHOWN] = true }
     }
 
-    private companion object {
-        val SPLASH_SHOWN = booleanPreferencesKey("splash_shown")
+    /**
+     * How long the vault stays open once the app is left, in seconds: one of [AUTO_LOCK_CHOICES]. A value
+     * that is not one of them (a damaged or hand-edited file) reads as the default, never as [NEVER].
+     */
+    val autoLockSeconds: Flow<Int> = data.map { prefs -> prefs[AUTO_LOCK]?.takeIf { it in AUTO_LOCK_CHOICES } ?: AUTO_LOCK_DEFAULT }
+
+    suspend fun setAutoLockSeconds(seconds: Int) {
+        require(seconds in AUTO_LOCK_CHOICES) { "Not an auto-lock choice: $seconds" }
+        store.edit { it[AUTO_LOCK] = seconds }
+    }
+
+    companion object {
+        /** The vault never locks by itself. */
+        const val NEVER = -1
+
+        /** 2.7.1's choices: immediately, 1, 5, 15 or 30 minutes, never. */
+        val AUTO_LOCK_CHOICES = listOf(0, 60, 300, 900, 1800, NEVER)
+
+        /** 2.7.1's default: 5 minutes. */
+        const val AUTO_LOCK_DEFAULT = 300
+
+        private val SPLASH_SHOWN = booleanPreferencesKey("splash_shown")
+        private val AUTO_LOCK = intPreferencesKey("auto_lock_seconds")
     }
 }

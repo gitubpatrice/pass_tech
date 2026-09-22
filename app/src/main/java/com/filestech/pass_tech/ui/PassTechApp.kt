@@ -1,5 +1,6 @@
 package com.filestech.pass_tech.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,14 +38,18 @@ import com.filestech.pass_tech.ui.splash.SplashViewModel
 @Composable
 fun PassTechApp(app: AppViewModel, entry: EntryViewModel, splash: SplashViewModel) {
     val vaultState by app.vaultState.collectAsStateWithLifecycle()
+    val locking by app.locking.collectAsStateWithLifecycle()
     val entryState by entry.state.collectAsStateWithLifecycle()
     val showSplash by splash.shouldShow.collectAsStateWithLifecycle()
     var splashDismissed by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        when (val state = vaultState) {
-            VaultManager.State.Locked -> EntryScreen(entry)
-            is VaultManager.State.Open -> HomeScreen(entries = state.entries, onLock = app::lock)
+        val state = vaultState
+        when {
+            // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
+            locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+            state is VaultManager.State.Open -> HomeScreen(entries = state.entries, onLock = app::lock)
+            else -> EntryScreen(entry)
         }
         if (showSplash == true && !splashDismissed) {
             SplashScreen(
