@@ -76,7 +76,9 @@ class SettingsViewModelTest {
 
     private suspend fun TestScope.opened(block: suspend TestScope.(SettingsViewModel, VaultManager, AppPreferences) -> Unit) {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        // The settings store on the test scheduler too: nothing of it is left running on a real thread,
+        // where it would come back to a Main that no longer exists (the CI caught that twice today).
+        val storeScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
         // The view model lives in a store, cleared at the end like a screen that goes away: its
         // collection of the settings stops before Main is reset.
         val viewModels = ViewModelStore()
@@ -111,9 +113,9 @@ class SettingsViewModelTest {
             block(settings, vault, preferences)
         } finally {
             viewModels.clear()
+            storeScope.cancel()
             testScheduler.advanceUntilIdle()
             Dispatchers.resetMain()
-            storeScope.cancel()
         }
     }
 
@@ -237,7 +239,7 @@ class SettingsViewModelTest {
     @Test
     fun `the view model can be built on a main thread that runs at once`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val storeScope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
         val viewModels = ViewModelStore()
         try {
             val keystore = InMemorySlotKeystore()
@@ -265,9 +267,9 @@ class SettingsViewModelTest {
             assertThat(settings.pending.value).isNull()
         } finally {
             viewModels.clear()
+            storeScope.cancel()
             testScheduler.advanceUntilIdle()
             Dispatchers.resetMain()
-            storeScope.cancel()
         }
     }
 

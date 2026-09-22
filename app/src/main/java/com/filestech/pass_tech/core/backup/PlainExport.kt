@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonArray
  */
 object PlainExport {
 
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     private val json = Json {
         prettyPrint = true
         prettyPrintIndent = "  "
