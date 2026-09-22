@@ -143,10 +143,10 @@ class VaultRepositoryTest {
         repeat(5) { assertThat(repo.unlock(wrong)).isEqualTo(VaultRepository.UnlockResult.WrongPassword) }
         val state = File(dir, StateStore.FILE_NAME)
         val before = state.readText()
-        keystore.unavailable += StateStore.KEY_ALIAS
+        keystore.unreadable += StateStore.KEY_ALIAS
         assertThat(repo.unlock(password)).isEqualTo(VaultRepository.UnlockResult.KeystoreUnavailable)
         assertThat(state.readText()).isEqualTo(before)
-        keystore.unavailable.clear()
+        keystore.unreadable.clear()
         // The five failures are still there: the sixth locks.
         assertThat(repo.unlock(wrong)).isEqualTo(VaultRepository.UnlockResult.WrongPassword)
         assertThat(repo.unlock(password)).isInstanceOf(VaultRepository.UnlockResult.Locked::class.java)

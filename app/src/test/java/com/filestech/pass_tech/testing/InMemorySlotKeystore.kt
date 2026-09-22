@@ -30,6 +30,13 @@ class InMemorySlotKeystore : SlotKeystore {
     /** Aliases for which the Keystore does not answer: reads give Unavailable, writes throw. */
     val unavailable = mutableSetOf<String>()
 
+    /**
+     * Aliases whose READS give Unavailable while writes still work: a Keystore that failed once and
+     * answers again. A code that writes after a failed read only shows its flaw this way: with
+     * [unavailable], its write fails too and hides it (measured by the v2.2 negative controls).
+     */
+    val unreadable = mutableSetOf<String>()
+
     /** When set, every HMAC from this many calls on (counted in [hmacCalls]) gives Unavailable. */
     var hmacUnavailableAfter: Int? = null
 
@@ -64,7 +71,7 @@ class InMemorySlotKeystore : SlotKeystore {
         unwrapCalls += alias
         val key = aesKeys[alias]
         return when {
-            alias in unavailable -> KeyResult.Unavailable
+            alias in unavailable || alias in unreadable -> KeyResult.Unavailable
             key == null -> KeyResult.NoKey
             else -> AesGcm.decryptOrNull(key, wrapped.nonce, wrapped.ciphertext, ByteArray(0))
                 ?.let { KeyResult.Done(it) }
@@ -76,7 +83,8 @@ class InMemorySlotKeystore : SlotKeystore {
         hmacCalls += alias
         val key = hmacKeys[alias]
         return when {
-            alias in unavailable || hmacUnavailableAfter?.let { hmacCalls.size > it } == true -> KeyResult.Unavailable
+            alias in unavailable || alias in unreadable || hmacUnavailableAfter?.let { hmacCalls.size > it } == true ->
+                KeyResult.Unavailable
             key == null -> KeyResult.NoKey
             else -> KeyResult.Done(Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(key, "HmacSHA256")) }.doFinal(data))
         }

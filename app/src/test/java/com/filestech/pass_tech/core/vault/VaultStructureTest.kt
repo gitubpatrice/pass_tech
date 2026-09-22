@@ -151,18 +151,26 @@ class VaultStructureTest {
     }
 
     @Test
+    fun `a decoy whose mark cannot be read still counts as there, but is never erased with its parent`() {
+        val parent = ownerWithDecoy()
+        keystore.unreadable += OccupancyMark.KEY_ALIAS
+        assertThat(repo.hasDecoy(parent)).isTrue()
+        assertThat(repo.decoyOf(parent)).isNull()
+    }
+
+    @Test
     fun `an unreadable decoy mark is never settled away, nor a second decoy offered over it`() {
         val parent = (repo.openOrCreate(owner) as VaultRepository.CreateResult.Created).session
         files.crashOnWrite = 3 // the decoy exists, its confirmation does not
         assertThrows<SimulatedCrash> { repo.configureDecoy(parent, decoy) }
         files.crashOnWrite = 0
-        keystore.unavailable += OccupancyMark.KEY_ALIAS
+        keystore.unreadable += OccupancyMark.KEY_ALIAS
 
         val reopened = open(owner)
         assertThat(reopened.meta.pendingChild?.slot).isEqualTo(Slot.B)
         assertThat(repo.hasDecoy(reopened)).isTrue()
 
-        keystore.unavailable.clear()
+        keystore.unreadable.clear()
         assertThat(repo.decoyOf(open(owner))?.slot).isEqualTo(Slot.B)
         assertThat(open(decoy).slot).isEqualTo(Slot.B)
     }
