@@ -9,6 +9,7 @@ import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -51,8 +52,10 @@ class VaultImportExportTest {
     @BeforeEach
     fun setUp() {
         files = CountingFiles(VaultFiles(dir))
-        val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
-        repository = VaultRepository(files, keystore, guard, params = fastParams)
+        val clock = FakeClock()
+        val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+        val guard = BruteForceGuard.forVault(store, clock)
+        repository = VaultRepository(files, keystore, guard, heirRepository(dir, keystore, store, clock, fastParams), params = fastParams)
     }
 
     private var fresh = 0

@@ -38,6 +38,7 @@ import com.filestech.pass_tech.ui.entries.EntryEditScreen
 import com.filestech.pass_tech.ui.entry.EntryScreen
 import com.filestech.pass_tech.ui.entry.EntryViewModel
 import com.filestech.pass_tech.ui.generator.GeneratorScreen
+import com.filestech.pass_tech.ui.heir.HeirScreen
 import com.filestech.pass_tech.ui.home.HomeScreen
 import com.filestech.pass_tech.ui.home.HomeViewModel
 import com.filestech.pass_tech.ui.settings.SettingsScreen
@@ -74,6 +75,8 @@ fun PassTechApp(
                 // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
                 locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
                 state is VaultManager.State.Open -> OpenVault(state, Screens(entries, home, settings), snackbar, onLock = app::lock)
+                // Read only, and nothing of this app around it: no vault is open behind this screen.
+                state is VaultManager.State.Heir -> HeirScreen(state.entries, snackbar, onCopy = entries::copy)
                 else -> EntryScreen(entry)
             }
             if (showSplash == true && !splashDismissed) {

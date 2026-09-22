@@ -5,6 +5,8 @@ import com.filestech.pass_tech.core.crypto.KdfParams
 import com.filestech.pass_tech.core.crypto.SecretBytes
 import com.filestech.pass_tech.core.crypto.useThenWipe
 import com.filestech.pass_tech.core.crypto.wipe
+import com.filestech.pass_tech.core.heir.HeirRepository
+import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import javax.crypto.Cipher
@@ -36,6 +38,7 @@ class VaultRepository(
     private val files: SlotFiles,
     private val keystore: SlotKeystore,
     private val guard: BruteForceGuard,
+    private val heir: HeirRepository,
     private val biometrics: BiometricBinding = BiometricBinding.NONE,
     private val params: KdfParams = KdfParams.OWASP_MOBILE_2024,
 ) {
@@ -125,6 +128,20 @@ class VaultRepository(
 
         /** Nothing was written: the current password still opens the vault. */
         data object KeystoreUnavailable : ChangeResult
+    }
+
+    sealed interface HeirConfigureResult {
+        data object Done : HeirConfigureResult
+
+        /** 2.7.1 refuses a snapshot of an empty vault, and says so. */
+        data object VaultEmpty : HeirConfigureResult
+
+        /** The passphrase is the master password of this vault: it is meant for someone else. */
+        data object PassphraseRefused : HeirConfigureResult
+
+        data class Locked(val remainingMillis: Long) : HeirConfigureResult
+
+        data object KeystoreUnavailable : HeirConfigureResult
     }
 
     /** Which vault a fingerprint opens, as the owner of an open vault may know it (design v2 §9). */
@@ -276,6 +293,9 @@ class VaultRepository(
                 ?: return if (hasDecoy(session)) DecoyDeleteResult.KeystoreUnavailable else DecoyDeleteResult.NotConfigured
             // As at every other deletion (design v2 §9): what a decoy's own session armed opens nothing now.
             biometrics.purge()
+            // And the decoy's heir with it: its snapshot holds every entry the decoy ever had.
+            heir.forget(child.generation)
+            heir.shred(setOf(child.slot))
             val updated = session.with(meta = session.meta.copy(child = null))
             write(updated, erase = child.slot)
             DecoyDeleteResult.Deleted(updated)
@@ -286,16 +306,33 @@ class VaultRepository(
         unavailableAs(CheckResult.KeystoreUnavailable) {
             val gate = guard.gate()
             if (gate is BruteForceGuard.Gate.Locked) return CheckResult.Locked(gate.remainingMillis)
-            guard.beginAttempt()
-            val derived = VaultContainer.deriveKey(session.header, password, keystore)
-            val correct = derived.valueOrNull()?.useThenWipe { SecretBytes.constantTimeEquals(it, session.key) } ?: false
-            if (correct) guard.succeeded() else guard.failed()
-            when {
-                correct -> CheckResult.Correct
-                derived == KeyResult.Unavailable -> CheckResult.KeystoreUnavailable
-                else -> CheckResult.Wrong
-            }
+            compareToCurrent(session, password).also { if (it == CheckResult.Correct) guard.succeeded() else guard.failed() }
         }
+
+    /**
+     * Whether [candidate] is the password of the open vault, asked while the owner is CHOOSING
+     * another one — the heir passphrase, which must not be the master password they would then be
+     * handing to someone else. The mirror of [verifyPassword]: here the match is the refusal, so it
+     * is the match that counts as a failed attempt and the miss that cancels it.
+     */
+    fun collidesWithCurrentPassword(session: VaultSession, candidate: ByteArray): CheckResult =
+        unavailableAs(CheckResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return CheckResult.Locked(gate.remainingMillis)
+            compareToCurrent(session, candidate).also { if (it == CheckResult.Wrong) guard.succeeded() else guard.failed() }
+        }
+
+    /** Counts the attempt and answers; the caller records what the answer means for it. */
+    private fun compareToCurrent(session: VaultSession, password: ByteArray): CheckResult {
+        guard.beginAttempt()
+        val derived = VaultContainer.deriveKey(session.header, password, keystore)
+        val correct = derived.valueOrNull()?.useThenWipe { SecretBytes.constantTimeEquals(it, session.key) } ?: false
+        return when {
+            correct -> CheckResult.Correct
+            derived == KeyResult.Unavailable -> CheckResult.KeystoreUnavailable
+            else -> CheckResult.Wrong
+        }
+    }
 
     /** A new salt and a new key. The previous file stays whole until the atomic replace. */
     fun changePassword(session: VaultSession, current: ByteArray, new: ByteArray): ChangeResult =
@@ -317,11 +354,56 @@ class VaultRepository(
      */
     fun deleteData(session: VaultSession) {
         biometrics.purge()
+        // A root vault erases slots it knows nothing about, so it forgets every heir; any other vault
+        // forgets its own and its decoy's (design v2 §5).
+        if (session.meta.root) heir.forgetAll() else forgetHeirsOf(session)
         val erased = if (session.meta.root) Slot.entries.toSet() else setOfNotNull(session.slot, decoyOf(session)?.slot)
+        heir.shred(erased)
         val bucket = largestBucketOnDisk(except = null)
         files.writeAll(erased.associateWith { dummy(it, bucket, creationRequested = true) })
         session.close()
     }
+
+    /** This vault's heir, and its decoy's: the two generations a non-root deletion erases. */
+    private fun forgetHeirsOf(session: VaultSession) {
+        heir.forget(session.meta.generation)
+        decoyOf(session)?.let { heir.forget(it.generation) }
+    }
+
+    /** The heir state of this vault, and of this one only (design v2 §8). */
+    fun heirStatus(session: VaultSession): HeirState.Status = heir.status(session.meta.generation)
+
+    /**
+     * Takes, or replaces, the heir snapshot of the open vault. The passphrase must not be the
+     * master password: the owner hands the heir passphrase to someone else.
+     *
+     * An empty vault is refused, as in 2.7.1: a snapshot of nothing helps no one and hides the
+     * mistake until the day it matters.
+     */
+    fun configureHeir(session: VaultSession, passphrase: ByteArray, thresholdDays: Int): HeirConfigureResult =
+        unavailableAs(HeirConfigureResult.KeystoreUnavailable) {
+            if (session.entries.isEmpty()) return HeirConfigureResult.VaultEmpty
+            when (val check = collidesWithCurrentPassword(session, passphrase)) {
+                CheckResult.Correct -> HeirConfigureResult.PassphraseRefused
+                is CheckResult.Locked -> HeirConfigureResult.Locked(check.remainingMillis)
+                CheckResult.KeystoreUnavailable -> HeirConfigureResult.KeystoreUnavailable
+                CheckResult.Wrong -> {
+                    heir.configure(session.slot, session.meta.generation, session.entries, passphrase, thresholdDays)
+                    HeirConfigureResult.Done
+                }
+            }
+        }
+
+    fun setHeirThreshold(session: VaultSession, thresholdDays: Int) = heir.setThreshold(session.meta.generation, thresholdDays)
+
+    /** Shreds the snapshot of the open vault and forgets its heir state. */
+    fun disableHeir(session: VaultSession) = heir.disable(session.slot, session.meta.generation)
+
+    /** This vault was just opened: the silence the heir waits for starts again. */
+    fun markVaultActive(session: VaultSession) = heir.markActive(session.meta.generation)
+
+    /** The read-only entries an heir may see, with no vault open. See [HeirRepository.unlock]. */
+    fun unlockAsHeir(passphrase: ByteArray): HeirRepository.UnlockResult = heir.unlock(passphrase)
 
     /**
      * Whether a fingerprint opens some vault: the unlock screen offers it. Says nothing of which, and

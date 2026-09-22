@@ -12,6 +12,7 @@ import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.filestech.pass_tech.ui.entries.EntriesViewModel.Message
 import com.filestech.pass_tech.ui.entries.EntriesViewModel.Screen
 import com.google.common.truth.Truth.assertThat
@@ -60,10 +61,13 @@ class EntriesViewModelTest {
     private suspend fun TestScope.opened(block: suspend TestScope.(Setup) -> Unit) {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
+            val clock = FakeClock()
+            val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+            val guard = BruteForceGuard.forVault(store, clock)
+            val heir = heirRepository(dir, keystore, store, clock, fastParams)
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), io)
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams), io)
             assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val clipboard = FakeClipboard(clearAfter = 30)
             val viewModel = EntriesViewModel(vault, clipboard)

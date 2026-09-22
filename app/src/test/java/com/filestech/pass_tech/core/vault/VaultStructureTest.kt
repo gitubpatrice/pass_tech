@@ -7,6 +7,7 @@ import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -36,14 +37,17 @@ class VaultStructureTest {
     @BeforeEach
     fun setUp() {
         files = CrashingFiles(VaultFiles(dir))
-        val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
+        val clock = FakeClock()
+        val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+        val guard = BruteForceGuard.forVault(store, clock)
         // Counts the purges; nothing is ever armed here.
         val biometrics = object : BiometricBinding by BiometricBinding.NONE {
             override fun purge() {
                 biometricPurges++
             }
         }
-        repo = VaultRepository(files, keystore, guard, biometrics, params = fastParams)
+        val heir = heirRepository(dir, keystore, store, clock, fastParams)
+        repo = VaultRepository(files, keystore, guard, heir, biometrics, params = fastParams)
     }
 
     private fun open(password: ByteArray): VaultSession =

@@ -12,6 +12,7 @@ import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
 import com.filestech.pass_tech.testing.FakeBiometricKeys
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.filestech.pass_tech.ui.components.PromptResult
 import com.filestech.pass_tech.ui.entry.EntryViewModel.Problem
 import com.google.common.truth.Truth.assertThat
@@ -61,7 +62,8 @@ class EntryViewModelTest {
             val biometrics = StoredBiometricBinding(state, bioKeys)
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, biometrics, fastParams), io)
+            val heir = heirRepository(dir, keystore, state, clock, fastParams)
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, biometrics, fastParams), io)
             val viewModel = EntryViewModel(vault, clock) { biometricHardware }
             block(viewModel, vault)
         } finally {
@@ -154,6 +156,62 @@ class EntryViewModelTest {
     }
 
     /** Creates the vault, arms the fingerprint on it, then locks: the unlock form follows. */
+    @Test
+    fun `heir access is offered on every phone, and refuses in the same words whatever is wrong`() = runTest {
+        entry { viewModel, vault ->
+            viewModel.settled()
+            // A phone where nothing at all is set up: the offer is there, and opens nothing.
+            viewModel.openHeirPrompt()
+            assertThat(viewModel.state.value.heirPrompt).isTrue()
+            viewModel.unlockAsHeir("une phrase quelconque")
+            testScheduler.advanceUntilIdle()
+            assertThat(viewModel.state.value.problem).isEqualTo(EntryViewModel.Problem.HEIR_REFUSED)
+            assertThat(vault.state.value).isEqualTo(VaultManager.State.Locked)
+
+            viewModel.cancelHeirPrompt()
+            assertThat(viewModel.state.value.heirPrompt).isFalse()
+        }
+    }
+
+    /**
+     * The whole heir path from the screen: set up, waited out, read, and closed — and the dialog does
+     * not come back on its own over the unlock form once the reading is over (seen on the emulator).
+     */
+    @Test
+    fun `an heir reads the snapshot once the vault has been silent, and the dialog does not linger`() = runTest {
+        entry { viewModel, vault ->
+            viewModel.settled()
+            viewModel.create(owner, owner)
+            viewModel.state.first { it.backupReminder }
+            vault.updateEntries { it + heirEntry() }
+            assertThat(vault.configureHeir("phrasedelheritier2026".encodeToByteArray(), 30))
+                .isEqualTo(VaultRepository.HeirConfigureResult.Done)
+            vault.lock()
+            viewModel.state.first { it.mode == EntryMode.UNLOCK }
+
+            advanceTimeBy((30L + 7) * 24 * 60 * 60 * 1000)
+            viewModel.openHeirPrompt()
+            viewModel.unlockAsHeir("phrasedelheritier2026")
+            testScheduler.advanceUntilIdle()
+            val heirState = vault.state.value as VaultManager.State.Heir
+            assertThat(heirState.entries.map { it.title }).containsExactly("bank")
+
+            // What the auto-lock does at the next return to the app.
+            vault.lock()
+            testScheduler.advanceUntilIdle()
+            assertThat(viewModel.state.value.heirPrompt).isFalse()
+        }
+    }
+
+    private fun heirEntry() = com.filestech.pass_tech.core.model.Entry(
+        id = "bank",
+        title = "bank",
+        category = "Web",
+        password = "secret",
+        createdAt = com.filestech.pass_tech.core.model.DartDateTime.nowLocal(),
+        updatedAt = com.filestech.pass_tech.core.model.DartDateTime.nowLocal(),
+    )
+
     private suspend fun TestScope.armedThenLocked(viewModel: EntryViewModel, vault: VaultManager) {
         viewModel.settled()
         viewModel.create(owner, owner)

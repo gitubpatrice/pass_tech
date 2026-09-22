@@ -29,9 +29,11 @@ import androidx.compose.material.icons.outlined.ContentPasteOff
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Diversity1
 import androidx.compose.material.icons.outlined.Emergency
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
@@ -83,6 +85,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.backup.ImportParser
+import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import com.filestech.pass_tech.ui.components.PasswordField
@@ -104,6 +107,11 @@ private enum class SettingsDialog {
     DECOY_SETUP,
     DECOY_PASSWORD,
     DECOY_MANAGE,
+    HEIR_SETUP,
+    HEIR_PASSPHRASE,
+    HEIR_UPDATE_PASSPHRASE,
+    HEIR_MANAGE,
+    HEIR_THRESHOLD,
     PANIC_BIOMETRIC_WARNING,
     PANIC_CONFIRM,
     DELETE_ALL,
@@ -126,6 +134,9 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
     val biometrics by settings.biometrics.collectAsStateWithLifecycle()
     val hasDecoy by settings.hasDecoy.collectAsStateWithLifecycle()
     val disguised by settings.disguised.collectAsStateWithLifecycle()
+    val heir by settings.heir.collectAsStateWithLifecycle()
+    val heirOn = heir?.enabled == true
+    val resources = LocalResources.current
     val pending by settings.pending.collectAsStateWithLifecycle()
     val openImport = remember { mutableStateOf(false) }
     Messages(settings, snackbar)
@@ -208,6 +219,26 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
                     title = stringResource(if (hasDecoy) R.string.decoy_tile_configured else R.string.decoy_tile_setup),
                     subtitle = stringResource(R.string.decoy_tile_subtitle),
                 ) { dialog = if (hasDecoy) SettingsDialog.DECOY_MANAGE else SettingsDialog.DECOY_SETUP }
+            }
+            item { SectionTitle(R.string.settings_section_heir) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.Diversity1,
+                    title = stringResource(if (heirOn) R.string.heir_tile_configured else R.string.heir_tile_setup),
+                    subtitle = stringResource(
+                        if (heirOn) R.string.heir_tile_subtitle_configured else R.string.heir_tile_subtitle_setup,
+                    ),
+                ) { dialog = if (heirOn) SettingsDialog.HEIR_MANAGE else SettingsDialog.HEIR_SETUP }
+            }
+            // Only once an heir is set up: on any other vault the days would count nothing.
+            if (heirOn) {
+                item {
+                    Tile(
+                        icon = Icons.Outlined.HourglassEmpty,
+                        title = stringResource(R.string.heir_threshold_tile_title),
+                        subtitle = heir?.let { thresholdSubtitle(resources, it) },
+                    ) { dialog = SettingsDialog.HEIR_THRESHOLD }
+                }
             }
             item { SectionTitle(R.string.settings_section_panic) }
             item {
@@ -355,43 +386,12 @@ private fun SettingsDialogs(
             DecoyDialogs(dialog, settings, armedHere, onDialog)
         SettingsDialog.PANIC_BIOMETRIC_WARNING, SettingsDialog.PANIC_CONFIRM ->
             PanicDialogs(dialog, settings, haptics, onDialog)
-        SettingsDialog.DELETE_ALL -> ConfirmDialog(
-            title = R.string.settings_delete_all_dialog_title,
-            body = R.string.settings_delete_all_dialog_body,
-            confirm = R.string.settings_delete_all_confirm,
-            onConfirm = { onDialog(SettingsDialog.DELETE_REAUTH) },
-            onDismiss = close,
-        )
-        SettingsDialog.DELETE_REAUTH -> ReauthDialog(
-            onConfirm = { password ->
-                close()
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                settings.deleteAll(password)
-            },
-            onDismiss = close,
-        )
-        SettingsDialog.BACKUP_PASSPHRASE -> PassphraseDialog(
-            title = R.string.passphrase_dialog_encrypt_title,
-            helper = R.string.passphrase_dialog_confirm_helper,
-            cta = R.string.passphrase_encrypt_cta,
-            confirm = true,
-            onValid = { passphrase ->
-                close()
-                settings.startBackup(passphrase)
-            },
-            onDismiss = close,
-        )
-        SettingsDialog.EXPORT_PLAIN -> PlainExportWarningDialog(
-            onConfirm = { onDialog(SettingsDialog.EXPORT_REAUTH) },
-            onDismiss = close,
-        )
-        SettingsDialog.EXPORT_REAUTH -> ReauthDialog(
-            onConfirm = { password ->
-                close()
-                settings.startPlainExport(password)
-            },
-            onDismiss = close,
-        )
+        SettingsDialog.HEIR_SETUP, SettingsDialog.HEIR_PASSPHRASE, SettingsDialog.HEIR_UPDATE_PASSPHRASE,
+        SettingsDialog.HEIR_MANAGE, SettingsDialog.HEIR_THRESHOLD,
+        -> HeirDialogs(dialog, settings, onDialog)
+        SettingsDialog.DELETE_ALL, SettingsDialog.DELETE_REAUTH, SettingsDialog.BACKUP_PASSPHRASE,
+        SettingsDialog.EXPORT_PLAIN, SettingsDialog.EXPORT_REAUTH,
+        -> DataDialogs(dialog, settings, haptics, onDialog)
         null -> Unit
     }
     PickedFileDialogs(pending, settings)
@@ -414,7 +414,10 @@ private fun DecoyDialogs(dialog: SettingsDialog?, settings: SettingsViewModel, a
             onContinue = { onDialog(SettingsDialog.DECOY_PASSWORD) },
             onDismiss = close,
         )
-        SettingsDialog.DECOY_PASSWORD -> DecoyPasswordDialog(
+        SettingsDialog.DECOY_PASSWORD -> NewPasswordDialog(
+            title = R.string.decoy_password_dialog_title,
+            label = R.string.decoy_password_label,
+            cta = R.string.decoy_configure,
             onValid = { password ->
                 close()
                 settings.configureDecoy(password)
@@ -462,37 +465,6 @@ private fun DecoySetupDialog(armedHere: Boolean, onContinue: () -> Unit, onDismi
     )
 }
 
-/** The decoy's password, typed twice, under the same rule as every other password of the app. */
-@Composable
-private fun DecoyPasswordDialog(onValid: (String) -> Unit, onDismiss: () -> Unit) {
-    var password by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
-    var problem by remember { mutableStateOf<ChangeProblem?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.decoy_password_dialog_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasswordField(password, { password = it }, stringResource(R.string.decoy_password_label), leadingIcon = null)
-                PasswordField(
-                    value = confirmation,
-                    onValueChange = { confirmation = it },
-                    label = stringResource(R.string.change_password_confirm_label),
-                    leadingIcon = null,
-                )
-                problem?.let { Text(stringResource(changeProblemLabel(it)), color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-        confirmButton = {
-            Button(onClick = {
-                problem = SettingsViewModel.checkNewPassword(password, confirmation)
-                if (problem == null) onValid(password)
-            }) { Text(stringResource(R.string.decoy_configure)) }
-        },
-    )
-}
-
 /** The decoy exists: the one thing left to do with it is to delete it, and 2.7.1 asks for nothing else. */
 @Composable
 private fun DecoyManageDialog(onDelete: () -> Unit, onDismiss: () -> Unit) {
@@ -510,6 +482,151 @@ private fun DecoyManageDialog(onDelete: () -> Unit, onDismiss: () -> Unit) {
         },
     )
 }
+
+/**
+ * The heir (2.7.1, `settings_screen.dart:310-520`): what it is, the passphrase that will open the
+ * snapshot, and afterwards the two things left to do with it — take it again, or turn it off.
+ *
+ * Its "update" is 2.7.1's: a new passphrase replaces the old one, with nothing checked against it.
+ * There is nothing to check against — the old passphrase opens a file, not an account, and the owner
+ * who forgot it has exactly one way out, which is to take the snapshot again.
+ */
+@Composable
+private fun HeirDialogs(dialog: SettingsDialog?, settings: SettingsViewModel, onDialog: (SettingsDialog?) -> Unit) {
+    val close = { onDialog(null) }
+    val heir by settings.heir.collectAsStateWithLifecycle()
+    when (dialog) {
+        SettingsDialog.HEIR_SETUP -> ExplanationDialog(
+            icon = Icons.Outlined.Diversity1,
+            title = R.string.heir_tile_setup,
+            body = R.string.heir_setup_body,
+            confirm = R.string.heir_configure,
+            onConfirm = { onDialog(SettingsDialog.HEIR_PASSPHRASE) },
+            onDismiss = close,
+        )
+        SettingsDialog.HEIR_PASSPHRASE, SettingsDialog.HEIR_UPDATE_PASSPHRASE -> NewPasswordDialog(
+            title = R.string.heir_password_prompt_title,
+            label = R.string.heir_password_label,
+            cta = if (dialog == SettingsDialog.HEIR_PASSPHRASE) R.string.heir_configure else R.string.heir_update,
+            onValid = { passphrase ->
+                close()
+                settings.configureHeir(passphrase, update = dialog == SettingsDialog.HEIR_UPDATE_PASSPHRASE)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.HEIR_MANAGE -> HeirManageDialog(
+            onUpdate = { onDialog(SettingsDialog.HEIR_UPDATE_PASSPHRASE) },
+            onDisable = {
+                close()
+                settings.disableHeir()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.HEIR_THRESHOLD -> ChoiceDialog(
+            title = R.string.heir_threshold_dialog_title,
+            choices = HeirState.THRESHOLD_CHOICES,
+            selected = heir?.thresholdDays ?: HeirState.DEFAULT_THRESHOLD_DAYS,
+            label = { it },
+            format = { resources, days -> resources.getQuantityString(R.plurals.heir_days, days, days) },
+            onChoose = {
+                settings.setHeirThreshold(it)
+                close()
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+@Composable
+private fun HeirManageDialog(onUpdate: () -> Unit, onDisable: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Diversity1, contentDescription = null) },
+        title = { Text(stringResource(R.string.heir_manage_title)) },
+        text = { Text(stringResource(R.string.heir_manage_body), fontSize = 13.sp) },
+        dismissButton = {
+            TextButton(onClick = onDisable) {
+                Text(stringResource(R.string.heir_disable), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = { Button(onClick = onUpdate) { Text(stringResource(R.string.heir_update)) } },
+    )
+}
+
+/** A long explanation with one way on, and one way out. */
+@Composable
+private fun ExplanationDialog(
+    icon: ImageVector,
+    @StringRes title: Int,
+    @StringRes body: Int,
+    @StringRes confirm: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(icon, contentDescription = null) },
+        title = { Text(stringResource(title)) },
+        text = {
+            Text(
+                text = stringResource(body),
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(confirm)) } },
+    )
+}
+
+/** A password being chosen, typed twice, under the app's one rule. */
+@Composable
+private fun NewPasswordDialog(
+    @StringRes title: Int,
+    @StringRes label: Int,
+    @StringRes cta: Int,
+    onValid: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var problem by remember { mutableStateOf<ChangeProblem?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasswordField(password, { password = it }, stringResource(label), leadingIcon = null)
+                PasswordField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it },
+                    label = stringResource(R.string.change_password_confirm_label),
+                    leadingIcon = null,
+                )
+                problem?.let { Text(stringResource(changeProblemLabel(it)), color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = {
+                problem = SettingsViewModel.checkNewPassword(password, confirmation)
+                if (problem == null) onValid(password)
+            }) { Text(stringResource(cta)) }
+        },
+    )
+}
+
+/** "Threshold: 90 days · current inactivity: 3 days", both counted in the language of the app. */
+private fun thresholdSubtitle(resources: Resources, heir: HeirState.Status): String =
+    resources.getString(
+        R.string.heir_threshold_tile_subtitle,
+        resources.getQuantityString(R.plurals.heir_days, heir.thresholdDays, heir.thresholdDays),
+        resources.getQuantityString(R.plurals.heir_days, heir.inactivityDays, heir.inactivityDays),
+    )
 
 /**
  * Panic mode, in two steps: what it costs the fingerprint of THIS vault, then what it does in full.
@@ -575,6 +692,58 @@ private fun PanicDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+/** Everything that writes or erases: a backup, an export, and the deletion of it all. */
+@Composable
+private fun DataDialogs(
+    dialog: SettingsDialog?,
+    settings: SettingsViewModel,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    onDialog: (SettingsDialog?) -> Unit,
+) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        SettingsDialog.DELETE_ALL -> ConfirmDialog(
+            title = R.string.settings_delete_all_dialog_title,
+            body = R.string.settings_delete_all_dialog_body,
+            confirm = R.string.settings_delete_all_confirm,
+            onConfirm = { onDialog(SettingsDialog.DELETE_REAUTH) },
+            onDismiss = close,
+        )
+        SettingsDialog.DELETE_REAUTH -> ReauthDialog(
+            onConfirm = { password ->
+                close()
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                settings.deleteAll(password)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.BACKUP_PASSPHRASE -> PassphraseDialog(
+            title = R.string.passphrase_dialog_encrypt_title,
+            helper = R.string.passphrase_dialog_confirm_helper,
+            cta = R.string.passphrase_encrypt_cta,
+            confirm = true,
+            onValid = { passphrase ->
+                close()
+                settings.startBackup(passphrase)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.EXPORT_PLAIN -> PlainExportWarningDialog(
+            onConfirm = { onDialog(SettingsDialog.EXPORT_REAUTH) },
+            onDismiss = close,
+        )
+        SettingsDialog.EXPORT_REAUTH -> ReauthDialog(
+            onConfirm = { password ->
+                close()
+                settings.startPlainExport(password)
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
 /** The dialogs a picked file brings with it: its passphrase, then how much of it is coming in. */
 @Composable
 private fun PickedFileDialogs(pending: SettingsViewModel.Pending?, settings: SettingsViewModel) {
@@ -617,6 +786,7 @@ private fun ArmingPrompts(settings: SettingsViewModel) {
     LaunchedEffect(settings) {
         settings.refreshBiometricSupport()
         settings.refreshDisguise()
+        settings.refreshHeir()
     }
     val activity = LocalActivity.current as? FragmentActivity ?: return
     LaunchedEffect(settings, activity) {
@@ -680,6 +850,17 @@ private fun vaultMessageText(resources: Resources, message: Message): String = w
     Message.DecoyDeleted -> resources.getString(R.string.decoy_deleted_snack)
     Message.DecoyImpossible -> resources.getString(R.string.decoy_error_impossible)
     Message.DisguiseRemoved -> resources.getString(R.string.panic_reveal_snack)
+    else -> heirMessageText(resources, message)
+}
+
+/** What the dead man's switch answered. */
+private fun heirMessageText(resources: Resources, message: Message): String = when (message) {
+    Message.HeirConfigured -> resources.getString(R.string.heir_configured_snack)
+    Message.HeirUpdated -> resources.getString(R.string.heir_updated_snack)
+    Message.HeirDisabled -> resources.getString(R.string.heir_disabled_snack)
+    Message.HeirVaultEmpty -> resources.getString(R.string.heir_vault_empty)
+    // The same words as a refused master password: they say nothing about which one it matched.
+    Message.HeirPassphraseRefused -> resources.getString(R.string.change_password_refused)
     else -> fileMessageText(resources, message)
 }
 
@@ -768,7 +949,9 @@ private fun <T> ChoiceDialog(
     onChoose: (T) -> Unit,
     onDismiss: () -> Unit,
     icon: ((T) -> ImageVector)? = null,
+    format: ((Resources, T) -> String)? = null,
 ) {
+    val resources = LocalResources.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(title)) },
@@ -777,7 +960,7 @@ private fun <T> ChoiceDialog(
                 choices.forEach { choice ->
                     ListItem(
                         leadingContent = icon?.let { { Icon(it(choice), contentDescription = null, modifier = Modifier.size(20.dp)) } },
-                        headlineContent = { Text(stringResource(label(choice))) },
+                        headlineContent = { Text(format?.invoke(resources, choice) ?: stringResource(label(choice))) },
                         trailingContent = if (choice == selected) ({ Icon(Icons.Filled.Check, contentDescription = null) }) else null,
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable { onChoose(choice) },

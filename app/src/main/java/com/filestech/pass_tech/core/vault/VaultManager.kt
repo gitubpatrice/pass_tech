@@ -4,6 +4,8 @@ import com.filestech.pass_tech.core.backup.PlainExport
 import com.filestech.pass_tech.core.backup.PtbakCodec
 import com.filestech.pass_tech.core.crypto.wipe
 import com.filestech.pass_tech.core.di.IoDispatcher
+import com.filestech.pass_tech.core.heir.HeirRepository
+import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import kotlinx.coroutines.CoroutineDispatcher
@@ -57,6 +59,12 @@ class VaultManager @Inject constructor(
             val hasDecoy: Boolean,
             val biometrics: BiometricStatus = BiometricStatus.OFF,
         ) : State
+
+        /**
+         * The read-only view an heir gets (design v2 §8). No vault is open: these entries come from a
+         * snapshot, and nothing here can write one.
+         */
+        data class Heir(val entries: List<Entry>) : State
     }
 
     sealed interface UnlockOutcome {
@@ -164,10 +172,24 @@ class VaultManager @Inject constructor(
         data object KeystoreUnavailable : BiometricOutcome
     }
 
+    sealed interface HeirUnlockOutcome {
+        data object Opened : HeirUnlockOutcome
+
+        /** A wrong passphrase, or a vault still answering. The same words for both (design v2 §8). */
+        data object Refused : HeirUnlockOutcome
+
+        data class Locked(val remainingMillis: Long) : HeirUnlockOutcome
+
+        data object KeystoreUnavailable : HeirUnlockOutcome
+    }
+
     private val mutex = Mutex()
 
     /** Read and written only under [mutex]. */
     private var session: VaultSession? = null
+
+    /** The entries of a heir reading, if one is open. Read and written only under [mutex]. */
+    private var heirEntries: List<Entry>? = null
 
     private val mutableState = MutableStateFlow<State>(State.Locked)
     val state: StateFlow<State> = mutableState.asStateFlow()
@@ -294,6 +316,50 @@ class VaultManager @Inject constructor(
                 publish()
             }
             current != null
+        }
+
+    /** The heir state of the open vault; `null` if none is open. */
+    suspend fun heirStatus(): HeirState.Status? = serialized { session?.let(repository::heirStatus) }
+
+    /** Takes or replaces the heir snapshot. Returns `null`, doing nothing, if no vault is open. */
+    suspend fun configureHeir(passphrase: ByteArray, thresholdDays: Int): VaultRepository.HeirConfigureResult? =
+        serialized(passphrase) {
+            session?.let { repository.configureHeir(it, passphrase, thresholdDays) }
+        }
+
+    /** Returns `false` if no vault is open: 2.7.1 asks for one too, and says so. */
+    suspend fun disableHeir(): Boolean =
+        serialized {
+            session?.let {
+                repository.disableHeir(it)
+                true
+            } ?: false
+        }
+
+    suspend fun setHeirThreshold(thresholdDays: Int): Boolean =
+        serialized {
+            session?.let {
+                repository.setHeirThreshold(it, thresholdDays)
+                true
+            } ?: false
+        }
+
+    /**
+     * Opens the read-only heir view. No vault is opened, and an open one would be left alone: the
+     * screen only offers this when the vault is locked.
+     */
+    suspend fun unlockAsHeir(passphrase: ByteArray): HeirUnlockOutcome =
+        serialized(passphrase) {
+            when (val result = repository.unlockAsHeir(passphrase)) {
+                is HeirRepository.UnlockResult.Opened -> {
+                    heirEntries = result.entries
+                    publish()
+                    HeirUnlockOutcome.Opened
+                }
+                HeirRepository.UnlockResult.Refused -> HeirUnlockOutcome.Refused
+                is HeirRepository.UnlockResult.Locked -> HeirUnlockOutcome.Locked(result.remainingMillis)
+                HeirRepository.UnlockResult.KeystoreUnavailable -> HeirUnlockOutcome.KeystoreUnavailable
+            }
         }
 
     /** Whether the unlock screen offers the fingerprint. See [VaultRepository.biometricsArmed]. */
@@ -427,6 +493,14 @@ class VaultManager @Inject constructor(
     private fun open(opened: VaultSession) {
         session?.close()
         session = opened
+        heirEntries = null
+        // The silence the heir waits for starts again, and a failure here must never cost an opening:
+        // at worst the heir's door opens earlier than it should, which beats refusing the owner.
+        try {
+            repository.markVaultActive(opened)
+        } catch (_: Exception) {
+            // Nothing to say and nothing to do: the vault is open, which is what was asked.
+        }
         publish()
     }
 
@@ -442,13 +516,14 @@ class VaultManager @Inject constructor(
     private fun close() {
         session?.close()
         session = null
+        heirEntries = null
         publish()
     }
 
     private fun publish() {
         mutableState.value = session?.let {
             State.Open(it.entries, hasDecoy = repository.hasDecoy(it), biometrics = biometricStatus(it))
-        } ?: State.Locked
+        } ?: heirEntries?.let(State::Heir) ?: State.Locked
     }
 
     private fun biometricStatus(session: VaultSession): BiometricStatus =

@@ -8,6 +8,7 @@ import com.filestech.pass_tech.core.backup.ImportParser
 import com.filestech.pass_tech.core.backup.PtbakCodec
 import com.filestech.pass_tech.core.biometric.BiometricSupport
 import com.filestech.pass_tech.core.di.IoDispatcher
+import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.panic.PanicService
 import com.filestech.pass_tech.core.password.PasswordPolicy
@@ -18,6 +19,7 @@ import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultManager.ArmOutcome
 import com.filestech.pass_tech.core.vault.VaultManager.ArmStart
 import com.filestech.pass_tech.core.vault.VaultManager.ChangeOutcome
+import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import com.filestech.pass_tech.core.vault.VaultRepository.CheckResult
 import com.filestech.pass_tech.ui.components.PromptResult
@@ -101,6 +103,18 @@ class SettingsViewModel @Inject constructor(
 
         /** The launcher shows Pass Tech again. */
         data object DisguiseRemoved : Message
+
+        data object HeirConfigured : Message
+
+        data object HeirUpdated : Message
+
+        data object HeirDisabled : Message
+
+        /** 2.7.1 refuses a snapshot of an empty vault, and says why. */
+        data object HeirVaultEmpty : Message
+
+        /** The heir passphrase is this vault's master password: it is meant for someone else. */
+        data object HeirPassphraseRefused : Message
 
         data object BackupSaved : Message
 
@@ -245,6 +259,45 @@ class SettingsViewModel @Inject constructor(
             VaultManager.DecoyOutcome.KeystoreUnavailable -> Message.KeystoreUnavailable
             null -> null
         }
+    }
+
+    /**
+     * The heir of THIS vault: whether one is set up, after how many days of silence, and how many
+     * days of silence there are so far. Read when the screen shows and after every change — it comes
+     * from the vault, not from a setting, and a decoy has its own (design v2 §8).
+     */
+    private val mutableHeir = MutableStateFlow<HeirState.Status?>(null)
+    val heir: StateFlow<HeirState.Status?> = mutableHeir.asStateFlow()
+
+    fun refreshHeir() {
+        viewModelScope.launch { mutableHeir.value = vault.heirStatus() }
+    }
+
+    /** Takes or replaces the snapshot. [update] only changes which words the screen says afterwards. */
+    fun configureHeir(passphrase: String, update: Boolean) = operate {
+        val days = mutableHeir.value?.thresholdDays ?: HeirState.DEFAULT_THRESHOLD_DAYS
+        val outcome = vault.configureHeir(passphrase.encodeToByteArray(), days)
+        mutableHeir.value = vault.heirStatus()
+        when (outcome) {
+            VaultRepository.HeirConfigureResult.Done -> if (update) Message.HeirUpdated else Message.HeirConfigured
+            VaultRepository.HeirConfigureResult.VaultEmpty -> Message.HeirVaultEmpty
+            VaultRepository.HeirConfigureResult.PassphraseRefused -> Message.HeirPassphraseRefused
+            is VaultRepository.HeirConfigureResult.Locked -> Message.Locked(outcome.remainingMillis)
+            VaultRepository.HeirConfigureResult.KeystoreUnavailable -> Message.KeystoreUnavailable
+            null -> null
+        }
+    }
+
+    fun disableHeir() = operate {
+        val done = vault.disableHeir()
+        mutableHeir.value = vault.heirStatus()
+        if (done) Message.HeirDisabled else null
+    }
+
+    fun setHeirThreshold(days: Int) = operate {
+        vault.setHeirThreshold(days)
+        mutableHeir.value = vault.heirStatus()
+        null
     }
 
     /**

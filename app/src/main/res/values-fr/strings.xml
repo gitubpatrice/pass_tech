@@ -280,6 +280,48 @@
     <string name="decoy_deleted_snack">Coffre leurre supprimé</string>
     <string name="decoy_error_impossible">Impossible de créer un coffre leurre sur ce téléphone.</string>
 
+    <!-- Heir access (2.7.1 heir_view_screen.dart, settings_screen.dart:310-520) -->
+    <string name="heir_dialog_title">Accès héritier</string>
+    <string name="heir_dialog_body">Saisissez le mot de passe héritier qui vous a été confié.</string>
+    <string name="heir_password_label">Mot de passe héritier</string>
+    <string name="heir_wrong_passphrase">Mot de passe incorrect</string>
+    <string name="heir_view_title">Accès héritier (lecture seule)</string>
+    <string name="heir_view_close">Fermer l\'app</string>
+    <string name="heir_view_empty">Instantané vide</string>
+    <string name="heir_view_banner_none">Vous accédez à l\'instantané du coffre transmis par son propriétaire. Les modifications ne sont pas possibles. Aucune entrée.</string>
+    <plurals name="heir_view_banner">
+        <item quantity="one">Vous accédez à l\'instantané du coffre transmis par son propriétaire. Les modifications ne sont pas possibles. %1$d entrée.</item>
+        <item quantity="other">Vous accédez à l\'instantané du coffre transmis par son propriétaire. Les modifications ne sont pas possibles. %1$d entrées.</item>
+    </plurals>
+    <string name="heir_view_field_username">Identifiant</string>
+    <string name="heir_view_field_password">Mot de passe</string>
+    <string name="heir_view_field_url">URL</string>
+    <string name="heir_view_field_notes">Notes</string>
+
+    <string name="settings_section_heir">Héritage (dead man\'s switch)</string>
+    <string name="heir_tile_setup">Configurer un héritier</string>
+    <string name="heir_tile_configured">Héritier configuré</string>
+    <string name="heir_tile_subtitle_setup">Un proche pourra accéder au coffre après une période d\'inactivité prolongée. Aucun cloud, aucun tiers.</string>
+    <string name="heir_tile_subtitle_configured">Toucher pour mettre à jour l\'instantané ou désactiver</string>
+    <string name="heir_setup_body">Un mot de passe distinct du vôtre permettra à un proche (conjoint, enfant, exécuteur testamentaire) d\'accéder au contenu du coffre **après une période d\'inactivité prolongée** de votre part (90 jours par défaut + 7 jours de grâce).\n\nÀ retenir :\n• Le mot de passe héritier doit être différent de votre mot de passe principal\n• Communiquez-le à votre héritier de manière sûre (oralement, testament, coffre bancaire) — il n\'est jamais stocké et ne peut pas être récupéré\n• L\'héritier accédera à un instantané du coffre. Pensez à le mettre à jour régulièrement.\n• Si vous vous reconnectez avant la fin de la grâce, le compte à rebours est réinitialisé.\n• Les trois instantanés existent alors et se ressemblent : rien ne dit auquel de vos coffres appartient le vrai. Qu\'un héritier soit configuré sur ce téléphone reste, lui, visible à une analyse — pour le déni, voyez le coffre leurre.\n\nCe système fonctionne 100 % localement, sans cloud ni tiers de confiance.</string>
+    <string name="heir_configure">Configurer</string>
+    <string name="heir_password_prompt_title">Mot de passe de l\'héritier</string>
+    <string name="heir_configured_snack">Héritage configuré ✓ Instantané du coffre chiffré.</string>
+    <string name="heir_vault_empty">Le coffre est vide — rien à transmettre</string>
+    <string name="heir_manage_title">Gérer l\'héritage</string>
+    <string name="heir_manage_body">L\'héritier accède à un instantané du coffre. Vous pouvez :\n\n• Mettre à jour l\'instantané (avec le mot de passe héritier)\n• Désactiver l\'héritage et supprimer l\'instantané</string>
+    <string name="heir_disable">Désactiver</string>
+    <string name="heir_update">Mettre à jour</string>
+    <string name="heir_disabled_snack">Héritage désactivé, instantané supprimé</string>
+    <string name="heir_updated_snack">Instantané mis à jour ✓</string>
+    <string name="heir_threshold_tile_title">Période d\'inactivité avant accès</string>
+    <string name="heir_threshold_tile_subtitle">Seuil : %1$s · inactivité actuelle : %2$s</string>
+    <string name="heir_threshold_dialog_title">Période d\'inactivité avant accès héritier</string>
+    <plurals name="heir_days">
+        <item quantity="one">%1$d jour</item>
+        <item quantity="other">%1$d jours</item>
+    </plurals>
+
     <!-- Panic mode and its disguise (2.7.1 settings_screen.dart:732-832, CalculatorActivity.kt) -->
     <string name="app_disguise_label">Calculatrice</string>
     <string name="calculator_error">Erreur</string>

@@ -6,6 +6,7 @@ import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,8 +44,10 @@ class AutoLockTest {
     private suspend fun TestScope.opened(seconds: Int, block: suspend TestScope.(Setup) -> Unit) {
         val clock = BootClock()
         val keystore = InMemorySlotKeystore()
-        val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), clock)
-        val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), Dispatchers.IO)
+        val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+        val guard = BruteForceGuard.forVault(store, clock)
+        val heir = heirRepository(dir, keystore, store, clock, fastParams)
+        val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams), Dispatchers.IO)
         assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
         val delay = MutableStateFlow(seconds)
         block(Setup(vault, AutoLock(vault, delay, clock, backgroundScope), clock, delay))
@@ -58,6 +61,40 @@ class AutoLockTest {
     }
 
     private fun VaultManager.State.isOpen() = this is VaultManager.State.Open
+
+    /**
+     * The heir's reading closes at EVERY return, whatever the delay says (2.7.1). It is someone
+     * else's phone, read once: nothing justifies keeping a stranger's secrets on screen across a trip
+     * to another app.
+     */
+    @Test
+    fun `a heir reading closes on any return, even with the longest delay`() = runTest {
+        opened(seconds = 1800) { (vault, autoLock, clock) ->
+            vault.updateEntries { it + entry() }
+            assertThat(vault.configureHeir("phrasedelheritier2026".encodeToByteArray(), 30))
+                .isEqualTo(VaultRepository.HeirConfigureResult.Done)
+            vault.lock()
+            clock.now += (30L + 7) * 24 * 60 * 60 * 1000
+            assertThat(vault.unlockAsHeir("phrasedelheritier2026".encodeToByteArray()))
+                .isEqualTo(VaultManager.HeirUnlockOutcome.Opened)
+            assertThat(vault.state.value).isInstanceOf(VaultManager.State.Heir::class.java)
+
+            autoLock.wentToBackground()
+            clock.now += 1_000
+            advanceTimeBy(1_000)
+            autoLock.cameToForeground()
+            assertThat(settled(vault)).isEqualTo(VaultManager.State.Locked)
+        }
+    }
+
+    private fun entry() = com.filestech.pass_tech.core.model.Entry(
+        id = "bank",
+        title = "bank",
+        category = "Web",
+        password = "secret",
+        createdAt = com.filestech.pass_tech.core.model.DartDateTime.nowLocal(),
+        updatedAt = com.filestech.pass_tech.core.model.DartDateTime.nowLocal(),
+    )
 
     @Test
     fun `back before the delay, the vault is still open`() = runTest {

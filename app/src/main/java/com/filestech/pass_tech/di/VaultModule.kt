@@ -6,8 +6,12 @@ import com.filestech.pass_tech.core.backup.DocumentStore
 import com.filestech.pass_tech.core.biometric.AndroidBiometricKeys
 import com.filestech.pass_tech.core.biometric.BiometricSupport
 import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
+import com.filestech.pass_tech.core.heir.HeirFiles
+import com.filestech.pass_tech.core.heir.HeirRepository
+import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.Clock
+import com.filestech.pass_tech.core.state.MonotonicWallClock
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.state.SystemClockSource
 import com.filestech.pass_tech.core.vault.AndroidSlotKeystore
@@ -59,6 +63,25 @@ abstract class VaultModule {
         @Provides
         fun biometricSupport(@ApplicationContext context: Context): BiometricSupport = BiometricSupport.of(context)
 
+        /**
+         * The heir side (design v2 §8): its own files, its own delay after a wrong passphrase, and a
+         * wall clock that cannot go backwards, since it counts days and not seconds.
+         */
+        @Provides
+        @Singleton
+        fun heirRepository(
+            @ApplicationContext context: Context,
+            keystore: SlotKeystore,
+            state: StateStore,
+            clock: Clock,
+        ): HeirRepository =
+            HeirRepository(
+                files = HeirFiles(context.filesDir),
+                keystore = keystore,
+                guard = BruteForceGuard.forHeir(state, clock),
+                state = HeirState(state, MonotonicWallClock(state, clock)),
+            )
+
         @Provides
         @Singleton
         fun vaultRepository(
@@ -66,12 +89,14 @@ abstract class VaultModule {
             keystore: SlotKeystore,
             state: StateStore,
             clock: Clock,
+            heir: HeirRepository,
             biometrics: BiometricBinding,
         ): VaultRepository =
             VaultRepository(
                 files = VaultFiles(context.filesDir),
                 keystore = keystore,
                 guard = BruteForceGuard.forVault(state, clock),
+                heir = heir,
                 biometrics = biometrics,
             )
     }

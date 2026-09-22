@@ -7,6 +7,7 @@ import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -30,8 +31,10 @@ class VaultRepositoryTest {
     @BeforeEach
     fun setUp() {
         val clock = FakeClock()
-        val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), clock)
-        repo = VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams)
+        val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+        val guard = BruteForceGuard.forVault(store, clock)
+        val heir = heirRepository(dir, keystore, store, clock, fastParams)
+        repo = VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams)
     }
 
     private fun created(pw: ByteArray = password): VaultSession {

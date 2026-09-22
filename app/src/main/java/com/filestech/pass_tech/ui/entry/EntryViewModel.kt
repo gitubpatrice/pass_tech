@@ -49,6 +49,9 @@ class EntryViewModel @Inject constructor(
         BIOMETRIC_FAILED,
         BIOMETRIC_INVALIDATED,
         BIOMETRIC_DISARMED,
+
+        /** A wrong heir passphrase, or a vault that still answers: the same words for both. */
+        HEIR_REFUSED,
     }
 
     data class UiState(
@@ -67,6 +70,10 @@ class EntryViewModel @Inject constructor(
          * comes back by itself, the fingerprint button is there for that.
          */
         val biometricAutoPrompt: Boolean = false,
+        /** The heir passphrase is being asked for. */
+        val heirPrompt: Boolean = false,
+        /** Above 0, the heir field is waiting out its own delay, which is not the vault's. */
+        val heirLockedForMillis: Long = 0,
     )
 
     private val mutableState = MutableStateFlow(UiState())
@@ -169,6 +176,43 @@ class EntryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Heir access, offered on the unlock form of EVERY phone, whether an heir is set up or not
+     * (design v2 §8). The offer is what would otherwise be the oracle: "the button is here, therefore
+     * someone is waiting for you to die". The refusal says nothing either — a wrong passphrase and a
+     * vault whose owner is still answering read exactly the same.
+     */
+    fun openHeirPrompt() {
+        mutableState.update { it.copy(heirPrompt = true, problem = null, heirLockedForMillis = 0) }
+    }
+
+    fun cancelHeirPrompt() {
+        mutableState.update { it.copy(heirPrompt = false, problem = null, heirLockedForMillis = 0) }
+    }
+
+    /** On success the state becomes the heir view and this screen goes with it. */
+    fun unlockAsHeir(passphrase: String) {
+        if (passphrase.isEmpty() || mutableState.value.busy) return
+        mutableState.update { it.copy(busy = true, problem = null, heirLockedForMillis = 0) }
+        viewModelScope.launch {
+            try {
+                answer(vault.unlockAsHeir(passphrase.encodeToByteArray()))
+            } finally {
+                mutableState.update { it.copy(busy = false) }
+            }
+        }
+    }
+
+    private fun answer(outcome: VaultManager.HeirUnlockOutcome) {
+        when (outcome) {
+            // The screen is about to be replaced by the heir view: nothing to say here.
+            VaultManager.HeirUnlockOutcome.Opened -> Unit
+            VaultManager.HeirUnlockOutcome.Refused -> mutableState.update { it.copy(problem = Problem.HEIR_REFUSED) }
+            is VaultManager.HeirUnlockOutcome.Locked -> mutableState.update { it.copy(heirLockedForMillis = outcome.remainingMillis) }
+            VaultManager.HeirUnlockOutcome.KeystoreUnavailable -> mutableState.update { it.copy(problem = Problem.KEYSTORE_UNAVAILABLE) }
+        }
+    }
+
     fun backupReminderSeen() {
         mutableState.update { it.copy(backupReminder = false) }
     }
@@ -176,7 +220,18 @@ class EntryViewModel @Inject constructor(
     private suspend fun refresh() {
         val mode = vault.entryMode()
         val biometric = mode == EntryMode.UNLOCK && biometricSupport.available() && vault.biometricsArmed()
-        mutableState.update { it.copy(mode = mode, problem = null, biometric = biometric, biometricAutoPrompt = biometric) }
+        mutableState.update {
+            it.copy(
+                mode = mode,
+                problem = null,
+                biometric = biometric,
+                biometricAutoPrompt = biometric,
+                // The heir reading that just closed left its dialog open behind it, over the unlock
+                // form nobody had asked to hide (seen on the emulator, 2026-09-22).
+                heirPrompt = false,
+                heirLockedForMillis = 0,
+            )
+        }
         lockedFor(vault.lockoutRemainingMillis())
     }
 

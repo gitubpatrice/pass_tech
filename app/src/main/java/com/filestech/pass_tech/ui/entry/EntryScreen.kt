@@ -20,12 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.Diversity1
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockClock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -33,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +74,13 @@ import kotlin.coroutines.cancellation.CancellationException
 fun EntryScreen(viewModel: EntryViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     BiometricPrompts(viewModel, autoPrompt = state.biometricAutoPrompt)
+    if (state.heirPrompt) {
+        HeirPromptDialog(
+            state = state,
+            onSubmit = viewModel::unlockAsHeir,
+            onDismiss = viewModel::cancelHeirPrompt,
+        )
+    }
     val mode = state.mode ?: return
     val locked = state.lockedForMillis > 0
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
@@ -112,7 +123,12 @@ fun EntryScreen(viewModel: EntryViewModel) {
             when {
                 locked -> LockedBox(state.lockedForMillis)
                 mode == EntryMode.CREATE -> CreateForm(state, onCreate = viewModel::create)
-                else -> UnlockForm(state, onUnlock = viewModel::unlock, onBiometric = viewModel::startBiometric)
+                else -> UnlockForm(
+                    state = state,
+                    onUnlock = viewModel::unlock,
+                    onBiometric = viewModel::startBiometric,
+                    onHeir = viewModel::openHeirPrompt,
+                )
             }
         }
     }
@@ -205,7 +221,7 @@ private fun BiometricPrompts(viewModel: EntryViewModel, autoPrompt: Boolean) {
 }
 
 @Composable
-private fun UnlockForm(state: EntryViewModel.UiState, onUnlock: (String) -> Unit, onBiometric: () -> Unit) {
+private fun UnlockForm(state: EntryViewModel.UiState, onUnlock: (String) -> Unit, onBiometric: () -> Unit, onHeir: () -> Unit) {
     var password by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
@@ -253,6 +269,13 @@ private fun UnlockForm(state: EntryViewModel.UiState, onUnlock: (String) -> Unit
                 Text(stringResource(R.string.unlock_biometric_cta))
             }
         }
+        // On every phone, whether an heir is set up or not (design v2 §8). 2.7.1 showed it only once
+        // the owner had gone silent, which told anyone looking that someone was waiting for them to
+        // stop answering. The offer says nothing; only the passphrase does.
+        Spacer(Modifier.height(4.dp))
+        TextButton(onClick = onHeir, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.heir_dialog_title), fontSize = 13.sp)
+        }
     }
 }
 
@@ -269,9 +292,51 @@ private fun ProblemText(problem: Problem?) {
         Problem.BIOMETRIC_FAILED -> R.string.unlock_biometric_failed
         Problem.BIOMETRIC_INVALIDATED -> R.string.unlock_biometric_enrollment_changed
         Problem.BIOMETRIC_DISARMED -> R.string.unlock_biometric_disarmed
+        Problem.HEIR_REFUSED -> R.string.heir_wrong_passphrase
     }
     Spacer(Modifier.height(12.dp))
     Text(stringResource(text), color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+}
+
+/**
+ * The heir's passphrase. Its words say nothing of whether an heir exists, nor of whether the owner
+ * has gone silent: everything this screen could say about either would be the oracle itself.
+ */
+@Composable
+private fun HeirPromptDialog(state: EntryViewModel.UiState, onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
+    var passphrase by remember { mutableStateOf("") }
+    val resources = LocalResources.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Diversity1, contentDescription = null) },
+        title = { Text(stringResource(R.string.heir_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.heir_dialog_body), fontSize = 13.sp)
+                PasswordField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = stringResource(R.string.heir_password_label),
+                    leadingIcon = null,
+                    readOnly = state.busy,
+                    onImeAction = { onSubmit(passphrase) },
+                )
+                val problem = when {
+                    state.heirLockedForMillis > 0 ->
+                        resources.getString(R.string.settings_locked_retry, countdownText(resources, state.heirLockedForMillis))
+                    state.problem != null -> resources.getString(R.string.heir_wrong_passphrase)
+                    else -> null
+                }
+                problem?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = { onSubmit(passphrase) }, enabled = passphrase.isNotEmpty() && !state.busy) {
+                Text(stringResource(R.string.unlock_cta))
+            }
+        },
+    )
 }
 
 @Composable

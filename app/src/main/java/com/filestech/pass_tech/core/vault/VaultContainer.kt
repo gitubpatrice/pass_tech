@@ -1,11 +1,8 @@
 package com.filestech.pass_tech.core.vault
 
 import com.filestech.pass_tech.core.crypto.AesGcm
-import com.filestech.pass_tech.core.crypto.Argon2id
-import com.filestech.pass_tech.core.crypto.HkdfSha256
 import com.filestech.pass_tech.core.crypto.KdfParams
 import com.filestech.pass_tech.core.crypto.SecretBytes
-import com.filestech.pass_tech.core.crypto.useThenWipe
 import com.filestech.pass_tech.core.json.ensure
 import com.filestech.pass_tech.core.json.objectOrNull
 import com.filestech.pass_tech.core.json.optInt
@@ -42,8 +39,6 @@ object VaultContainer {
 
     private const val MAGIC = "PTVAULT"
     private const val VERSION = 5
-    private const val SALT_LENGTH = 32
-    private const val KEY_LENGTH = 32
     private val HKDF_INFO = "pt:v5".encodeToByteArray()
 
     private val json = Json
@@ -52,28 +47,20 @@ object VaultContainer {
     class Header(val slot: Slot, val params: KdfParams, val salt: ByteArray)
 
     /** A new header for [slot]: a fresh salt. Also the synthetic header that spends an attempt's work on an empty slot. */
-    fun newHeader(slot: Slot, params: KdfParams = KdfParams.OWASP_MOBILE_2024) = Header(slot, params, SecretBytes.random(SALT_LENGTH))
+    fun newHeader(slot: Slot, params: KdfParams = KdfParams.OWASP_MOBILE_2024) =
+        Header(slot, params, SecretBytes.random(SlotCrypto.SALT_LENGTH))
 
-    /**
-     * Derives the key of a file: Argon2id, then the slot's hardware HMAC, whatever happens, so that every
-     * slot costs the same work. [KeyResult.Done] carries the key; otherwise the reason there is none:
-     * [KeyResult.NoKey] (the slot key is gone, this file opens nothing, ever) or [KeyResult.Unavailable]
-     * (the Keystore did not answer: nothing is known, retry).
-     */
+    /** See [SlotCrypto.deriveKey]. The domain `"pt:v5|slot=<label>|"` is this file's own. */
     fun deriveKey(header: Header, password: ByteArray, keystore: SlotKeystore): KeyResult<ByteArray> =
-        Argon2id.derive(password, header.salt, header.params).useThenWipe { pwHash ->
-            val hw = hardwareInput(header.slot, pwHash).useThenWipe { keystore.hmac(header.slot.hardwareKeyAlias, it) }
-            if (hw is KeyResult.Done) {
-                hw.value.useThenWipe { tag ->
-                    KeyResult.Done((pwHash + tag).useThenWipe { ikm -> HkdfSha256.derive(header.salt, ikm, HKDF_INFO, KEY_LENGTH) })
-                }
-            } else {
-                hw
-            }
-        }
-
-    /** `"pt:v5|slot=<label>|"` in ASCII, then the 32 bytes of pwHash: fixed length, no ambiguity. */
-    private fun hardwareInput(slot: Slot, pwHash: ByteArray): ByteArray = "pt:v5|slot=${slot.label}|".encodeToByteArray() + pwHash
+        SlotCrypto.deriveKey(
+            slot = header.slot,
+            params = header.params,
+            salt = header.salt,
+            password = password,
+            keystore = keystore,
+            domain = "pt:v$VERSION|slot=${header.slot.label}|",
+            info = HKDF_INFO,
+        )
 
     /**
      * Encrypts [paddedPayload] under [key] into the file content, with the slot's [occupancy] mark

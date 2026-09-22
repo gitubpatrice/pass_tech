@@ -51,11 +51,14 @@ class VaultOnDeviceTest {
             override fun getFilesDir(): File = sandbox
         }
         // No biometrics: the real binding would purge the app's own `pt_bio` key at every deletion.
+        val state = VaultModule.stateStore(context, keystore)
+        val clock = VaultModule.clock()
         val repository = VaultModule.vaultRepository(
             context,
             keystore,
-            VaultModule.stateStore(context, keystore),
-            VaultModule.clock(),
+            state,
+            clock,
+            VaultModule.heirRepository(context, keystore, state, clock),
             BiometricBinding.NONE,
         )
         manager = VaultManager(repository, Dispatchers.IO)

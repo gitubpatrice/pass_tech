@@ -13,6 +13,7 @@ import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FakeLauncherDisguise
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
@@ -54,10 +55,12 @@ class PanicServiceTest {
 
     @BeforeEach
     fun setUp() {
+        val clock = FakeClock()
         val state = StateStore(File(dir, StateStore.FILE_NAME), keystore)
-        guard = BruteForceGuard.forVault(state, FakeClock())
+        guard = BruteForceGuard.forVault(state, clock)
         val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
-        vault = VaultManager(VaultRepository(files, keystore, guard, biometrics, fastParams), Dispatchers.Unconfined)
+        val heir = heirRepository(dir, keystore, state, clock, fastParams)
+        vault = VaultManager(VaultRepository(files, keystore, guard, heir, biometrics, fastParams), Dispatchers.Unconfined)
         panic = PanicService(vault, clipboard, disguise)
     }
 

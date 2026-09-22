@@ -26,6 +26,7 @@ import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FakeLauncherDisguise
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.filestech.pass_tech.ui.components.PromptResult
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.ChangeProblem
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.Message
@@ -90,11 +91,13 @@ class SettingsViewModelTest {
         try {
             val keystore = InMemorySlotKeystore()
             val state = StateStore(File(dir, StateStore.FILE_NAME), keystore)
-            val guard = BruteForceGuard.forVault(state, FakeClock())
+            val clock = FakeClock()
+            val guard = BruteForceGuard.forVault(state, clock)
             val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
-            val repository = VaultRepository(files, keystore, guard, StoredBiometricBinding(state, bioKeys), fastParams)
+            val heir = heirRepository(dir, keystore, state, clock, fastParams)
+            val repository = VaultRepository(files, keystore, guard, heir, StoredBiometricBinding(state, bioKeys), fastParams)
             val vault = VaultManager(repository, io)
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "settings.preferences_pb") })
@@ -232,6 +235,42 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `the heir tile follows this vault, and an empty vault is refused`() = runTest {
+        opened { settings, vault, _ ->
+            settings.refreshHeir()
+            settings.heir.first { it != null }
+            assertThat(settings.heir.value?.enabled).isFalse()
+
+            // 2.7.1 refuses a snapshot of nothing, and says so.
+            settings.configureHeir("phrasedelheritier2026", update = false)
+            assertThat(settings.nextMessage()).isEqualTo(Message.HeirVaultEmpty)
+            settings.idle()
+
+            vault.updateEntries { it + entry("bank") }
+            settings.configureHeir("phrasedelheritier2026", update = false)
+            assertThat(settings.nextMessage()).isEqualTo(Message.HeirConfigured)
+            assertThat(settings.heir.first { it?.enabled == true }?.thresholdDays).isEqualTo(90)
+        }
+    }
+
+    @Test
+    fun `the heir passphrase may not be the master password, and turning it off says so`() = runTest {
+        opened { settings, vault, _ ->
+            vault.updateEntries { it + entry("bank") }
+            settings.configureHeir(owner, update = false)
+            assertThat(settings.nextMessage()).isEqualTo(Message.HeirPassphraseRefused)
+            settings.idle()
+
+            settings.configureHeir("phrasedelheritier2026", update = false)
+            assertThat(settings.nextMessage()).isEqualTo(Message.HeirConfigured)
+            settings.idle()
+            settings.disableHeir()
+            assertThat(settings.nextMessage()).isEqualTo(Message.HeirDisabled)
+            assertThat(settings.heir.first { it?.enabled == false }?.enabled).isFalse()
+        }
+    }
+
+    @Test
     fun `panic locks the vault and disguises the launcher, and revealing puts the name back`() = runTest {
         opened { settings, vault, _ ->
             settings.refreshDisguise()
@@ -320,10 +359,12 @@ class SettingsViewModelTest {
         try {
             val keystore = InMemorySlotKeystore()
             val state = StateStore(File(dir, StateStore.FILE_NAME), keystore)
-            val guard = BruteForceGuard.forVault(state, FakeClock())
+            val clock = FakeClock()
+            val guard = BruteForceGuard.forVault(state, clock)
             val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
             val io = StandardTestDispatcher(testScheduler)
-            val vault = VaultManager(VaultRepository(files, keystore, guard, params = fastParams), io)
+            val heir = heirRepository(dir, keystore, state, clock, fastParams)
+            val vault = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), io)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "now.preferences_pb") })
             val settings = ViewModelProvider.create(
                 viewModels,

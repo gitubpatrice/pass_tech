@@ -114,6 +114,13 @@ class AutoLock internal constructor(
         leftAt = null
         val announced = systemScreenTrip
         systemScreenTrip = false
+        // A heir reading closes at EVERY return, whatever the delay says and whatever was announced
+        // (2.7.1): it is someone else's phone, read once, and the snapshot has no reason to survive a
+        // trip to another app.
+        if (vault.state.value is VaultManager.State.Heir) {
+            scope.launch { vault.lock() }
+            return
+        }
         // Back from a file picker: a lock that was due waits, but only for a moment.
         if (announced && clock.elapsedMillis() - at <= SYSTEM_SCREEN_GRACE_MILLIS) return
         if (isDue(at)) {

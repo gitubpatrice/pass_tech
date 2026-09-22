@@ -13,6 +13,7 @@ import com.filestech.pass_tech.core.vault.VaultManager.UnlockOutcome
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.GatedFiles
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,8 +45,11 @@ class VaultManagerTest {
     @BeforeEach
     fun setUp() {
         files = GatedFiles(VaultFiles(dir))
-        val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
-        manager = VaultManager(VaultRepository(files, keystore, guard, params = fastParams), Dispatchers.IO)
+        val clock = FakeClock()
+        val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+        val guard = BruteForceGuard.forVault(store, clock)
+        val heir = heirRepository(dir, keystore, store, clock, fastParams)
+        manager = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), Dispatchers.IO)
     }
 
     // A fresh array for every call: the manager wipes what it is given.

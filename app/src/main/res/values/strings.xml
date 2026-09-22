@@ -298,6 +298,59 @@
     <!-- New in 3.0.0: no slot is provably free. The same words the creation form gives. -->
     <string name="decoy_error_impossible">A decoy vault cannot be created on this phone.</string>
 
+    <!-- Heir access (2.7.1 heir_view_screen.dart, settings_screen.dart:310-520) -->
+    <string name="heir_dialog_title">Heir access</string>
+    <!--
+      2.7.1 opened with "Owner inactivity period exceeded", because it only showed this once that was
+      true. Here the offer is on every phone (design v2 §8), so nothing it says may depend on whether
+      an heir exists or on whether the owner has gone silent.
+    -->
+    <string name="heir_dialog_body">Enter the heir password you were given.</string>
+    <string name="heir_password_label">Heir password</string>
+    <!-- The same words for a wrong password and for a vault whose owner is still answering. -->
+    <string name="heir_wrong_passphrase">Wrong password</string>
+    <string name="heir_view_title">Heir access (read only)</string>
+    <string name="heir_view_close">Close app</string>
+    <string name="heir_view_empty">Empty snapshot</string>
+    <string name="heir_view_banner_none">You are viewing the vault snapshot shared by its owner. Edits are not possible. No entry.</string>
+    <plurals name="heir_view_banner">
+        <item quantity="one">You are viewing the vault snapshot shared by its owner. Edits are not possible. %1$d entry.</item>
+        <item quantity="other">You are viewing the vault snapshot shared by its owner. Edits are not possible. %1$d entries.</item>
+    </plurals>
+    <string name="heir_view_field_username">Username</string>
+    <string name="heir_view_field_password">Password</string>
+    <string name="heir_view_field_url">URL</string>
+    <string name="heir_view_field_notes">Notes</string>
+
+    <string name="settings_section_heir">Inheritance (dead man\'s switch)</string>
+    <string name="heir_tile_setup">Set up an heir</string>
+    <string name="heir_tile_configured">Heir set up</string>
+    <string name="heir_tile_subtitle_setup">Someone close to you can reach the vault after a long period of inactivity. No cloud, no third party.</string>
+    <string name="heir_tile_subtitle_configured">Tap to update the snapshot or turn it off</string>
+    <!--
+      The last bullet is not 2.7.1's. It claimed the snapshot was detectable, which was true of its
+      single file; here the three exist and look alike, so what a phone shows is that AN heir was set
+      up, never for which vault.
+    -->
+    <string name="heir_setup_body">A password of its own, different from yours, lets someone close to you (partner, child, executor) reach the contents of the vault **after a long period of inactivity** on your part (90 days by default, plus 7 days of grace).\n\nKeep in mind:\n• The heir password must differ from your master password\n• Give it to your heir safely (in person, in a will, in a bank vault) — it is never stored and cannot be recovered\n• The heir reads a snapshot of the vault. Remember to update it from time to time.\n• If you unlock the vault before the grace ends, the countdown starts again.\n• All three snapshots then exist and look alike: nothing says which of your vaults the real one belongs to. That an heir is set up on this phone does show to an examination — for deniability, see the decoy vault.\n\nThis works entirely on the phone, with no cloud and no trusted third party.</string>
+    <string name="heir_configure">Set up</string>
+    <string name="heir_password_prompt_title">Heir password</string>
+    <string name="heir_configured_snack">Heir set up ✓ Vault snapshot encrypted.</string>
+    <string name="heir_vault_empty">The vault is empty — nothing to pass on</string>
+    <string name="heir_manage_title">Manage inheritance</string>
+    <string name="heir_manage_body">The heir reads a snapshot of the vault. You can:\n\n• Update the snapshot (with the heir password)\n• Turn inheritance off and delete the snapshot</string>
+    <string name="heir_disable">Turn off</string>
+    <string name="heir_update">Update</string>
+    <string name="heir_disabled_snack">Inheritance turned off, snapshot deleted</string>
+    <string name="heir_updated_snack">Snapshot updated ✓</string>
+    <string name="heir_threshold_tile_title">Inactivity before heir access</string>
+    <string name="heir_threshold_tile_subtitle">Threshold: %1$s · current inactivity: %2$s</string>
+    <string name="heir_threshold_dialog_title">Inactivity before heir access</string>
+    <plurals name="heir_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+
     <!-- Panic mode and its disguise (2.7.1 settings_screen.dart:732-832, CalculatorActivity.kt) -->
     <!--
       The name under the launcher icon while the disguise is on. It follows the language of the

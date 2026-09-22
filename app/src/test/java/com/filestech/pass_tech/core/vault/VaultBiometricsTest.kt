@@ -11,6 +11,7 @@ import com.filestech.pass_tech.core.vault.VaultRepository.BiometricUnlockResult
 import com.filestech.pass_tech.testing.FakeBiometricKeys
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -37,9 +38,11 @@ class VaultBiometricsTest {
 
     @BeforeEach
     fun setUp() {
+        val clock = FakeClock()
         state = StateStore(File(dir, StateStore.FILE_NAME), keystore)
         binding = StoredBiometricBinding(state, bioKeys)
-        repo = VaultRepository(VaultFiles(dir), keystore, BruteForceGuard.forVault(state, FakeClock()), binding, fastParams)
+        val heir = heirRepository(dir, keystore, state, clock, fastParams)
+        repo = VaultRepository(VaultFiles(dir), keystore, BruteForceGuard.forVault(state, clock), heir, binding, fastParams)
     }
 
     private fun created(): VaultSession = (repo.openOrCreate(owner.copyOf()) as VaultRepository.CreateResult.Created).session
