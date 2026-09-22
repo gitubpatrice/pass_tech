@@ -55,7 +55,9 @@ class SettingsViewModelTest {
             val keystore = InMemorySlotKeystore()
             val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
             val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
-            val vault = VaultManager(VaultRepository(files, keystore, guard, params = fastParams), Dispatchers.IO)
+            // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
+            val io = StandardTestDispatcher(testScheduler)
+            val vault = VaultManager(VaultRepository(files, keystore, guard, params = fastParams), io)
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "settings.preferences_pb") })
             val preferences = AppPreferences(store)

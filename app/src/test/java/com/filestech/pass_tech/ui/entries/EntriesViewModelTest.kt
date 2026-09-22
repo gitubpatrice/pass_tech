@@ -25,8 +25,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -63,7 +61,9 @@ class EntriesViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), Dispatchers.IO)
+            // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
+            val io = StandardTestDispatcher(testScheduler)
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), io)
             assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val clipboard = FakeClipboard(clearAfter = 30)
             val viewModel = EntriesViewModel(vault, clipboard)
@@ -77,12 +77,8 @@ class EntriesViewModelTest {
 
     private fun VaultManager.entries() = (state.value as VaultManager.State.Open).entries
 
-    /** Lets the view model's coroutine run, and waits for the vault write it started, on real threads. */
-    private suspend fun TestScope.settle(vault: VaultManager) {
-        testScheduler.advanceUntilIdle()
-        withContext(Dispatchers.Default) { withTimeout(10_000) { vault.entryMode() } }
-        testScheduler.advanceUntilIdle()
-    }
+    /** Lets the view model's coroutine run, and the vault write it started: both are on the test scheduler. */
+    private fun TestScope.settle() = testScheduler.advanceUntilIdle()
 
     private fun EntriesViewModel.editor() = stack.value.last() as Screen.Edit
 
@@ -93,7 +89,7 @@ class EntriesViewModelTest {
             val editor = viewModel.editor()
             editor.form.title = "Visa"
             viewModel.save(editor)
-            settle(vault)
+            settle()
             assertThat(vault.entries().map { it.title }).containsExactly("Visa")
             assertThat(vault.entries().single().category).isEqualTo("Banque")
             assertThat(viewModel.stack.value).isEmpty()
@@ -105,7 +101,7 @@ class EntriesViewModelTest {
         opened { (viewModel, vault, messages) ->
             viewModel.openNew(EntryType.NOTE)
             viewModel.save(viewModel.editor())
-            settle(vault)
+            settle()
             assertThat(vault.entries()).isEmpty()
             assertThat(viewModel.stack.value).hasSize(1)
             assertThat(messages).containsExactly(Message.TitleRequired)
@@ -118,13 +114,13 @@ class EntriesViewModelTest {
             viewModel.openNew(EntryType.PASSWORD)
             viewModel.editor().form.title = "Mail"
             viewModel.save(viewModel.editor())
-            settle(vault)
+            settle()
             val first = vault.entries().single()
             viewModel.openDetail(first.id)
             viewModel.openEditor(first)
             viewModel.editor().form.username = "alice"
             viewModel.save(viewModel.editor())
-            settle(vault)
+            settle()
             val edited = vault.entries().single()
             assertThat(edited.id).isEqualTo(first.id)
             assertThat(edited.username).isEqualTo("alice")
@@ -139,10 +135,10 @@ class EntriesViewModelTest {
             viewModel.openNew(EntryType.NOTE)
             viewModel.editor().form.title = "Wi-Fi"
             viewModel.save(viewModel.editor())
-            settle(vault)
+            settle()
             val before = vault.entries().single()
             viewModel.toggleFavorite(before.id)
-            settle(vault)
+            settle()
             val after = vault.entries().single()
             assertThat(after.isFavorite).isTrue()
             assertThat(after.updatedAt).isEqualTo(before.updatedAt)
@@ -155,11 +151,11 @@ class EntriesViewModelTest {
             viewModel.openNew(EntryType.NOTE)
             viewModel.editor().form.title = "Wi-Fi"
             viewModel.save(viewModel.editor())
-            settle(vault)
+            settle()
             val entry = vault.entries().single()
             viewModel.openDetail(entry.id)
             viewModel.delete(entry)
-            settle(vault)
+            settle()
             assertThat(vault.entries()).isEmpty()
             assertThat(viewModel.stack.value).isEmpty()
             assertThat(messages).containsExactly(Message.Deleted("Wi-Fi"))
@@ -208,7 +204,7 @@ class EntriesViewModelTest {
             viewModel.copy("secret", R.string.entry_detail_field_password)
             clipboard.clearAfter = null
             viewModel.copy("alice", R.string.entry_detail_field_username)
-            settle(vault)
+            settle()
             assertThat(clipboard.copied).containsExactly("secret", "alice").inOrder()
             assertThat(messages).containsExactly(
                 Message.Copied(R.string.entry_detail_field_password, 30),
@@ -225,7 +221,7 @@ class EntriesViewModelTest {
             editor.form.title = "Wi-Fi"
             keystore.unavailable += OccupancyMark.KEY_ALIAS
             viewModel.save(editor)
-            settle(vault)
+            settle()
             assertThat(vault.entries()).isEmpty()
             assertThat(viewModel.stack.value).containsExactly(editor)
             assertThat(editor.form.saving).isFalse()
@@ -233,7 +229,7 @@ class EntriesViewModelTest {
 
             keystore.unavailable.clear()
             viewModel.save(editor)
-            settle(vault)
+            settle()
             assertThat(vault.entries().map { it.title }).containsExactly("Wi-Fi")
         }
     }

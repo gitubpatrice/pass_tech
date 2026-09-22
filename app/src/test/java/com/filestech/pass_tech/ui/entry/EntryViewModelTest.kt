@@ -50,7 +50,9 @@ class EntryViewModelTest {
             }
             val keystore = InMemorySlotKeystore()
             val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), clock)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), Dispatchers.IO)
+            // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
+            val io = StandardTestDispatcher(testScheduler)
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), io)
             val viewModel = EntryViewModel(vault, clock)
             block(viewModel, vault)
         } finally {
