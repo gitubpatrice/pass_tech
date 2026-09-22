@@ -323,6 +323,10 @@ class VaultRepository(
      * Opens the vault that armed biometrics, with a cipher the prompt authenticated (design v2 §9): the
      * sealed key is tried on every slot, and opens the one it decrypts whose generation it carries. Not
      * a password guess, so the lockout does not count it; but a running lockout refuses it, as 2.7.1 did.
+     *
+     * A vault with a decoy, or one it cannot rule out, is never opened by a fingerprint, whatever
+     * armed it: checked here, at the moment of use, and not only when arming (Gemini review of the
+     * biometrics, 2026-09-22). The purges keep this from happening; this keeps it from mattering.
      */
     fun unlockWithBiometrics(cipher: Cipher): BiometricUnlockResult =
         unavailableAs(BiometricUnlockResult.KeystoreUnavailable) {
@@ -330,12 +334,10 @@ class VaultRepository(
             if (gate is BruteForceGuard.Gate.Locked) return BiometricUnlockResult.Locked(gate.remainingMillis)
             val armed = biometrics.open(cipher)
             val session = armed?.key?.useThenWipe { openArmed(it, armed.generation) }
-            if (session == null) {
-                biometrics.purge()
-                BiometricUnlockResult.Disarmed
-            } else {
-                BiometricUnlockResult.Opened(settle(session))
-            }
+            if (session != null && !hasDecoy(session)) return BiometricUnlockResult.Opened(settle(session))
+            session?.close()
+            biometrics.purge()
+            BiometricUnlockResult.Disarmed
         }
 
     private fun changeVerified(session: VaultSession, new: ByteArray): ChangeResult =

@@ -33,9 +33,13 @@ class AndroidBiometricKeys(private val alias: String = ALIAS) : BiometricKeys {
             .setUserAuthenticationRequired(true)
             .setInvalidatedByBiometricEnrollment(true)
             .apply {
-                // Below Android 11, a key with no validity duration already asks for a biometric at every use.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
+                } else {
+                    // -1: a biometric at every use. The default already, written out rather than left to
+                    // the device (GPT review of the biometrics, 2026-09-22).
+                    @Suppress("DEPRECATION")
+                    setUserAuthenticationValidityDurationSeconds(-1)
                 }
             }
             .build()

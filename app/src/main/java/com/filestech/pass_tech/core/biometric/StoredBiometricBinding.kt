@@ -1,5 +1,6 @@
 package com.filestech.pass_tech.core.biometric
 
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.vault.BiometricBinding
 import com.filestech.pass_tech.core.vault.BiometricBinding.Start
@@ -66,7 +67,9 @@ class StoredBiometricBinding(private val store: StateStore, private val keys: Bi
             }
             BiometricBinding.Armed(record.generation, key)
         } catch (e: KeystoreUnavailableException) {
-            if (e.cause is AEADBadTagException) null else throw e
+            // A key some phones only find invalidated once used, after a new enrolment: it opens
+            // nothing, like a seal that does not authenticate, and the vault then disarms.
+            if (e.cause is AEADBadTagException || e.cause is KeyPermanentlyInvalidatedException) null else throw e
         }
     }
 

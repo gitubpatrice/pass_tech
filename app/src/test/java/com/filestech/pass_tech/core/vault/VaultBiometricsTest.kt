@@ -114,6 +114,17 @@ class VaultBiometricsTest {
     }
 
     @Test
+    fun `a fingerprint never opens a vault that has a decoy, whatever armed it`() {
+        val parent = withDecoy(created())
+        // Armed behind every rule's back, as a purge that went missing would leave it.
+        binding.arm(parent.meta.generation, parent.key.copyOf(), binding.cipherToArm())
+        parent.close()
+        assertThat(fingerprint()).isEqualTo(BiometricUnlockResult.Disarmed)
+        assertThat(repo.biometricsArmed()).isFalse()
+        opened(owner).close()
+    }
+
+    @Test
     fun `a secure chip that does not answer stops the decoy before anything is written, still armed`() {
         val parent = created()
         assertThat(arm(parent)).isTrue()
