@@ -50,7 +50,14 @@ class VaultOnDeviceTest {
         val context: Context = object : ContextWrapper(target) {
             override fun getFilesDir(): File = sandbox
         }
-        val repository = VaultModule.vaultRepository(context, keystore, VaultModule.stateStore(context, keystore), VaultModule.clock())
+        // No biometrics: the real binding would purge the app's own `pt_bio` key at every deletion.
+        val repository = VaultModule.vaultRepository(
+            context,
+            keystore,
+            VaultModule.stateStore(context, keystore),
+            VaultModule.clock(),
+            BiometricBinding.NONE,
+        )
         manager = VaultManager(repository, Dispatchers.IO)
     }
 

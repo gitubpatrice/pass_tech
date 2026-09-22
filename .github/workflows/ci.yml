@@ -32,9 +32,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       # The same command as the local gate, so that CI and a developer's machine can never disagree
-      # about what "green" means. detekt is blocking (maxIssues: 0, no baseline).
+      # about what "green" means. detekt is blocking (maxIssues: 0, no baseline). The instrumented
+      # tests are compiled, not run: they need a device, and nothing else would notice them broken
+      # (a signature change left them uncompilable for a whole feature, 2026-09-22).
       - name: Gate
-        run: ./gradlew --no-daemon :app:assembleDebug testDebugUnitTest :app:lintDebug detekt
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest :app:lintDebug detekt
 
       # R8 decides what actually ships. A debug-only gate never runs it, so a keep rule missing for a
       # class reached by reflection would only show up in the published APK.
