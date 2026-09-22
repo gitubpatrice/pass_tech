@@ -1,5 +1,6 @@
 package com.filestech.pass_tech.ui
 
+import android.content.res.Resources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,55 +13,137 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.vault.VaultManager
+import com.filestech.pass_tech.ui.components.PrivateKeyboard
+import com.filestech.pass_tech.ui.entries.EntriesViewModel
+import com.filestech.pass_tech.ui.entries.EntriesViewModel.Message
+import com.filestech.pass_tech.ui.entries.EntriesViewModel.Screen
+import com.filestech.pass_tech.ui.entries.EntryDetailScreen
+import com.filestech.pass_tech.ui.entries.EntryEditScreen
 import com.filestech.pass_tech.ui.entry.EntryScreen
 import com.filestech.pass_tech.ui.entry.EntryViewModel
 import com.filestech.pass_tech.ui.home.HomeScreen
 import com.filestech.pass_tech.ui.splash.SplashScreen
 import com.filestech.pass_tech.ui.splash.SplashViewModel
+import kotlinx.coroutines.launch
 
 /**
  * The root: the vault state picks the screen, the first-launch splash covers it, and the backup
  * reminder follows a creation over whichever screen is up (the home, by then).
  */
 @Composable
-fun PassTechApp(app: AppViewModel, entry: EntryViewModel, splash: SplashViewModel) {
+fun PassTechApp(app: AppViewModel, entry: EntryViewModel, entries: EntriesViewModel, splash: SplashViewModel) {
     val vaultState by app.vaultState.collectAsStateWithLifecycle()
     val locking by app.locking.collectAsStateWithLifecycle()
     val entryState by entry.state.collectAsStateWithLifecycle()
     val showSplash by splash.shouldShow.collectAsStateWithLifecycle()
     var splashDismissed by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+    Messages(entries, snackbar)
 
-    Box(Modifier.fillMaxSize()) {
-        val state = vaultState
-        when {
-            // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
-            locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-            state is VaultManager.State.Open -> HomeScreen(entries = state.entries, onLock = app::lock)
-            else -> EntryScreen(entry)
-        }
-        if (showSplash == true && !splashDismissed) {
-            SplashScreen(
-                onDismiss = {
-                    splashDismissed = true
-                    splash.markShown()
-                },
-            )
+    PrivateKeyboard {
+        Box(Modifier.fillMaxSize()) {
+            val state = vaultState
+            when {
+                // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
+                locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                state is VaultManager.State.Open -> OpenVault(state, entries, snackbar, onLock = app::lock)
+                else -> EntryScreen(entry)
+            }
+            if (showSplash == true && !splashDismissed) {
+                SplashScreen(
+                    onDismiss = {
+                        splashDismissed = true
+                        splash.markShown()
+                    },
+                )
+            }
         }
     }
     if (entryState.backupReminder) BackupReminderDialog(onDismiss = entry::backupReminderSeen)
+}
+
+/** The home, or the screen on top of it: an entry's detail or the editor. */
+@Composable
+private fun OpenVault(state: VaultManager.State.Open, entries: EntriesViewModel, snackbar: SnackbarHostState, onLock: () -> Unit) {
+    val stack by entries.stack.collectAsStateWithLifecycle()
+    when (val top = stack.lastOrNull()) {
+        null -> HomeScreen(
+            entries = state.entries,
+            snackbar = snackbar,
+            onLock = onLock,
+            onOpen = { entries.openDetail(it.id) },
+            onAdd = entries::openNew,
+            onToggleFavorite = { entries.toggleFavorite(it.id) },
+            onDelete = entries::delete,
+        )
+        is Screen.Detail -> {
+            val shown = state.entries.firstOrNull { it.id == top.id }
+            if (shown == null) {
+                // Deleted in the meantime.
+                LaunchedEffect(top) { entries.close(top) }
+            } else {
+                EntryDetailScreen(
+                    entry = shown,
+                    snackbar = snackbar,
+                    onBack = { entries.close(top) },
+                    onToggleFavorite = { entries.toggleFavorite(shown.id) },
+                    onEdit = { entries.openEditor(shown) },
+                    onDelete = { entries.delete(shown) },
+                    onCopy = entries::copy,
+                )
+            }
+        }
+        is Screen.Edit -> EntryEditScreen(
+            form = top.form,
+            snackbar = snackbar,
+            onSave = { entries.save(top) },
+            onLeave = { entries.close(top) },
+            onSecretAdded = entries::secretAdded,
+        )
+    }
+}
+
+/** One message at a time: a new one replaces the one showing, as 2.7.1's snack bars do. */
+@Composable
+private fun Messages(entries: EntriesViewModel, snackbar: SnackbarHostState) {
+    val resources = LocalResources.current
+    LaunchedEffect(entries, snackbar) {
+        entries.messages.collect { message ->
+            snackbar.currentSnackbarData?.dismiss()
+            launch { snackbar.showSnackbar(message.text(resources)) }
+        }
+    }
+}
+
+private fun Message.text(resources: Resources): String = when (this) {
+    is Message.Copied -> {
+        val label = resources.getString(label)
+        if (clearedInSeconds == null) {
+            resources.getString(R.string.entry_detail_copied_snack_kept, label)
+        } else {
+            resources.getString(R.string.entry_detail_copied_snack, label, clearedInSeconds)
+        }
+    }
+    is Message.Deleted -> resources.getString(R.string.home_deleted_snack, title)
+    Message.TitleRequired -> resources.getString(R.string.entry_edit_title_required)
+    Message.SecretAdded -> resources.getString(R.string.entry_edit_secret_added)
+    Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
 }
 
 /** 2.7.1: shown once, right after the creation, one button. */

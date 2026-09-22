@@ -41,6 +41,18 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         store.edit { it[AUTO_LOCK] = seconds }
     }
 
+    /**
+     * How long a copied value stays in the clipboard, in seconds: one of [CLIPBOARD_CHOICES], 0 for
+     * never cleared. A value that is not one of them reads as the default.
+     */
+    val clipboardClearSeconds: Flow<Int> =
+        data.map { prefs -> prefs[CLIPBOARD_CLEAR]?.takeIf { it in CLIPBOARD_CHOICES } ?: CLIPBOARD_DEFAULT }
+
+    suspend fun setClipboardClearSeconds(seconds: Int) {
+        require(seconds in CLIPBOARD_CHOICES) { "Not a clipboard choice: $seconds" }
+        store.edit { it[CLIPBOARD_CLEAR] = seconds }
+    }
+
     companion object {
         /** The vault never locks by itself. */
         const val NEVER = -1
@@ -51,7 +63,14 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         /** 2.7.1's default: 5 minutes. */
         const val AUTO_LOCK_DEFAULT = 300
 
+        /** 2.7.1's choices: 15, 30 or 60 seconds, or never (0). */
+        val CLIPBOARD_CHOICES = listOf(15, 30, 60, 0)
+
+        /** 2.7.1's default: 30 seconds. */
+        const val CLIPBOARD_DEFAULT = 30
+
         private val SPLASH_SHOWN = booleanPreferencesKey("splash_shown")
         private val AUTO_LOCK = intPreferencesKey("auto_lock_seconds")
+        private val CLIPBOARD_CLEAR = intPreferencesKey("clipboard_clear")
     }
 }

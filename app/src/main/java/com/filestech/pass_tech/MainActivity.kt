@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.filestech.pass_tech.ui.AppViewModel
 import com.filestech.pass_tech.ui.PassTechApp
+import com.filestech.pass_tech.ui.entries.EntriesViewModel
 import com.filestech.pass_tech.ui.entry.EntryViewModel
 import com.filestech.pass_tech.ui.splash.SplashViewModel
 import com.filestech.pass_tech.ui.theme.PassTechTheme
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
 
     private val app: AppViewModel by viewModels()
     private val entry: EntryViewModel by viewModels()
+    private val entries: EntriesViewModel by viewModels()
     private val splash: SplashViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +34,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PassTechTheme {
-                PassTechApp(app = app, entry = entry, splash = splash)
+                PassTechApp(app = app, entry = entry, entries = entries, splash = splash)
             }
         }
     }

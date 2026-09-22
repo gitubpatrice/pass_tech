@@ -1,0 +1,122 @@
+[
+  {
+    "secret": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "time": 1790077613,
+    "code": "181 727",
+    "validate": null
+  },
+  {
+    "secret": "gezd gnbv gy3t qojq gezd gnbv gy3t qojq====",
+    "time": 1790077613,
+    "code": "181 727",
+    "validate": null
+  },
+  {
+    "secret": "JBSWY3DPEHPK3PXP",
+    "time": 1790077613,
+    "code": "074 833",
+    "validate": null
+  },
+  {
+    "secret": "JBSWY3DPEHPK3PX",
+    "time": 1790077613,
+    "code": "436 323",
+    "validate": "tooShort"
+  },
+  {
+    "secret": "JBSWY3DPEHPK3PXP1",
+    "time": 1790077613,
+    "code": "074 833",
+    "validate": "invalidCharacters"
+  },
+  {
+    "secret": "JBSW-Y3DP-EHPK-3PXP-JBSW",
+    "time": 1790077613,
+    "code": "670 222",
+    "validate": "invalidCharacters"
+  },
+  {
+    "secret": "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+    "time": 1790077613,
+    "code": "322 906",
+    "validate": null
+  },
+  {
+    "secret": "A",
+    "time": 1790077613,
+    "code": "------",
+    "validate": "tooShort"
+  },
+  {
+    "secret": "",
+    "time": 1790077613,
+    "code": "------",
+    "validate": "empty"
+  },
+  {
+    "secret": "   ",
+    "time": 1790077613,
+    "code": "------",
+    "validate": "empty"
+  },
+  {
+    "secret": "1890!",
+    "time": 1790077613,
+    "code": "------",
+    "validate": "invalidCharacters"
+  },
+  {
+    "secret": "ABC1",
+    "time": 1790077613,
+    "code": "685 278",
+    "validate": "invalidCharacters"
+  },
+  {
+    "secret": "ABCD EFGH",
+    "time": 1790077613,
+    "code": "678 945",
+    "validate": "tooShort"
+  },
+  {
+    "secret": "GEZDGNBVGY3TQOJQ",
+    "time": 1790077613,
+    "code": "355 156",
+    "validate": null
+  },
+  {
+    "secret": "GEZDGNBVGY3TQOJ",
+    "time": 1790077613,
+    "code": "814 614",
+    "validate": "tooShort"
+  },
+  {
+    "secret": "====",
+    "time": 1790077613,
+    "code": "------",
+    "validate": "tooShort"
+  },
+  {
+    "secret": "MZXW6YTBOI======",
+    "time": 1790077613,
+    "code": "048 330",
+    "validate": "tooShort"
+  },
+  {
+    "secret": "MZXW6YTBOIMZXW6YTBOI",
+    "time": 1790077613,
+    "code": "621 895",
+    "validate": null
+  },
+  {
+    "secret": "éàGEZDGNBVGY3TQOJQ",
+    "time": 1790077613,
+    "code": "355 156",
+    "validate": "invalidCharacters"
+  },
+  {
+    "secret": "GEZDGNBVGY3TQOJQ\n",
+    "time": 1790077613,
+    "code": "355 156",
+    "validate": null
+  }
+]

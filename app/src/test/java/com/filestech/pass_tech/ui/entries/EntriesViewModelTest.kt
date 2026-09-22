@@ -1,0 +1,217 @@
+package com.filestech.pass_tech.ui.entries
+
+import com.filestech.pass_tech.R
+import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
+import com.filestech.pass_tech.core.crypto.KdfParams
+import com.filestech.pass_tech.core.model.EntryType
+import com.filestech.pass_tech.core.security.BruteForceGuard
+import com.filestech.pass_tech.core.state.StateStore
+import com.filestech.pass_tech.core.vault.OccupancyMark
+import com.filestech.pass_tech.core.vault.VaultFiles
+import com.filestech.pass_tech.core.vault.VaultManager
+import com.filestech.pass_tech.core.vault.VaultRepository
+import com.filestech.pass_tech.testing.FakeClock
+import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.ui.entries.EntriesViewModel.Message
+import com.filestech.pass_tech.ui.entries.EntriesViewModel.Screen
+import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+
+/** The screens above the home, on a real vault (in-memory Keystore, temporary files). */
+@OptIn(ExperimentalCoroutinesApi::class)
+class EntriesViewModelTest {
+
+    @TempDir
+    lateinit var dir: File
+
+    private val fastParams = KdfParams(memoryKiB = KdfParams.MIN_MEMORY_KIB, iterations = 1, parallelism = 1)
+    private val keystore = InMemorySlotKeystore()
+
+    private class FakeClipboard(var clearAfter: Int?) : SensitiveClipboard {
+        val copied = mutableListOf<String>()
+
+        override fun copy(text: String): Int? {
+            copied += text
+            return clearAfter
+        }
+
+        override fun clear() = Unit
+    }
+
+    private data class Setup(
+        val viewModel: EntriesViewModel,
+        val vault: VaultManager,
+        val messages: List<Message>,
+        val clipboard: FakeClipboard,
+    )
+
+    private suspend fun TestScope.opened(block: suspend TestScope.(Setup) -> Unit) {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), Dispatchers.IO)
+            assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
+            val clipboard = FakeClipboard(clearAfter = 30)
+            val viewModel = EntriesViewModel(vault, clipboard)
+            val messages = mutableListOf<Message>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.messages.toList(messages) }
+            block(Setup(viewModel, vault, messages, clipboard))
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    private fun VaultManager.entries() = (state.value as VaultManager.State.Open).entries
+
+    /** Lets the view model's coroutine run, and waits for the vault write it started, on real threads. */
+    private suspend fun TestScope.settle(vault: VaultManager) {
+        testScheduler.advanceUntilIdle()
+        withContext(Dispatchers.Default) { withTimeout(10_000) { vault.entryMode() } }
+        testScheduler.advanceUntilIdle()
+    }
+
+    private fun EntriesViewModel.editor() = stack.value.last() as Screen.Edit
+
+    @Test
+    fun `a new entry is saved into the vault and its editor closes`() = runTest {
+        opened { (viewModel, vault) ->
+            viewModel.openNew(EntryType.CARD)
+            val editor = viewModel.editor()
+            editor.form.title = "Visa"
+            viewModel.save(editor)
+            settle(vault)
+            assertThat(vault.entries().map { it.title }).containsExactly("Visa")
+            assertThat(vault.entries().single().category).isEqualTo("Banque")
+            assertThat(viewModel.stack.value).isEmpty()
+        }
+    }
+
+    @Test
+    fun `no title, nothing written, the editor stays and says why`() = runTest {
+        opened { (viewModel, vault, messages) ->
+            viewModel.openNew(EntryType.NOTE)
+            viewModel.save(viewModel.editor())
+            settle(vault)
+            assertThat(vault.entries()).isEmpty()
+            assertThat(viewModel.stack.value).hasSize(1)
+            assertThat(messages).containsExactly(Message.TitleRequired)
+        }
+    }
+
+    @Test
+    fun `an edit replaces the entry in place, same id, same creation date`() = runTest {
+        opened { (viewModel, vault) ->
+            viewModel.openNew(EntryType.PASSWORD)
+            viewModel.editor().form.title = "Mail"
+            viewModel.save(viewModel.editor())
+            settle(vault)
+            val first = vault.entries().single()
+            viewModel.openDetail(first.id)
+            viewModel.openEditor(first)
+            viewModel.editor().form.username = "alice"
+            viewModel.save(viewModel.editor())
+            settle(vault)
+            val edited = vault.entries().single()
+            assertThat(edited.id).isEqualTo(first.id)
+            assertThat(edited.username).isEqualTo("alice")
+            assertThat(edited.createdAt).isEqualTo(first.createdAt)
+            assertThat(viewModel.stack.value).containsExactly(Screen.Detail(first.id))
+        }
+    }
+
+    @Test
+    fun `starring an entry does not move its modification date`() = runTest {
+        opened { (viewModel, vault) ->
+            viewModel.openNew(EntryType.NOTE)
+            viewModel.editor().form.title = "Wi-Fi"
+            viewModel.save(viewModel.editor())
+            settle(vault)
+            val before = vault.entries().single()
+            viewModel.toggleFavorite(before.id)
+            settle(vault)
+            val after = vault.entries().single()
+            assertThat(after.isFavorite).isTrue()
+            assertThat(after.updatedAt).isEqualTo(before.updatedAt)
+        }
+    }
+
+    @Test
+    fun `deleting closes the entry's detail and says so`() = runTest {
+        opened { (viewModel, vault, messages) ->
+            viewModel.openNew(EntryType.NOTE)
+            viewModel.editor().form.title = "Wi-Fi"
+            viewModel.save(viewModel.editor())
+            settle(vault)
+            val entry = vault.entries().single()
+            viewModel.openDetail(entry.id)
+            viewModel.delete(entry)
+            settle(vault)
+            assertThat(vault.entries()).isEmpty()
+            assertThat(viewModel.stack.value).isEmpty()
+            assertThat(messages).containsExactly(Message.Deleted("Wi-Fi"))
+        }
+    }
+
+    @Test
+    fun `locking drops every screen, an entry being typed included`() = runTest {
+        opened { (viewModel, vault) ->
+            viewModel.openNew(EntryType.PASSWORD)
+            viewModel.editor().form.password = "typed but not saved"
+            vault.lock()
+            testScheduler.advanceUntilIdle()
+            assertThat(viewModel.stack.value).isEmpty()
+        }
+    }
+
+    @Test
+    fun `a copy says when the clipboard clears, or nothing when it never does`() = runTest {
+        opened { setup ->
+            val (viewModel, vault, messages) = setup
+            val clipboard = setup.clipboard
+            viewModel.copy("secret", R.string.entry_detail_field_password)
+            clipboard.clearAfter = null
+            viewModel.copy("alice", R.string.entry_detail_field_username)
+            settle(vault)
+            assertThat(clipboard.copied).containsExactly("secret", "alice").inOrder()
+            assertThat(messages).containsExactly(
+                Message.Copied(R.string.entry_detail_field_password, 30),
+                Message.Copied(R.string.entry_detail_field_username, null),
+            ).inOrder()
+        }
+    }
+
+    @Test
+    fun `a Keystore that does not answer writes nothing, keeps the editor and lets the user retry`() = runTest {
+        opened { (viewModel, vault, messages) ->
+            viewModel.openNew(EntryType.NOTE)
+            val editor = viewModel.editor()
+            editor.form.title = "Wi-Fi"
+            keystore.unavailable += OccupancyMark.KEY_ALIAS
+            viewModel.save(editor)
+            settle(vault)
+            assertThat(vault.entries()).isEmpty()
+            assertThat(viewModel.stack.value).containsExactly(editor)
+            assertThat(editor.form.saving).isFalse()
+            assertThat(messages).containsExactly(Message.KeystoreUnavailable)
+
+            keystore.unavailable.clear()
+            viewModel.save(editor)
+            settle(vault)
+            assertThat(vault.entries().map { it.title }).containsExactly("Wi-Fi")
+        }
+    }
+}

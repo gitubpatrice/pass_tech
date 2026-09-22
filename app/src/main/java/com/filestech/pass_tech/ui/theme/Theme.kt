@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 // Dark palette of the Flutter app (2.7.1, lib/main.dart `_darkTheme`, GitHub dark), carried over unchanged.
@@ -85,14 +87,26 @@ object StrengthColors {
     val VeryStrong = Color(0xFF43A047)
 }
 
+/** Whether the dark palette is showing: the two themes of 2.7.1 draw cards differently. */
+val LocalDarkTheme = staticCompositionLocalOf { false }
+
+/** 2.7.1's red for destructive actions, in both themes (`widgets/destructive.dart`). */
+val DestructiveRed = Color(0xFFC62828)
+
+/** 2.7.1's favourite star (Flutter `Colors.amber` shades 400 and 600). */
+val FavoriteAmber = Color(0xFFFFCA28)
+val FavoriteAmberDark = Color(0xFFFFB300)
+
 /** Follows the system setting, as 2.7.1 does by default (`ThemeMode.system`). */
 @Composable
 fun PassTechTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
-        content = content,
-    )
+    CompositionLocalProvider(LocalDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColors else LightColors,
+            content = content,
+        )
+    }
 }

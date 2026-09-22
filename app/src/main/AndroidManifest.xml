@@ -38,5 +38,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Clears the clipboard once the delay is over, even while the app is in the background. -->
+        <receiver
+            android:name=".core.clipboard.SecureClipboard$ClearReceiver"
+            android:exported="false" />
     </application>
 </manifest>

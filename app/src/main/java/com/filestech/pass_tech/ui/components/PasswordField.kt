@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -58,9 +59,12 @@ fun PasswordField(
     label: String,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    isError: Boolean = false,
     imeAction: ImeAction = ImeAction.Done,
     onImeAction: () -> Unit = {},
     readOnly: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Password,
+    leadingIcon: ImageVector? = Icons.Outlined.Lock,
 ) {
     var visible by remember { mutableStateOf(false) }
     OutlinedTextField(
@@ -68,7 +72,8 @@ fun PasswordField(
         onValueChange = onValueChange,
         label = { Text(label) },
         supportingText = supportingText?.let { { Text(it) } },
-        leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
+        isError = isError,
+        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(20.dp)) } },
         trailingIcon = {
             IconButton(onClick = { visible = !visible }) {
                 Icon(
@@ -78,7 +83,7 @@ fun PasswordField(
             }
         },
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false, imeAction = imeAction),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, autoCorrectEnabled = false, imeAction = imeAction),
         keyboardActions = KeyboardActions(onAny = { onImeAction() }),
         singleLine = true,
         readOnly = readOnly,
