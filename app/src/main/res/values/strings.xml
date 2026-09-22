@@ -261,4 +261,20 @@
     <string name="change_password_refused">This password cannot be used. Choose another one.</string>
     <!-- New: 2.7.1 had no message for a confirmation refused by the lockout. -->
     <string name="settings_locked_retry">Too many attempts. Try again in %1$s.</string>
+    <!-- Biometrics (2.7.1: unlock_screen.dart, settings_screen.dart) -->
+    <string name="unlock_biometric_cta">Fingerprint / Face ID</string>
+    <string name="unlock_biometric_failed">Biometric failure</string>
+    <string name="unlock_biometric_enrollment_changed">Android fingerprints changed: biometric unlock was disabled for safety. Unlock with your master password, then re-enable biometric in Settings.</string>
+    <string name="unlock_biometric_disarmed">Biometric unlock was disabled. Unlock with your master password, then re-enable biometric in Settings.</string>
+    <string name="biometric_prompt_subtitle">Unlock your vault</string>
+    <string name="settings_biometric_title">Biometric unlock</string>
+    <string name="settings_biometric_subtitle">Fingerprint or Face ID</string>
+    <string name="settings_biometric_enabled">Biometric unlock enabled.</string>
+    <string name="settings_biometric_disabled">Biometric unlock disabled.</string>
+    <string name="settings_biometric_enable_canceled">Biometric activation canceled.</string>
+    <string name="settings_biometric_enable_failed">Biometric activation failed.</string>
+    <string name="settings_biometric_decoy_conflict">Biometric unlock is unavailable on this vault. Only your master password opens it.</string>
+    <string name="settings_biometric_new_enrollment_warning">If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.</string>
+    <string name="settings_biometric_another_vault">Biometric unlock opens a vault other than this one.</string>
+    <string name="change_password_done_biometric_reset">Password changed. Biometric unlock has been disabled — re-enable it in Settings.</string>
 </resources>

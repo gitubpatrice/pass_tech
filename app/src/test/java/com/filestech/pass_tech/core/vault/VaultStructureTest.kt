@@ -37,7 +37,13 @@ class VaultStructureTest {
     fun setUp() {
         files = CrashingFiles(VaultFiles(dir))
         val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
-        repo = VaultRepository(files, keystore, guard, biometrics = { biometricPurges++ }, params = fastParams)
+        // Counts the purges; nothing is ever armed here.
+        val biometrics = object : BiometricBinding by BiometricBinding.NONE {
+            override fun purge() {
+                biometricPurges++
+            }
+        }
+        repo = VaultRepository(files, keystore, guard, biometrics, params = fastParams)
     }
 
     private fun open(password: ByteArray): VaultSession =

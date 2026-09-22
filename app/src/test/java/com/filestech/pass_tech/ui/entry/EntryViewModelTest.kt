@@ -1,5 +1,6 @@
 package com.filestech.pass_tech.ui.entry
 
+import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
 import com.filestech.pass_tech.core.crypto.KdfParams
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.Clock
@@ -8,8 +9,10 @@ import com.filestech.pass_tech.core.vault.VaultFiles
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
+import com.filestech.pass_tech.testing.FakeBiometricKeys
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.ui.components.PromptResult
 import com.filestech.pass_tech.ui.entry.EntryViewModel.Problem
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +41,10 @@ class EntryViewModelTest {
 
     private val fastParams = KdfParams(memoryKiB = KdfParams.MIN_MEMORY_KIB, iterations = 1, parallelism = 1)
     private val owner = "renardclochesoleil2026"
+    private val bioKeys = FakeBiometricKeys()
+
+    /** Whether the phone can authenticate with a biometric. */
+    private var biometricHardware = true
 
     /** A view model over a fresh vault, with Main and the uptime clock both on the test scheduler. */
     private suspend fun TestScope.entry(block: suspend TestScope.(EntryViewModel, VaultManager) -> Unit) {
@@ -49,11 +56,13 @@ class EntryViewModelTest {
                 override fun wallMillis() = testScheduler.currentTime
             }
             val keystore = InMemorySlotKeystore()
-            val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), clock)
+            val state = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+            val guard = BruteForceGuard.forVault(state, clock)
+            val biometrics = StoredBiometricBinding(state, bioKeys)
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, params = fastParams), io)
-            val viewModel = EntryViewModel(vault, clock)
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, biometrics, fastParams), io)
+            val viewModel = EntryViewModel(vault, clock) { biometricHardware }
             block(viewModel, vault)
         } finally {
             Dispatchers.resetMain()
@@ -95,7 +104,7 @@ class EntryViewModelTest {
             viewModel.settled()
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             // The activity recreated in the background: a new view model, the vault still open.
-            val recreated = EntryViewModel(vault, FakeClock())
+            val recreated = EntryViewModel(vault, FakeClock()) { biometricHardware }
             assertThat(recreated.settled().mode).isEqualTo(EntryMode.UNLOCK)
             // The same read goes on with the lockout: let it end before the test does.
             vault.lockoutRemainingMillis()
@@ -141,6 +150,71 @@ class EntryViewModelTest {
             advanceTimeBy(FIRST_LOCK_MILLIS / 2)
             runCurrent()
             assertThat(viewModel.state.value.lockedForMillis).isEqualTo(0)
+        }
+    }
+
+    /** Creates the vault, arms the fingerprint on it, then locks: the unlock form follows. */
+    private suspend fun TestScope.armedThenLocked(viewModel: EntryViewModel, vault: VaultManager) {
+        viewModel.settled()
+        viewModel.create(owner, owner)
+        viewModel.state.first { it.backupReminder }
+        val start = vault.startArmingBiometrics() as VaultManager.ArmStart.Ready
+        assertThat(vault.armBiometrics(start.cipher)).isEqualTo(VaultManager.ArmOutcome.Armed)
+        vault.lock()
+        viewModel.state.first { it.mode == EntryMode.UNLOCK }
+        testScheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `an armed fingerprint is offered, prompted once on its own, and opens the vault`() = runTest {
+        entry { viewModel, vault ->
+            armedThenLocked(viewModel, vault)
+            assertThat(viewModel.state.value.biometric).isTrue()
+            assertThat(viewModel.state.value.biometricAutoPrompt).isTrue()
+            viewModel.startBiometric()
+            assertThat(viewModel.state.value.biometricAutoPrompt).isFalse()
+            val cipher = viewModel.prompts.first()
+            viewModel.biometricResult(PromptResult.Authenticated(cipher))
+            vault.state.first { it is VaultManager.State.Open }
+        }
+    }
+
+    @Test
+    fun `a cancelled prompt says nothing, stays offered, and does not come back on its own`() = runTest {
+        entry { viewModel, vault ->
+            armedThenLocked(viewModel, vault)
+            viewModel.startBiometric()
+            viewModel.prompts.first()
+            viewModel.biometricResult(PromptResult.Canceled)
+            val after = viewModel.settled()
+            assertThat(after.problem).isNull()
+            assertThat(after.biometric).isTrue()
+            assertThat(after.biometricAutoPrompt).isFalse()
+            assertThat(vault.state.value).isEqualTo(VaultManager.State.Locked)
+        }
+    }
+
+    @Test
+    fun `a fingerprint enrolled since arming disarms, says so, and hides the button`() = runTest {
+        entry { viewModel, vault ->
+            armedThenLocked(viewModel, vault)
+            bioKeys.enrollFingerprint()
+            viewModel.startBiometric()
+            val after = viewModel.state.first { !it.busy && it.problem != null }
+            assertThat(after.problem).isEqualTo(Problem.BIOMETRIC_INVALIDATED)
+            assertThat(after.biometric).isFalse()
+            assertThat(vault.biometricsArmed()).isFalse()
+        }
+    }
+
+    @Test
+    fun `no fingerprint offered on a phone that cannot authenticate, even armed`() = runTest {
+        entry { viewModel, vault ->
+            biometricHardware = false
+            armedThenLocked(viewModel, vault)
+            assertThat(viewModel.state.value.biometric).isFalse()
+            viewModel.startBiometric()
+            assertThat(viewModel.state.value.busy).isFalse()
         }
     }
 

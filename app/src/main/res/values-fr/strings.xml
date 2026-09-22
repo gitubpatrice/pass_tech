@@ -248,4 +248,20 @@
     <string name="change_password_done">Mot de passe modifié ✓</string>
     <string name="change_password_refused">Ce mot de passe ne peut pas être utilisé. Choisissez-en un autre.</string>
     <string name="settings_locked_retry">Trop de tentatives. Réessayez dans %1$s.</string>
+    <!-- Biometrics (2.7.1: unlock_screen.dart, settings_screen.dart) -->
+    <string name="unlock_biometric_cta">Empreinte / Face ID</string>
+    <string name="unlock_biometric_failed">Échec biométrique</string>
+    <string name="unlock_biometric_enrollment_changed">Empreinte Android modifiée : le déverrouillage biométrique a été désactivé par sécurité. Déverrouillez avec votre mot de passe principal, puis réactivez la biométrie dans Réglages.</string>
+    <string name="unlock_biometric_disarmed">Le déverrouillage biométrique a été désactivé. Déverrouillez avec votre mot de passe principal, puis réactivez la biométrie dans Réglages.</string>
+    <string name="biometric_prompt_subtitle">Déverrouiller votre coffre-fort</string>
+    <string name="settings_biometric_title">Déverrouillage biométrique</string>
+    <string name="settings_biometric_subtitle">Empreinte digitale ou Face ID</string>
+    <string name="settings_biometric_enabled">Déverrouillage biométrique activé.</string>
+    <string name="settings_biometric_disabled">Déverrouillage biométrique désactivé.</string>
+    <string name="settings_biometric_enable_canceled">Activation biométrique annulée.</string>
+    <string name="settings_biometric_enable_failed">Activation biométrique échouée.</string>
+    <string name="settings_biometric_decoy_conflict">Le déverrouillage biométrique est indisponible sur ce coffre. Seul votre mot de passe maître l\'ouvre.</string>
+    <string name="settings_biometric_new_enrollment_warning">Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.</string>
+    <string name="settings_biometric_another_vault">Le déverrouillage biométrique ouvre un autre coffre que celui-ci.</string>
+    <string name="change_password_done_biometric_reset">Mot de passe changé. Le déverrouillage biométrique a été désactivé — réactivez-le dans Réglages.</string>
 </resources>

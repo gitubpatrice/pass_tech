@@ -7,6 +7,7 @@ import com.filestech.pass_tech.core.crypto.useThenWipe
 import com.filestech.pass_tech.core.crypto.wipe
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.security.BruteForceGuard
+import javax.crypto.Cipher
 
 /**
  * The vault slots, as the rest of the app sees them. Design: `audit/conversion-kotlin/10-conception-coffre.md`
@@ -99,7 +100,8 @@ class VaultRepository(
     }
 
     sealed interface ChangeResult {
-        data class Changed(val session: VaultSession) : ChangeResult
+        /** [biometricsDisarmed]: a fingerprint opened this vault, and no longer does (design v2 §10). */
+        data class Changed(val session: VaultSession, val biometricsDisarmed: Boolean) : ChangeResult
 
         data object WrongCurrentPassword : ChangeResult
 
@@ -109,6 +111,20 @@ class VaultRepository(
 
         /** Nothing was written: the current password still opens the vault. */
         data object KeystoreUnavailable : ChangeResult
+    }
+
+    /** Which vault a fingerprint opens, as the owner of an open vault may know it (design v2 §9). */
+    enum class BiometricStatus { OFF, THIS_VAULT, ANOTHER_VAULT }
+
+    sealed interface BiometricUnlockResult {
+        data class Opened(val session: VaultSession) : BiometricUnlockResult
+
+        data class Locked(val remainingMillis: Long) : BiometricUnlockResult
+
+        /** What was armed opens no vault any more: now disarmed. The password still opens the vault. */
+        data object Disarmed : BiometricUnlockResult
+
+        data object KeystoreUnavailable : BiometricUnlockResult
     }
 
     /** One attempt, against one slot or against all of them. */
@@ -269,19 +285,76 @@ class VaultRepository(
         session.close()
     }
 
+    /**
+     * Whether a fingerprint opens some vault: the unlock screen offers it. Says nothing of which, and
+     * `false` if the secure hardware did not answer: the password is always there.
+     */
+    fun biometricsArmed(): Boolean = unavailableAs(false) { biometrics.armedGeneration() != null }
+
+    fun biometricStatus(session: VaultSession): BiometricStatus =
+        when (biometrics.armedGeneration()) {
+            null -> BiometricStatus.OFF
+            session.meta.generation -> BiometricStatus.THIS_VAULT
+            else -> BiometricStatus.ANOTHER_VAULT
+        }
+
+    /**
+     * Starts arming biometrics on [session]; `null` if refused: this vault has a decoy, or cannot rule
+     * one out (design v2 §9, v2.1 §3). A fingerprint must never open the vault a decoy stands in front
+     * of: that was the 2.7.0 flaw. Disarms whatever was armed.
+     */
+    fun cipherToArmBiometrics(session: VaultSession): Cipher? = if (hasDecoy(session)) null else biometrics.cipherToArm()
+
+    /**
+     * Seals the key of [session] with [cipher], once the prompt authenticated it. `false` if refused:
+     * the check is made again, a decoy may have been created since [cipherToArmBiometrics].
+     */
+    fun armBiometrics(session: VaultSession, cipher: Cipher): Boolean {
+        if (hasDecoy(session)) return false
+        biometrics.arm(session.meta.generation, session.key, cipher)
+        return true
+    }
+
+    fun cipherToUnlockWithBiometrics(): BiometricBinding.Start = biometrics.cipherToUnlock()
+
+    fun disarmBiometrics() = biometrics.purge()
+
+    /**
+     * Opens the vault that armed biometrics, with a cipher the prompt authenticated (design v2 §9): the
+     * sealed key is tried on every slot, and opens the one it decrypts whose generation it carries. Not
+     * a password guess, so the lockout does not count it; but a running lockout refuses it, as 2.7.1 did.
+     */
+    fun unlockWithBiometrics(cipher: Cipher): BiometricUnlockResult =
+        unavailableAs(BiometricUnlockResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return BiometricUnlockResult.Locked(gate.remainingMillis)
+            val armed = biometrics.open(cipher)
+            val session = armed?.key?.useThenWipe { openArmed(it, armed.generation) }
+            if (session == null) {
+                biometrics.purge()
+                BiometricUnlockResult.Disarmed
+            } else {
+                BiometricUnlockResult.Opened(settle(session))
+            }
+        }
+
     private fun changeVerified(session: VaultSession, new: ByteArray): ChangeResult =
         when (collision(new)) {
             Collision.MATCH -> ChangeResult.PasswordRefused
             Collision.UNKNOWN -> ChangeResult.KeystoreUnavailable
             Collision.NONE -> {
+                // Read before the new key exists: a Keystore that does not answer here leaves nothing to wipe.
+                val armedHere = biometrics.armedGeneration() == session.meta.generation
                 val changed = newSession(session.slot, new, session.meta)?.with(entries = session.entries)
                 if (changed == null) {
                     ChangeResult.KeystoreUnavailable
                 } else {
-                    biometrics.purge()
+                    // Only this vault's arming: another vault's owner would see their fingerprint stop
+                    // working because of a vault they must not know about (design v2 §10).
+                    if (armedHere) biometrics.purge()
                     written(changed)
                     session.close()
-                    ChangeResult.Changed(changed)
+                    ChangeResult.Changed(changed, biometricsDisarmed = armedHere)
                 }
             }
         }
@@ -487,6 +560,19 @@ class VaultRepository(
             key == null -> Attempt.NoMatch
             else -> openWith(slot, parsed, key)
         }
+    }
+
+    /** The one slot [key] decrypts and whose vault carries [generation]; `null` if none. [key] is left to the caller. */
+    private fun openArmed(key: ByteArray, generation: String): VaultSession? {
+        var found: VaultSession? = null
+        for (slot in Slot.entries) {
+            val parsed = files.read(slot)?.let { VaultContainer.parseOrNull(it, slot) } ?: continue
+            val attempt = openWith(slot, parsed, key.copyOf())
+            if (attempt is Attempt.Opened) {
+                if (found == null && attempt.session.meta.generation == generation) found = attempt.session else attempt.session.close()
+            }
+        }
+        return found
     }
 
     private fun openWith(slot: Slot, parsed: VaultContainer.Parsed, key: ByteArray): Attempt {

@@ -1,5 +1,6 @@
 package com.filestech.pass_tech.ui.entry
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockClock
@@ -28,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,19 +50,26 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.withResumed
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
 import com.filestech.pass_tech.ui.components.HeaderBadge
 import com.filestech.pass_tech.ui.components.PasswordField
+import com.filestech.pass_tech.ui.components.PromptResult
 import com.filestech.pass_tech.ui.components.StrengthGauge
+import com.filestech.pass_tech.ui.components.authenticate
 import com.filestech.pass_tech.ui.components.countdownText
 import com.filestech.pass_tech.ui.entry.EntryViewModel.Problem
+import kotlin.coroutines.cancellation.CancellationException
 
 /** The creation or unlock form, laid out as the 2.7.1 setup and unlock screens. */
 @Composable
 fun EntryScreen(viewModel: EntryViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    BiometricPrompts(viewModel, autoPrompt = state.biometricAutoPrompt)
     val mode = state.mode ?: return
     val locked = state.lockedForMillis > 0
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
@@ -102,7 +112,7 @@ fun EntryScreen(viewModel: EntryViewModel) {
             when {
                 locked -> LockedBox(state.lockedForMillis)
                 mode == EntryMode.CREATE -> CreateForm(state, onCreate = viewModel::create)
-                else -> UnlockForm(state, onUnlock = viewModel::unlock)
+                else -> UnlockForm(state, onUnlock = viewModel::unlock, onBiometric = viewModel::startBiometric)
             }
         }
     }
@@ -167,8 +177,35 @@ private fun CreateForm(state: EntryViewModel.UiState, onCreate: (String, String)
     }
 }
 
+/**
+ * Hands each cipher of the view model to the system prompt, and starts the prompt on its own once per
+ * lock, only once the screen is in front: a prompt asked for in the background would just be cancelled.
+ *
+ * The view model outlives the screen (rotation, theme change): a prompt torn down with it is answered
+ * as cancelled, or the unlock form would wait for it forever.
+ */
 @Composable
-private fun UnlockForm(state: EntryViewModel.UiState, onUnlock: (String) -> Unit) {
+private fun BiometricPrompts(viewModel: EntryViewModel, autoPrompt: Boolean) {
+    val activity = LocalActivity.current as? FragmentActivity ?: return
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel, activity) {
+        viewModel.prompts.collect { cipher ->
+            val result = try {
+                activity.authenticate(cipher)
+            } catch (e: CancellationException) {
+                viewModel.biometricResult(PromptResult.Canceled)
+                throw e
+            }
+            viewModel.biometricResult(result)
+        }
+    }
+    LaunchedEffect(autoPrompt) {
+        if (autoPrompt) lifecycle.withResumed { viewModel.startBiometric() }
+    }
+}
+
+@Composable
+private fun UnlockForm(state: EntryViewModel.UiState, onUnlock: (String) -> Unit, onBiometric: () -> Unit) {
     var password by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
@@ -203,6 +240,19 @@ private fun UnlockForm(state: EntryViewModel.UiState, onUnlock: (String) -> Unit
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.unlock_cta))
         }
+        if (state.biometric) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onBiometric,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+            ) {
+                Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.unlock_biometric_cta))
+            }
+        }
     }
 }
 
@@ -216,6 +266,9 @@ private fun ProblemText(problem: Problem?) {
         Problem.WRONG_PASSWORD -> R.string.unlock_wrong_password
         Problem.IMPOSSIBLE -> R.string.setup_error_impossible
         Problem.KEYSTORE_UNAVAILABLE -> R.string.keystore_unavailable
+        Problem.BIOMETRIC_FAILED -> R.string.unlock_biometric_failed
+        Problem.BIOMETRIC_INVALIDATED -> R.string.unlock_biometric_enrollment_changed
+        Problem.BIOMETRIC_DISARMED -> R.string.unlock_biometric_disarmed
     }
     Spacer(Modifier.height(12.dp))
     Text(stringResource(text), color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())

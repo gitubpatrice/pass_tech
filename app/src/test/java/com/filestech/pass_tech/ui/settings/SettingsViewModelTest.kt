@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
 import com.filestech.pass_tech.core.crypto.KdfParams
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.settings.AppPreferences
@@ -14,8 +15,11 @@ import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.vault.VaultFiles
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
+import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
+import com.filestech.pass_tech.testing.FakeBiometricKeys
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
+import com.filestech.pass_tech.ui.components.PromptResult
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.ChangeProblem
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.Message
 import com.google.common.truth.Truth.assertThat
@@ -33,6 +37,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import javax.crypto.Cipher
 
 /** The settings on a real vault (in-memory Keystore, temporary files) and a real DataStore. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,6 +49,7 @@ class SettingsViewModelTest {
     private val fastParams = KdfParams(memoryKiB = KdfParams.MIN_MEMORY_KIB, iterations = 1, parallelism = 1)
     private val owner = "renardclochesoleil2026"
     private val next = "abricotmarteaunuage2027"
+    private val bioKeys = FakeBiometricKeys()
 
     private suspend fun TestScope.opened(block: suspend TestScope.(SettingsViewModel, VaultManager, AppPreferences) -> Unit) {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -53,17 +59,19 @@ class SettingsViewModelTest {
         val viewModels = ViewModelStore()
         try {
             val keystore = InMemorySlotKeystore()
-            val guard = BruteForceGuard.forVault(StateStore(File(dir, StateStore.FILE_NAME), keystore), FakeClock())
+            val state = StateStore(File(dir, StateStore.FILE_NAME), keystore)
+            val guard = BruteForceGuard.forVault(state, FakeClock())
             val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
-            val vault = VaultManager(VaultRepository(files, keystore, guard, params = fastParams), io)
+            val repository = VaultRepository(files, keystore, guard, StoredBiometricBinding(state, bioKeys), fastParams)
+            val vault = VaultManager(repository, io)
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "settings.preferences_pb") })
             val preferences = AppPreferences(store)
             val settings = ViewModelProvider.create(
                 viewModels,
-                viewModelFactory { initializer { SettingsViewModel(vault, preferences) } },
+                viewModelFactory { initializer { SettingsViewModel(vault, preferences) { true } } },
             )[SettingsViewModel::class]
             block(settings, vault, preferences)
         } finally {
@@ -129,10 +137,60 @@ class SettingsViewModelTest {
             assertThat(vault.state.value).isInstanceOf(VaultManager.State.Open::class.java)
 
             settings.deleteAll(owner)
-            settings.state.first { it.busy }
-            settings.idle()
+            // The vault runs on the test scheduler: the deletion is over once it is idle. Waiting to SEE
+            // the busy state instead hung when the whole operation ran before the screen state was read.
+            testScheduler.advanceUntilIdle()
             assertThat(vault.state.value).isEqualTo(VaultManager.State.Locked)
             assertThat(vault.entryMode()).isEqualTo(VaultRepository.EntryMode.CREATE)
+        }
+    }
+
+    /** Turns the switch on, and answers the prompt with [result]. */
+    private suspend fun SettingsViewModel.enable(result: (Cipher) -> PromptResult) {
+        enableBiometrics()
+        armResult(result(prompts.first()))
+    }
+
+    @Test
+    fun `turning biometrics on arms this vault, and a password change then disarms it and says so`() = runTest {
+        opened { settings, vault, _ ->
+            settings.refreshBiometricSupport()
+            settings.enable { PromptResult.Authenticated(it) }
+            assertThat(settings.nextMessage()).isEqualTo(Message.BiometricsEnabled)
+            assertThat(settings.biometrics.first { it.status == BiometricStatus.THIS_VAULT }.available).isTrue()
+            assertThat(vault.biometricsArmed()).isTrue()
+
+            settings.idle()
+            settings.changePassword(owner, next)
+            assertThat(settings.nextMessage()).isEqualTo(Message.PasswordChangedBiometricsReset)
+            settings.biometrics.first { it.status == BiometricStatus.OFF }
+        }
+    }
+
+    @Test
+    fun `a cancelled prompt arms nothing and says so, and turning it off disarms`() = runTest {
+        opened { settings, vault, _ ->
+            settings.enable { PromptResult.Canceled }
+            assertThat(settings.nextMessage()).isEqualTo(Message.BiometricsCanceled)
+            assertThat(vault.biometricsArmed()).isFalse()
+
+            settings.idle()
+            settings.enable { PromptResult.Authenticated(it) }
+            assertThat(settings.nextMessage()).isEqualTo(Message.BiometricsEnabled)
+            settings.idle()
+            settings.disableBiometrics()
+            assertThat(settings.nextMessage()).isEqualTo(Message.BiometricsDisabled)
+            assertThat(vault.biometricsArmed()).isFalse()
+        }
+    }
+
+    @Test
+    fun `a vault with a decoy is refused, with 2_7_1's words, and no prompt`() = runTest {
+        opened { settings, vault, _ ->
+            assertThat(vault.configureDecoy("cerisetambourlune2028".encodeToByteArray())).isEqualTo(VaultManager.DecoyOutcome.Created)
+            settings.enableBiometrics()
+            assertThat(settings.nextMessage()).isEqualTo(Message.BiometricsRefused)
+            assertThat(bioKeys.created).isEqualTo(0)
         }
     }
 

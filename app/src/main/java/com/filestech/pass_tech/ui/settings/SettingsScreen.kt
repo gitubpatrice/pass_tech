@@ -1,6 +1,7 @@
 package com.filestech.pass_tech.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.ContentPasteOff
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
@@ -63,12 +65,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.settings.AppPreferences
+import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import com.filestech.pass_tech.ui.components.PasswordField
 import com.filestech.pass_tech.ui.components.PtCard
 import com.filestech.pass_tech.ui.components.PtSnackbarHost
+import com.filestech.pass_tech.ui.components.authenticate
 import com.filestech.pass_tech.ui.components.countdownText
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.ChangeProblem
 import com.filestech.pass_tech.ui.settings.SettingsViewModel.Message
@@ -79,7 +84,7 @@ private enum class SettingsDialog { THEME, CLIPBOARD, AUTO_LOCK, SCREENSHOTS_OFF
 
 /**
  * The settings (2.7.1, `settings_screen.dart`): each setting on its own card under a section title.
- * The rest of 2.7.1's settings (biometrics, decoy, panic, heir, data) come with their features.
+ * The rest of 2.7.1's settings (decoy, panic, heir, data) come with their features.
  */
 @Composable
 fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onBack: () -> Unit) {
@@ -87,7 +92,9 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
     val ui by settings.state.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
     val haptics = LocalHapticFeedback.current
+    val biometrics by settings.biometrics.collectAsStateWithLifecycle()
     Messages(settings, snackbar)
+    ArmingPrompts(settings)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -125,6 +132,16 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
             item {
                 ScreenshotTile(ui.screenshotProtection) { on ->
                     if (on) settings.setScreenshotProtection(true) else dialog = SettingsDialog.SCREENSHOTS_OFF
+                }
+            }
+            // Offered when the phone can authenticate, and kept while something is armed, to disarm it.
+            if (biometrics.available || biometrics.status != BiometricStatus.OFF) {
+                item {
+                    BiometricTile(
+                        status = biometrics.status,
+                        onEnable = settings::enableBiometrics,
+                        onDisable = settings::disableBiometrics,
+                    )
                 }
             }
             item {
@@ -238,6 +255,12 @@ private fun Messages(settings: SettingsViewModel, snackbar: SnackbarHostState) {
         settings.messages.collect { message ->
             val text = when (message) {
                 Message.PasswordChanged -> resources.getString(R.string.change_password_done)
+                Message.PasswordChangedBiometricsReset -> resources.getString(R.string.change_password_done_biometric_reset)
+                Message.BiometricsEnabled -> resources.getString(R.string.settings_biometric_enabled)
+                Message.BiometricsDisabled -> resources.getString(R.string.settings_biometric_disabled)
+                Message.BiometricsCanceled -> resources.getString(R.string.settings_biometric_enable_canceled)
+                Message.BiometricsFailed -> resources.getString(R.string.settings_biometric_enable_failed)
+                Message.BiometricsRefused -> resources.getString(R.string.settings_biometric_decoy_conflict)
                 Message.WrongPassword -> resources.getString(R.string.change_password_error_wrong_current)
                 Message.PasswordRefused -> resources.getString(R.string.change_password_refused)
                 is Message.Locked -> resources.getString(R.string.settings_locked_retry, countdownText(resources, message.remainingMillis))
@@ -245,6 +268,56 @@ private fun Messages(settings: SettingsViewModel, snackbar: SnackbarHostState) {
             }
             snackbar.currentSnackbarData?.dismiss()
             snackbar.showSnackbar(text)
+        }
+    }
+}
+
+/** Reads the phone's biometric support each time the screen shows, and hands arming ciphers to the system prompt. */
+@Composable
+private fun ArmingPrompts(settings: SettingsViewModel) {
+    LaunchedEffect(settings) { settings.refreshBiometricSupport() }
+    val activity = LocalActivity.current as? FragmentActivity ?: return
+    LaunchedEffect(settings, activity) {
+        settings.prompts.collect { cipher -> settings.armResult(activity.authenticate(cipher)) }
+    }
+}
+
+/**
+ * On when a fingerprint opens THIS vault. When it opens another one, the owner is told so and may cut it
+ * (design v2 §9): only someone who knows this vault's password sees it, and it tells an attacker nothing
+ * they did not arm themselves. The note under it is 2.7.1's, for phones that do not invalidate the key.
+ */
+@Composable
+private fun BiometricTile(status: BiometricStatus, onEnable: () -> Unit, onDisable: () -> Unit) {
+    val on = status == BiometricStatus.THIS_VAULT
+    val change = { checked: Boolean -> if (checked) onEnable() else onDisable() }
+    PtCard(Modifier.fillMaxWidth()) {
+        Column {
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Fingerprint, contentDescription = null, tint = iconTint()) },
+                headlineContent = { Text(stringResource(R.string.settings_biometric_title)) },
+                supportingContent = { Text(stringResource(R.string.settings_biometric_subtitle)) },
+                trailingContent = { Switch(checked = on, onCheckedChange = change) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.clickable { change(!on) },
+            )
+            if (status == BiometricStatus.ANOTHER_VAULT) {
+                Text(
+                    text = stringResource(R.string.settings_biometric_another_vault),
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 56.dp, end = 16.dp),
+                )
+                TextButton(onClick = onDisable, modifier = Modifier.padding(start = 44.dp)) {
+                    Text(stringResource(R.string.action_disable))
+                }
+            }
+            Text(
+                text = stringResource(R.string.settings_biometric_new_enrollment_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 56.dp, end = 16.dp, bottom = 12.dp),
+            )
         }
     }
 }

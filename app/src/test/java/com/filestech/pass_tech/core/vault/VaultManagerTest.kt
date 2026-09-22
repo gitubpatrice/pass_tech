@@ -89,7 +89,8 @@ class VaultManagerTest {
         manager.updateEntries { it + entry("bank") }
         assertThat(manager.configureDecoy(decoy())).isEqualTo(DecoyOutcome.Created)
         assertThat(open().hasDecoy).isTrue()
-        assertThat(manager.changePassword(owner(), "renewed password".encodeToByteArray())).isEqualTo(ChangeOutcome.Changed)
+        val changed = manager.changePassword(owner(), "renewed password".encodeToByteArray())
+        assertThat(changed).isEqualTo(ChangeOutcome.Changed(biometricsDisarmed = false))
         manager.lock()
         assertThat(manager.unlock(owner())).isEqualTo(UnlockOutcome.WrongPassword)
         assertThat(manager.unlock("renewed password".encodeToByteArray())).isEqualTo(UnlockOutcome.Opened)

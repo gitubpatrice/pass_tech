@@ -3,6 +3,7 @@ package com.filestech.pass_tech.core.vault
 import com.filestech.pass_tech.core.crypto.wipe
 import com.filestech.pass_tech.core.di.IoDispatcher
 import com.filestech.pass_tech.core.model.Entry
+import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import javax.crypto.Cipher
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,6 +32,9 @@ import javax.inject.Singleton
  * - [updateEntries] and [deleteData] throw [KeystoreUnavailableException] when the secure hardware did
  *   not answer: nothing was written, and the vault stays open. The other operations say it in their result.
  */
+// Every public function is one vault operation behind the same lock, which is the point of this class:
+// split across classes, each half would need the lock and the session of the other.
+@Suppress("TooManyFunctions")
 @Singleton
 class VaultManager @Inject constructor(
     private val repository: VaultRepository,
@@ -39,8 +44,16 @@ class VaultManager @Inject constructor(
     sealed interface State {
         data object Locked : State
 
-        /** [hasDecoy]: this vault has a decoy, or cannot rule one out, so it cannot create another one. */
-        data class Open(val entries: List<Entry>, val hasDecoy: Boolean) : State
+        /**
+         * [hasDecoy]: this vault has a decoy, or cannot rule one out, so it cannot create another one.
+         * [biometrics]: which vault a fingerprint opens; [BiometricStatus.OFF] as well if the secure
+         * hardware did not answer, which at worst offers to enable it again.
+         */
+        data class Open(
+            val entries: List<Entry>,
+            val hasDecoy: Boolean,
+            val biometrics: BiometricStatus = BiometricStatus.OFF,
+        ) : State
     }
 
     sealed interface UnlockOutcome {
@@ -83,7 +96,8 @@ class VaultManager @Inject constructor(
     }
 
     sealed interface ChangeOutcome {
-        data object Changed : ChangeOutcome
+        /** [biometricsDisarmed]: a fingerprint opened this vault, and must be enabled again (2.7.1 says so). */
+        data class Changed(val biometricsDisarmed: Boolean) : ChangeOutcome
 
         data object WrongCurrentPassword : ChangeOutcome
 
@@ -92,6 +106,47 @@ class VaultManager @Inject constructor(
         data class Locked(val remainingMillis: Long) : ChangeOutcome
 
         data object KeystoreUnavailable : ChangeOutcome
+    }
+
+    sealed interface ArmStart {
+        /** The system prompt authenticates [cipher], then [armBiometrics] takes it. */
+        class Ready(val cipher: Cipher) : ArmStart
+
+        /** This vault has a decoy, or cannot rule one out (design v2 §9). */
+        data object Refused : ArmStart
+
+        data object KeystoreUnavailable : ArmStart
+    }
+
+    sealed interface ArmOutcome {
+        data object Armed : ArmOutcome
+
+        data object Refused : ArmOutcome
+
+        data object KeystoreUnavailable : ArmOutcome
+    }
+
+    sealed interface BiometricStart {
+        /** The system prompt authenticates [cipher], then [unlockWithBiometrics] takes it. */
+        class Ready(val cipher: Cipher) : BiometricStart
+
+        data object NotArmed : BiometricStart
+
+        /** A fingerprint was enrolled, or every one removed: biometrics is now disarmed (2.7.1 says so). */
+        data object Invalidated : BiometricStart
+
+        data object KeystoreUnavailable : BiometricStart
+    }
+
+    sealed interface BiometricOutcome {
+        data object Opened : BiometricOutcome
+
+        data class Locked(val remainingMillis: Long) : BiometricOutcome
+
+        /** What was armed opens no vault any more: now disarmed. */
+        data object Disarmed : BiometricOutcome
+
+        data object KeystoreUnavailable : BiometricOutcome
     }
 
     private val mutex = Mutex()
@@ -185,7 +240,7 @@ class VaultManager @Inject constructor(
                     // The repository closed the previous session: its key is already wiped.
                     is VaultRepository.ChangeResult.Changed -> {
                         advance(result.session)
-                        ChangeOutcome.Changed
+                        ChangeOutcome.Changed(result.biometricsDisarmed)
                     }
                     VaultRepository.ChangeResult.WrongCurrentPassword -> ChangeOutcome.WrongCurrentPassword
                     VaultRepository.ChangeResult.PasswordRefused -> ChangeOutcome.PasswordRefused
@@ -205,6 +260,77 @@ class VaultManager @Inject constructor(
                 publish()
             }
             current != null
+        }
+
+    /** Whether the unlock screen offers the fingerprint. See [VaultRepository.biometricsArmed]. */
+    suspend fun biometricsArmed(): Boolean = serialized { repository.biometricsArmed() }
+
+    /** Returns `null` if no vault is open. Disarms whatever was armed. */
+    suspend fun startArmingBiometrics(): ArmStart? =
+        serialized {
+            session?.let { current ->
+                try {
+                    val cipher = repository.cipherToArmBiometrics(current)
+                    // Whatever was armed is gone: the settings must say so even if the prompt is cancelled.
+                    publish()
+                    if (cipher == null) ArmStart.Refused else ArmStart.Ready(cipher)
+                } catch (_: KeystoreUnavailableException) {
+                    publish()
+                    ArmStart.KeystoreUnavailable
+                }
+            }
+        }
+
+    /** With a cipher from [startArmingBiometrics] the prompt authenticated. Returns `null` if no vault is open. */
+    suspend fun armBiometrics(cipher: Cipher): ArmOutcome? =
+        serialized {
+            session?.let { current ->
+                try {
+                    if (repository.armBiometrics(current, cipher)) ArmOutcome.Armed else ArmOutcome.Refused
+                } catch (_: KeystoreUnavailableException) {
+                    ArmOutcome.KeystoreUnavailable
+                } finally {
+                    publish()
+                }
+            }
+        }
+
+    /** Throws [KeystoreUnavailableException] if the secure hardware did not answer: still armed, then. */
+    suspend fun disarmBiometrics() {
+        serialized {
+            try {
+                repository.disarmBiometrics()
+            } finally {
+                publish()
+            }
+        }
+    }
+
+    suspend fun startBiometricUnlock(): BiometricStart =
+        serialized {
+            try {
+                when (val start = repository.cipherToUnlockWithBiometrics()) {
+                    is BiometricBinding.Start.Ready -> BiometricStart.Ready(start.cipher)
+                    BiometricBinding.Start.NotArmed -> BiometricStart.NotArmed
+                    BiometricBinding.Start.Invalidated -> BiometricStart.Invalidated
+                }
+            } catch (_: KeystoreUnavailableException) {
+                BiometricStart.KeystoreUnavailable
+            }
+        }
+
+    /** With a cipher from [startBiometricUnlock] the prompt authenticated. */
+    suspend fun unlockWithBiometrics(cipher: Cipher): BiometricOutcome =
+        serialized {
+            when (val result = repository.unlockWithBiometrics(cipher)) {
+                is VaultRepository.BiometricUnlockResult.Opened -> {
+                    open(result.session)
+                    BiometricOutcome.Opened
+                }
+                is VaultRepository.BiometricUnlockResult.Locked -> BiometricOutcome.Locked(result.remainingMillis)
+                VaultRepository.BiometricUnlockResult.Disarmed -> BiometricOutcome.Disarmed
+                VaultRepository.BiometricUnlockResult.KeystoreUnavailable -> BiometricOutcome.KeystoreUnavailable
+            }
         }
 
     /** Wipes the key and forgets the entries. Waits for the operation in progress, if any. */
@@ -246,6 +372,15 @@ class VaultManager @Inject constructor(
     }
 
     private fun publish() {
-        mutableState.value = session?.let { State.Open(it.entries, hasDecoy = repository.hasDecoy(it)) } ?: State.Locked
+        mutableState.value = session?.let {
+            State.Open(it.entries, hasDecoy = repository.hasDecoy(it), biometrics = biometricStatus(it))
+        } ?: State.Locked
     }
+
+    private fun biometricStatus(session: VaultSession): BiometricStatus =
+        try {
+            repository.biometricStatus(session)
+        } catch (_: KeystoreUnavailableException) {
+            BiometricStatus.OFF
+        }
 }

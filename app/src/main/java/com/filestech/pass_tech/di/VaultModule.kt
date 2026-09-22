@@ -1,6 +1,9 @@
 package com.filestech.pass_tech.di
 
 import android.content.Context
+import com.filestech.pass_tech.core.biometric.AndroidBiometricKeys
+import com.filestech.pass_tech.core.biometric.BiometricSupport
+import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.state.StateStore
@@ -42,6 +45,14 @@ abstract class VaultModule {
         @Provides
         fun clock(): Clock = SystemClockSource
 
+        /** The one biometric key, `pt_bio`, and what it seals, kept in the state store (design v2 §9). */
+        @Provides
+        @Singleton
+        fun biometricBinding(state: StateStore): BiometricBinding = StoredBiometricBinding(state, AndroidBiometricKeys())
+
+        @Provides
+        fun biometricSupport(@ApplicationContext context: Context): BiometricSupport = BiometricSupport.of(context)
+
         @Provides
         @Singleton
         fun vaultRepository(
@@ -49,13 +60,13 @@ abstract class VaultModule {
             keystore: SlotKeystore,
             state: StateStore,
             clock: Clock,
+            biometrics: BiometricBinding,
         ): VaultRepository =
             VaultRepository(
                 files = VaultFiles(context.filesDir),
                 keystore = keystore,
                 guard = BruteForceGuard.forVault(state, clock),
-                // Until biometric unlock lands, nothing is ever armed, so there is nothing to purge.
-                biometrics = BiometricBinding.NONE,
+                biometrics = biometrics,
             )
     }
 }
