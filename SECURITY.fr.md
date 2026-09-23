@@ -1,605 +1,105 @@
 # Politique de sécurité — Pass Tech
 
-[English](SECURITY.md) · <strong>Français</strong>
+[English](SECURITY.md) · **Français**
 
-> Pass Tech est un gestionnaire de mots de passe. La sécurité est la priorité absolue de ce projet. Tout signalement responsable est traité avec la plus haute priorité.
+> Pass Tech est un gestionnaire de mots de passe. La sécurité est la priorité absolue de ce projet,
+> et tout signalement responsable est traité en priorité maximale.
 
-## Versions supportées
+## Versions suivies
 
 Seule la dernière version publiée sur GitHub Releases est activement maintenue côté sécurité.
 
-| Version       | Supportée  |
-| ------------- | ---------- |
-| 2.7.x         | ✅          |
-| 2.6.x         | ⚠️ legacy (mettre à jour) |
-| 2.0.x – 2.5.x | ⚠️ migration uniquement |
-| < 2.0.0       | ❌          |
+| Version | Identifiant d'application | Suivie |
+|---|---|---|
+| 3.0.x | `com.filestech.pass_tech` | ✅ |
+| 2.7.x | `com.passtech.pass_tech` | ⚠️ l'app Flutter — migration seulement, voir plus bas |
+| < 2.7 | `com.passtech.pass_tech` | ❌ |
 
-### Historique des correctifs récents
-
-- **v2.7.1** (2026-09-21) — Coffre leurre : trois surfaces des Réglages
-  distinguaient une session leurre du vrai coffre.
-  - **L'héritage devient propre à l'emplacement.** Les cinq clés d'héritage et
-    le fichier d'instantané étaient globaux, et l'écran des Réglages les rend :
-    depuis une session leurre, l'interface affichait donc l'état du coffre
-    PRINCIPAL. Le configurer était refusé par un message qui NOMMAIT le coffre
-    principal — quatre tapes, aucun secret exigé, la garde s'exécutait avant
-    même la demande de passphrase. Le compteur « inactivité actuelle » ne
-    pouvait valoir que zéro depuis le principal, donc toute autre valeur
-    désignait le leurre sans une seule tape. Et « Mettre à jour » acceptait
-    depuis le leurre la passphrase qu'on venait de livrer sous contrainte, la
-    refusait depuis le principal, et écrasait au passage le vrai instantané :
-    la garde SEC F7 avait fermé l'oracle sur le SECRET et ouvert, à la même
-    ligne, un oracle sur l'EMPLACEMENT. Scoper l'état supprime les trois d'un
-    seul geste. Le principal garde ses noms de clés historiques : un héritage
-    déjà configuré survit à la mise à jour sans rien perdre.
-  - **Retirer le leurre détruit son héritage**, sur les trois sorties qui le
-    retirent seul, purge AVANT écrasement. `pt_heir_b.enc` n'a pas de jumeau
-    factice : survivant au retrait du leurre, il prouverait après coup qu'un
-    leurre a existé — l'oracle déplacé de l'écran vers le disque.
-  - **`disable()` exige désormais un coffre ouvert.** `isDecoyActive` rend
-    `false` aussi bien quand le principal est ouvert que quand rien ne l'est :
-    un verrouillage automatique intercalé entre le dialogue et le tap aurait
-    détruit l'instantané du propriétaire depuis une session leurre.
-  - **L'application ne revenait pas au déverrouillage** après création d'un
-    leurre, ni après le mode panique. `popUntil(isFirst)` n'y revient pas —
-    `HomeScreen` a remplacé l'écran de déverrouillage — donc le parcours
-    promettait de forcer la reconnexion et ne la forçait pas. Présent dans la
-    2.7.0, trouvé en testant sur appareil.
-  - Les fiches store annonçaient que le mode panique détruit la clé Keystore.
-    C'est faux, et ça l'a toujours été ; le dialogue DANS l'app, lui, était
-    exact.
-  - `THREAT_MODEL.md` énonce désormais les trois oracles de leurre qui
-    restent, ce que fermer chacun coûterait, et ce que scoper l'héritage
-    coûte au repos.
-
-- **v2.7.0** (2026-09-20) — Coffre leurre : deux défauts annulaient la
-  protection qu'il promet.
-  - **Biométrie ↔ leurre, exclusion mutuelle.** Le déverrouillage biométrique
-    ouvre `_Slot.primary` en dur et l'invite part seule à l'ouverture de
-    l'écran. Sous contrainte, qui vous fait poser le doigt obtenait donc le
-    coffre PRINCIPAL sans jamais demander de mot de passe — le leurre était
-    contourné sans qu'on ait besoin de le connaître. Les deux fonctions
-    s'excluent désormais **dans les deux sens** : refuser une seule direction
-    laissait le trou, puisqu'on pouvait réactiver la biométrie après coup. Le
-    refus ne dépend que de l'existence d'un leurre, jamais de l'emplacement
-    actif : il n'est donc pas un oracle.
-  - **Export en clair rémanent.** Le fichier d'export non chiffré déposé en
-    cache survivait à « Supprimer toutes mes données » **et** au mode panique.
-    `VaultService.shredCachedExports()` est désormais appelé par `deleteVault()`
-    et par `panic()`.
-  - Traduction : 21 chaînes françaises codées en dur, hors du système l10n,
-    remontées. Sans effet sur la sécurité, mais l'invite biométrique du
-    système en faisait partie.
-
-- **v2.6.1** (2026-08-11) — Vérification de mise à jour, le seul code de
-  l'application qui sorte sur le réseau. Un portail captif Wi-Fi répondant
-  « 200 » avec une page HTML faisait passer la vérification pour faite et la
-  suspendait 12 h ; la réponse n'était bornée par aucune taille ; les
-  redirections n'étaient pas revérifiées ; le délai ne couvrait pas la lecture.
-  Coffre et chiffrement inchangés.
-
-- **v2.6.0** (2026-08-04) — Retrait complet des bibliothèques et services
-  Google. Audit de sécurité : le score était trompeur sur les petits coffres et
-  ignorait les fuites détectées. Mot de passe maître porté à 12 caractères sans
-  exiger symbole ni chiffre. Avertissement avant le mode panique (la biométrie
-  y est désactivée). Annuler l'invite d'empreinte n'enferme plus sur l'écran de
-  déverrouillage.
-
-- **v2.5.1** (2026-07-08) — Audit expert 4-axes post-v2.5.0
-  (sécurité / perf-qualité / câblage / cohérence-i18n). Socle crypto jugé
-  exceptionnel (Argon2id, AES-256-GCM+AAD, KEK scellée TEE/StrongBox
-  non-exportable, nonce frais par save). Corrections :
-  - **Perte de données (migration v3→v4)** — `_migrateV3ToV4` écrivait le
-    nouveau salt en storage AVANT `_saveVaultV4`. Un échec du save laissait le
-    fichier en v3 mais le salt storage en v4 → le path v3 relisait un salt
-    divergent au prochain unlock → `wrongPassword` définitif + `.bak` inutile
-    (son salt aussi écrasé). Corrigé : salt écrit APRÈS le save (aligné sur
-    `_createSlot` / `changeMasterPassword` v2.4.0 ; le path v4 lit son salt du
-    FICHIER, pas du storage — sûr au crash-between).
-  - **`.bak` v3 brute-forçable (H2)** — le `*_v3.enc.bak` (copie complète du
-    coffre en PBKDF2+AES-CBC dérivée du seul master password, sans liaison
-    TEE) persistait après migration jusqu'au prochain `changeMasterPassword`.
-    Désormais purgé **dès la migration réussie** — plus de fenêtre de
-    brute-force offline annulant les durcissements v4.
-  - **Déni plausible au repos (H1)** — le coffre leurre n'était créé qu'à la
-    configuration, sous un nom (`pt_vault_decoy.enc`) qui révélait au forensic
-    quel fichier était le vrai coffre. Refonte : (1) noms **neutres
-    indistinguables** `pt_vault_a.enc` / `pt_vault_b.enc` ; (2) leurre
-    **factice toujours présent** — liste d'entrées vide chiffrée AES-GCM sous
-    un mot de passe aléatoire **jamais stocké** (coffre v4 valide mais jamais
-    déverrouillable) → profil de fichiers **constant** que le decoy soit
-    configuré ou non ; (3) flag `pt_decoy_configured` en secure storage
-    (chiffré TEE) au lieu de « le fichier decoy existe » pour l'UI. Migration
-    `ensureVaultLayout` **crash-safe** (rename ancien→neutre + backfill leurre
-    factice, fallback lecture des anciens noms). Validé device (unlock
-    empreinte + création/suppression leurre).
-
-    > **Correction v2.5.2 (SEC F6).** « Profil de fichiers constant » était
-    > FAUX jusqu'à la v2.5.1 : les noms et les enveloppes JSON étaient bien
-    > identiques champ pour champ, mais AES-GCM **préserve la longueur** et
-    > aucun rembourrage n'était appliqué. Le leurre factice chiffrait `[]`,
-    > soit 24 caractères base64 dans `cipher.data`, contre plusieurs kilo-
-    > octets pour un vrai coffre : la TAILLE était un discriminant
-    > déterministe, et le code étant public, la taille exacte du leurre était
-    > calculable à l'avance. Un `ls -l` suffisait.
-    >
-    > Depuis v2.5.2, le clair est rembourré par espaces sur une échelle de
-    > barreaux (64 Kio, puis ×4) **avant** chiffrement, sur les deux chemins
-    > d'écriture, et chaque emplacement s'aligne sur le barreau couvrant aussi
-    > la longueur de clair de l'autre — lisible sans sa clé, puisque
-    > `longueurClair = base64Decode(cipher.data).length - 16`. Un coffre de
-    > plusieurs centaines d'entrées tient sous le premier barreau : en
-    > pratique les deux fichiers font exactement 64 Kio.
-    >
-    > **Limite subsistante** : deux coffres qui tomberaient sur des barreaux
-    > différents (l'un dépassant 64 Kio, l'autre non) redeviendraient
-    > distinguables jusqu'à la prochaine écriture du plus petit, qui le
-    > réaligne.
-  - **Mot de passe héritier min 12** (était 8, service) — aligné sur le master
-    password et l'export `.ptbak`. Le snapshot héritier n'a pas de liaison TEE.
-  - **Gel UI** — `_changePassword` wrappé en try/catch (le spinner
-    `barrierDismissible:false` restait affiché indéfiniment si l'opération
-    throwait ; risque de désync « mot de passe changé mais UI en échec »).
-  - Garde `mounted` sur `_tryBiometric` ; migration des 6 derniers `SnackBar`
-    bruts vers `SnackUtils` (contraste/floating) ; date `entry_detail`
-    localisée ; purge de 8 clés l10n orphelines ; import JSON tolérant
-    (id/timestamps optionnels) ; nettoyage code mort. `flutter analyze` 0
-    issue, 74 tests verts.
-
-  **Points ouverts (documentés, non régressifs)** :
-  - **Biométrie non invalidée par nouvel enrôlement d'empreinte** (TODO M-6) —
-    nécessite un MethodChannel natif (`setInvalidatedByBiometricEnrollment`).
-
-- **v2.4.4** (2026-05-14) — Audit expert post-v2.4.3 (3 agents parallèles
-  sécurité / performance / UX) : 22 corrections F2-F12+F15 sécu /
-  P1+P3+P5+P6 perf / U2-U11 UX. Objectif : zéro vulnérabilité, zéro faille.
-  `flutter analyze` 0 issue, 48+7 tests verts.
-
-  **Sécurité (haute priorité)** :
-  - **F2** — `_unlockWithBiometricInternal` : longueur de la clé
-    biométrique décodée VALIDÉE avant pose en `_key`. Avant : `_key =
-    base64Decode(keyB64)` posé puis check `length != 32` plus loin. Si
-    le storage avait été corrompu (downgrade, disk error, attaque ciblée),
-    une clé non-32B vivait brièvement en RAM. Désormais : check via une
-    variable locale `candidate`, wipe + `deleteBiometricKey` + retour
-    `biometricInvalidated` si invalide.
-  - **F3** — Refactor anti-RAM-exposure decoy. `_v4Unlock` rendu **pur**
-    (retourne `(finalKey, entries, salt, wrappedDek, wrapNonce)` au
-    lieu de muter `_entries`/`_isOpen`/`_cachedSalt`). `_unlockInternal`
-    réécrit pour itérer les 2 slots (déni plausible anti-timing) sans
-    toucher au state global : applique le winner UNE fois après le loop.
-    Avant : si l'utilisateur réutilisait le même mot de passe pour
-    primary et decoy (config erronée), la 2ᵉ itération exposait
-    brièvement les entries decoy en RAM (~10ms) avant écrasement.
-  - **F4** — `passwordMatchesPrimary` partage le mutex `_unlockGate`
-    avec `unlock()` et `unlockWithBiometric()`. Avant : un setup decoy
-    ou heritage déclenché pendant un unlock en cours (deeplinks / Back
-    rapide) pouvait corrompre `_key`/`_entries` pendant le snapshot/
-    restore du path v3.
-  - **F5** — `BreachService._userAgent` fixé constant
-    (`Mozilla/5.0 (compatible)`) au lieu d'un pool rotatif de 4 UAs
-    tiré au démarrage de l'app via `static final`. Avant : un observateur
-    réseau (HIBP logs, MITM, ISP) qui voyait toujours le même UA durant
-    une session pouvait corréler une installation Pass Tech avec un
-    compte HIBP / IP. Désormais : UA strictement identique entre toutes
-    les installations, toutes les sessions, banal comme un crawler générique.
-  - **F6** — `_onUnlockFail` : compteur d'échecs `clamp(0, 1000)`.
-    Avant : un attaquant qui spam `unlock()` montait le compteur à
-    des dizaines de milliers, usure NAND et pollution storage (le
-    lockout step reste plafonné à 30 min via la table). Aucun impact
-    crypto, hygiène uniquement.
-  - **F7** — `_TotpCard` : code TOTP masqué par défaut (`••• •••`),
-    bouton oeil pour révéler. Avant : code 6-digits visible en
-    permanence dans la card → shoulder-surfing trivial. Aligné sur le
-    pattern `_PasswordField` qui exige `show=true`.
-  - **F8** — `_HeirPasswordDialog` (saisie passphrase héritier) :
-    `TextField(obscureText: true)` brut remplacé par `PasswordTextField`
-    (autofillHints=[], enableInteractiveSelection=show,
-    keyboardType=visiblePassword, autocorrect=false). Régression
-    v2.4.3 U1 qui avait corrigé le master password mais oublié ce
-    dialog. L'héritier saisit son passphrase dans un champ désormais
-    protégé contre Autofill tiers et long-press copy.
-  - **F9** — `.ptbak` v1/v2 legacy : `mac.length != 32` refusé AVANT
-    le `compute pbkdf2Worker`. Avant :
-    `SecretBytes.constantTimeEq(computed, mac)` retournait `false`
-    sur length mismatch (commentaire M-2) mais après avoir consommé
-    600 000 itérations PBKDF2 pour rien. Un `.ptbak` v1/v2 forgé
-    avec `mac="AAA="` (3 octets) court-circuitait silencieusement.
-  - **F10** — `MonotonicClock.nowMs()` sérialisée via un Future cache
-    pour éviter les races `read → max → write` non-atomiques quand 2
-    callers concurrent (auto-lock timer + unlock + heritage markActive)
-    s'entrelaçaient autour des `await _storage.read/write`.
-  - **F11** — `_extractTotpSecret` : refus strict des `otpauth://`
-    avec scheme ≠ `otpauth` ou host ≠ `totp`. Avant : un QR
-    `otpauth://malicious-host/whatever?secret=ABCD&issuer=<huge string>`
-    était accepté tant que `secret` était base32-valide.
-  - **F12** — `_extractTotpSecret` cap rawValue QR à 2048 octets
-    avant `Uri.parse`. Anti-DoS marginal mais borne la surface
-    d'attaque du parser sur un QR malicieux 3-4 Ko.
-  - **F15** — `PanicService.panic()` reset désormais `pt_fail_count` ET
-    `pt_lockout_until` dans flutter_secure_storage. Avant : après
-    panic+disguise, un attaquant tombant sur le decoy pouvait déclencher
-    un lockout 30 min "anormal" via 5 tentatives ratées — signal indirect
-    qu'une situation d'urgence venait d'avoir lieu (le compteur antérieur
-    de l'utilisateur légitime persistait). Désormais : état post-panic
-    indistinguable d'un boot frais.
-
-  **Performance** :
-  - **P1** — `HomeScreen._filtered` mémoïsé via `_cachedFiltered`/
-    `_cachedEntriesLength`, invalidé sur mutation (`_filter`, `_sort`,
-    `_search`, mutations entries via `_refresh`). Avant : 4 passes
-    `where().toList()` + sort recalculées à CHAQUE build sur 500
-    entries (4-8 ms × 6 rebuilds/écran = 25-50 ms évités). Sur 1000
-    entries : 150 ms.
-  - **P3** — `_TotpCardState` cache `(code, validUntilEpoch)` ; le
-    `Timer.periodic 1s` continue de driver le countdown mais le calcul
-    HMAC-SHA1 ne tourne plus que tous les 30 s. Économie batterie
-    réelle sur écran TOTP ouvert (~0.5 ms/s × N visualisations).
-  - **P5** — `SetupScreen` : jauge de force scope-isolée dans un
-    `ValueListenableBuilder` lié à `_pass1`. Avant : `onChanged: (_)
-    => setState(() {})` sur les 2 PasswordTextField rebuilder TOUT
-    l'écran à chaque frappe. Gain ~3-5 ms / frappe sur S9.
-  - **P6** — `AuditScreen._analyze` single-pass : 1 boucle remplit
-    `_weak`/`_duplicates`/`_old`/`_missing2fa` + compteurs
-    `_passCount`/`_noteCount`/`_cardCount`/`_with2fa` (utilisés en
-    header stats). Avant : 4 passes `where().toList()` + 4 passes
-    `where().length` à chaque rebuild (8×500 = 4000 evals).
-
-  **UX / a11y** :
-  - **U2** — 4 dialogs destructifs alignés sur le pattern v2.4.3 U10
-    (autofocus Cancel + `FilledButton.tonal` rouge avec `cs.errorContainer`
-    / `cs.onErrorContainer`) : delete entry, decoy delete, heritage
-    disable, screenshot protection off, deleteAll vault (le plus
-    critique). Avant : `TextButton` rouge sans autofocus, pas de
-    différentiation visuelle suffisante du destructif vs annulation.
-  - **U3** — `_Badge` (about_screen) : texte en `cs.onSurface` au
-    lieu de `color` thématique. Contraste WCAG AA atteint (~13:1 vs
-    ~2.5:1 mesuré sur 5 des 6 badges) — texte rouge sur fond rouge
-    clair échouait. L'icône colorée conserve le signal visuel.
-  - **U4** — `_scoreIcon()` (audit_screen) : icône daltonien-safe
-    (`check_circle` / `thumb_up_alt` / `warning_amber_rounded` /
-    `error`) à côté du libellé. Avant : couleur seule signalait la
-    qualité du score → confusion deutéranope/protanope. Semantics
-    group annonce "Score 85 sur 100, Bon" à TalkBack.
-  - **U5** — `HeirViewScreen` : tooltips `IconButton` copy
-    (l'héritier est par définition non-familier de l'app, c'est son
-    SEUL usage) + `cs.onSurfaceVariant` au lieu de `Colors.grey`
-    hardcodé (contraste pauvre dark mode).
-  - **U6** — `entry_edit_screen` username / URL : `autocorrect: false`
-    + `enableSuggestions: false` + `textCapitalization: none`. Avant :
-    Gboard transformait `john.doe` → `John Doe` au premier caractère,
-    capitalisait `Https://` au début du champ URL.
-  - **U7** — `about_screen` : `Image.asset` icon `cacheWidth: 160`
-    + `cacheHeight: 160` (= 2× displayWidth 80dp). Sans ce cap,
-    Flutter décodait l'asset à devicePixelRatio (240×240 sur S24),
-    soit ~230 Ko RAM par instance. Aligné PDF Tech / RFT / AI Tech.
-  - **U8** — `LinearProgressIndicator` audit_screen (HIBP progress)
-    et setup_screen (jauge force) : `semanticsLabel` + `semanticsValue`
-    "%" pour TalkBack. Avant : aveugle voyait juste la section
-    sans aucun feedback de progression sur les ~6 s du batch.
-  - **U9** — `HapticFeedback` ajouté : `selectionClick` sur save
-    entry (action utilisateur réussie), `mediumImpact` sur lock manuel
-    + delete entry (geste protecteur), `heavyImpact` sur panic +
-    deleteAll vault (action critique). Avant : seul `clipboard.copy`
-    avait `lightImpact`. Pattern aligné AI Tech v0.9.1 U4.
-  - **U10** — Onboarding dots : `Semantics(label: 'X / Y')` group
-    pour TalkBack. Avant : les dots étaient purement visuels — swipe
-    entre pages ne s'annonçait pas pour utilisateurs aveugles.
-  - **U11** — `snackBarTheme: SnackBarThemeData(behavior:
-    SnackBarBehavior.floating)` ajouté aux `_lightTheme()` et
-    `_darkTheme()` globaux. Avant : sites `ScaffoldMessenger.of(
-    context).showSnackBar` inline (38 occurrences hors SnackUtils)
-    n'avaient pas `behavior:floating` — overlap fréquent avec FAB
-    sur petits écrans.
-
-  **Qualité** :
-  - +7 tests garde `v2_4_4_guards_test.dart` (F11/F12 QR
-    scheme+cap, F9 mac.length pre-check, F5 UA constant).
-  - `flutter analyze` 0 issue, 48+7 tests verts.
-
-- **v2.4.3** (2026-05-13) — Audit expert post-v2.4.2 : 24 corrections
-  (F1-F6+F10 sécu / U1 U3 U4 U6 U10 U12 U14 UX / P1.1 P2.1 P2.2 perf).
-
-  **Sécurité (haute priorité)** :
-  - **F1** — Format `.ptbak` v3 (Argon2id + AES-GCM) remplace v2 (PBKDF2 600k
-    + AES-CBC + HMAC). Le `.ptbak` est le seul fichier qui circule
-    *hors device* (export pour backup cloud, transfert) — il est donc
-    le plus exposé au brute-force GPU offline (~50 M tries/s contre
-    PBKDF2 vs ~10/s contre Argon2id même sur RTX 4090). AAD `ptbak:v=3|
-    kdf=argon2id|m=...|t=...|p=...|salt=...` anti-downgrade. Lecture
-    v1/v2 préservée pour rétro-compat ; écriture v3 uniquement.
-    Bornes strictes sur params Argon2 lus (`4096 ≤ m ≤ 1 048 576 KiB`,
-    `1 ≤ t ≤ 16`, `1 ≤ p ≤ 4`) — refus immédiat d'un `.ptbak` forgé
-    avec m=2 Go destiné à OOM le device au déchiffrement.
-  - **F2** — `deleteBiometricKey()` ordre inversé : le flag UI
-    (`pt_biometric_enabled` dans flutter_secure_storage) est désormais
-    supprimé en PREMIER, le storage Keystore best-effort en second.
-    Évite le cas où une suppression partielle laissait le bouton
-    biométrique affiché alors qu'aucun storage utilisable n'existait.
-  - **F3** — `PhishingDetectorService.kt` : `System.currentTimeMillis()`
-    → `SystemClock.elapsedRealtime()` (boot-based monotone). Un user
-    rooté pouvait faire reculer la wall-clock entre la création d'un
-    snapshot et son lookup, rendant la fenêtre de fraîcheur 15 s
-    réutilisable indéfiniment. Aligné sur `MonotonicClock` côté Dart.
-  - **F4** — `VaultService.lock()` appelle désormais
-    `ClipboardService.cancelAndClear()` (fire-and-forget). Auparavant
-    seul `PanicService.panic()` le faisait : un lock manuel depuis
-    Settings, un auto-lock par timer, laissait un timer pendant qui
-    pouvait retirer un callback sur un context disposé, et la valeur
-    copiée restait dans le presse-papier jusqu'à expiration.
-  - **F5** — `VaultService.lock()` wipe désormais cryptographiquement
-    les bytes du cache méta v4 (`_cachedSalt`, `_cachedWrappedDek`,
-    `_cachedWrapNonce`) avant nullification. Ces 3 champs ne sont pas
-    secrets *stricto sensu* mais leur concaténation est un fingerprint
-    unique du vault, exploitable pour corréler des dumps mémoire
-    cross-sessions.
-  - **F6** — `_decryptVaultV3(null)` retournait `true` avec 0 entry
-    (path mort post-v2.0 mais qui ouvrait le vault SANS authentification
-    si un futur appelant passait null). Désormais refus strict.
-  - **F10** — `_v4Unlock` : la clé `out` est désormais clonée et
-    `finalKey` wipée AVANT le peuplement du cache méta. Évite qu'une
-    exception OOM/GC entre `_cachedSalt = ...` et `SecretBytes.wipe`
-    laisse à la fois la clé brute et un cache partiel.
-
-  **UX / a11y** :
-  - **U1** — `PasswordTextField` : `autofillHints: const <String>[]`
-    désactive le service Autofill Android (pas de capture cross-app
-    d'un master password) + `enableInteractiveSelection: _show` bloque
-    la sélection/copie quand masqué (anti clipboard manager tiers).
-  - **U3** — Search IconButton AppBar : tooltip Flutter built-in
-    (`closeButtonTooltip` / `searchFieldLabel`).
-  - **U4** — PopupMenuButton `more_vert` : `moreButtonTooltip` built-in.
-  - **U6** — Spinner Argon2id (setup + unlock) wrap `Semantics(
-    liveRegion: true, label: t.setupEncrypting/unlockDecrypting)` —
-    TalkBack annonce désormais le statut au début de la dérivation
-    (auparavant 1-3 s de silence sur device contraint).
-  - **U10** — Dialog "Supprimer entrée" : `TextButton(autofocus: true)`
-    sur Annuler (safe default) + `FilledButton.tonal` rouge sur Delete
-    avec `cs.errorContainer/onErrorContainer` au lieu de `Colors.red`.
-  - **U12** — Empty state home : ajout `FilledButton.tonalIcon` "Ajouter"
-    inline en plus du FAB, plus découvrable au premier lancement.
-  - **U14** — Search bar : `suffixIcon` croix inline pour vider le
-    champ (plus découvrable que l'action AppBar Close).
-
-  **Performance** :
-  - **P1.1** — Search bar debouncée 150 ms (avant : setState par char
-    relançait sort+filter+toLowerCase × N entries × N champs → 8-12 ms
-    par char sur S9 avec 500 entries).
-  - **P2.1** — **splits ABI + resourceConfigurations FR/EN** activés
-    (auparavant APK universel 71 Mo). Gain estimé arm64 ~25-30 Mo.
-  - **P2.2** — `DateFormat` hissé en `static final _dfDMYHm`
-    (entry_detail rebuild fréquent à cause du TOTP timer 1 Hz).
-
-  **Tests garde** : `test/ptbak_v3_test.dart` (10 tests : round-trip
-  v3, refus wrong passphrase, refus params Argon2 forgés, refus KDF
-  algo non-argon2id, refus version > 3, refus salt < 16 octets).
-  Total tests : 48/48 verts (38 + 10 nouveaux).
-
-  Aucun changement de format vault `.enc` (v3/v4 lus comme avant).
-  Aucun changement de format vault legacy `.bak`. Les `.ptbak` v2
-  existants sont toujours lus en import.
-
-- **v2.4.2** (2026-05-13) — Robustesse biométrique après ré-enrôlement
-  d'empreinte Android. Avant : si l'utilisateur supprimait puis
-  ré-enrôlait son empreinte, le bouton biométrique affichait « Échec
-  biométrique » sans expliquer la marche à suivre, et le wrap restait
-  en place (la résolution exigeait un toggle off/on manuel dans
-  Réglages). Maintenant : détection explicite de l'exception
-  `biometric_storage.AuthException` non-cancel, auto-suppression du
-  wrap, et nouveau résultat typé `UnlockResult.biometricInvalidated`
-  qui pilote un message clair « Empreinte Android modifiée : le
-  déverrouillage biométrique a été désactivé par sécurité. Déverrouillez
-  avec votre mot de passe principal, puis réactivez la biométrie dans
-  Réglages. ». Ajout d'un snack de confirmation explicite à
-  l'activation/désactivation de la biométrie dans Réglages (auparavant
-  silencieux), avec discrimination annulation utilisateur vs échec
-  technique. Aligne le pattern avec Health Tech v1.5.5.
-- **v2.4.0** (2026-05-13) — Audit zéro-vuln zéro-faille A1-A20 +
-  B1-B24, FLAG_SECURE dynamique avec refcount, MonotonicClock partagé,
-  PanicService purge phishing snapshot.
+**La 3.0.0 est une réécriture, en Kotlin, et une application différente.** Elle s'installe à côté de
+la 2.x, pas par-dessus. Pour passer de l'une à l'autre : exportez une sauvegarde `.ptbak` depuis la
+2.x, importez-la dans la 3.0, puis retirez l'ancienne quand vous serez satisfait. L'historique de la
+2.x vit dans les tags de ce dépôt ; son document de sécurité est celui livré avec elle.
 
 ## Signaler une vulnérabilité
 
-**Merci de ne PAS ouvrir d'issue publique sur GitHub** — un gestionnaire de mots de passe demande une divulgation strictement coordonnée.
+**N'ouvrez pas d'issue publique sur GitHub** — un gestionnaire de mots de passe exige une divulgation
+strictement coordonnée.
 
-📧 **Envoyez un email chiffré (si possible) à : contact@files-tech.com**
+📧 **Un courriel, chiffré si vous le pouvez, à : contact@files-tech.com**
 
-Indiquez dans le sujet : `[SECURITY] Pass Tech — <description courte>`.
+Objet : `[SECURITY] Pass Tech — <description courte>`.
 
-Merci d'inclure :
+Merci d'y mettre :
 
-- Une description claire de la vulnérabilité
-- Les étapes pour la reproduire (PoC bienvenue mais non requise)
-- L'impact potentiel (compromission du vault ? vol clé ? bypass biométrie ?)
-- La version affectée
-- Une suggestion de correctif si possible
+- une description claire de la vulnérabilité ;
+- les étapes pour la reproduire (une preuve de concept est bienvenue, pas obligatoire) ;
+- l'impact que vous voyez — compromission du coffre, extraction de clé, contournement de la
+  biométrie, un coffre leurre dont on peut prouver l'existence ;
+- la version touchée, et le téléphone et la version d'Android sur lesquels vous l'avez vue ;
+- un correctif proposé, si vous en avez un.
 
-## Délai de réponse renforcé (gestionnaire de mots de passe)
+## Délais de réponse
 
-- Accusé de réception : sous 48 heures
-- Évaluation initiale : sous 7 jours
-- Correctif : selon la criticité
-  - Critique (compromission du vault, fuite clé) → patch sous 7 jours
-  - Majeure → patch sous 30 jours
-  - Mineure → version suivante
+- Accusé de réception : sous 48 heures.
+- Première évaluation : sous 7 jours.
+- Correctif, selon la gravité :
+  - **Critique** — compromission du coffre, fuite de clé, coffre leurre prouvable → sous 7 jours ;
+  - **Majeur** → sous 30 jours ;
+  - **Mineur** → à la version suivante.
 
 ## Divulgation responsable
 
-Merci de ne pas divulguer publiquement la vulnérabilité avant qu'un correctif ne soit publié et qu'un délai raisonnable de mise à jour (90 jours minimum) ait été laissé aux utilisateurs.
+Merci de ne rien divulguer publiquement avant qu'un correctif soit publié et qu'une fenêtre de mise à
+jour raisonnable — 90 jours au minimum — ait été laissée aux personnes qui utilisent l'application.
 
-## Plateforme minimale supportée
+## Plateforme minimale
 
-Depuis la v1.13 (audit hardening 2026-05), Pass Tech requiert **Android 7.0
-(API 24) ou supérieur** :
+Pass Tech 3.0 demande **Android 8.0 (API 26) ou plus**.
 
-- `minSdk = 24` dans `android/app/build.gradle.kts`.
-- Signature APK **v2+ uniquement** (`enableV1Signing = false`) — neutralise
-  CVE-2017-13156 (Janus) qui permettait d'injecter du DEX malveillant dans
-  un APK v1-signé.
-- Android 5 et 6 (parc < 0.5 % en 2026) ne sont plus pris en charge.
+- `minSdk = 26`, déclaré dans `app/build.gradle.kts`, ce que supposent le travail sur les clés
+  matérielles et l'usage du Keystore.
+- Signature de l'APK **v2, v3 et v4 seulement** (`enableV1Signing = false`), ce qui neutralise
+  CVE-2017-13156 (Janus) : cette attaque injecte du DEX dans un APK signé en v1.
+- Android 7 et antérieurs ne sont pas pris en charge par cette version. La 2.x descendait à
+  Android 7 et n'est plus maintenue côté sécurité.
 
-Les utilisateurs sur Android antérieur peuvent rester sur la dernière v1.12.x
-(non supportée côté sécurité) jusqu'à migration matérielle.
+## Vérifier ce que vous avez installé
 
-## Vérification de l'intégrité d'un APK
-
-Chaque release publiée sur GitHub contient un hash SHA-256 attendu pour l'APK arm64-v8a dans les notes. Avant install, vous pouvez vérifier :
+Chaque version publie le SHA-256 de **chacun de ses fichiers**. Avant d'installer :
 
 ```bash
-sha256sum app-arm64-v8a-release.apk
+sha256sum <le fichier que vous avez téléchargé>
 ```
 
-Le résultat doit correspondre exactement à la valeur publiée. Sinon, **ne pas installer l'APK**.
+Le résultat doit correspondre exactement à la valeur publiée pour ce même fichier. Sinon,
+**ne l'installez pas**.
 
-## Modèle de menace
+## Ce qui est protégé, et ce qui ne l'est pas
 
-### Pack cryptographique v2.0 (vault v4)
+Le modèle de menace est un document à part, et c'est celui qu'il faut lire : il nomme les
+adversaires, la portée exacte de chaque protection, et les risques résiduels assumés plutôt que
+résolus — y compris les limites du coffre leurre et du mode panique.
 
-Depuis la v2.0.0, Pass Tech utilise un pack cryptographique entièrement
-remplacé pour le coffre principal :
-
-- **KDF** : Argon2id (RFC 9106) — m = 19 456 KiB (19 MiB), t = 2, p = 1,
-  L = 32 octets. Choix OWASP 2024 pour gestionnaire de mots de passe sur
-  mobile. Remplace PBKDF2-HMAC-SHA256 600 000 iter (v3).
-- **AEAD** : AES-GCM-256 (NIST SP 800-38D), nonce 96 bits aléatoires,
-  tag 128 bits. Remplace AES-256-CBC + HMAC-SHA256 séparé (v3). L'AAD
-  GCM lie la version, l'alias KEK et les paramètres KDF (anti-downgrade).
-- **Clé liée matériel** : `hwSecret` (32 octets aléatoires) chiffré par
-  une **KEK AES/GCM/NoPadding 256 bits** dans l'AndroidKeyStore, alias
-  `pt_vault_kek_v1`. Tentative `setIsStrongBoxBacked(true)` à la création,
-  fallback silencieux sur TEE software.
-- **Dérivation finale** : `finalKey = HKDF-SHA256(salt, pwHash || hwSecret,
-  "pt:v4", 32)`. La KEK Keystore ne quitte jamais le TEE / StrongBox.
-- **Déni plausible** : 2 alias KEK (`pt_vault_kek_v1` +
-  `pt_vault_kek_decoy_v1`) sont créés systématiquement à la 1ʳᵉ install,
-  même si le coffre leurre n'est pas configuré — l'inspection du Keystore
-  ne révèle rien sur l'usage du décoy. Depuis la **v2.0.2**, un sel dummy
-  de 32 octets est généré pour le décoy même sans usage et le timing de
-  la vérification du leurre est aligné sur celui du coffre principal —
-  une attaque side-channel temporelle ne peut plus distinguer les deux
-  chemins.
-
-### Surface protégée
-
-Le modèle de menace cible trois scénarios :
-
-1. **Anti-coercition** — un attaquant force l'utilisateur à déverrouiller
-   l'app. Pass Tech répond avec le coffre leurre + mode panique.
-   Le déverrouillage biométrique est incompatible avec cette défense et
-   l'application les exclut mutuellement depuis le 2026-09-20 : l'empreinte
-   ouvre le coffre **principal** sans mot de passe, donc un adversaire qui
-   fait poser le doigt contournait le leurre entièrement. Cf. `THREAT_MODEL.md`
-   §4, point 5.
-2. **Perte / vol de l'appareil** — l'attaquant a un accès physique mais
-   pas le master password. Pass Tech répond avec Argon2id + KEK Keystore
-   non-extractible + lockout progressif + auto-lock + wipe RAM.
-3. **Malware sandbox** — un autre process tente de lire le coffre. Pass
-   Tech répond avec sandbox Android, FLAG_SECURE, allowBackup=false,
-   clipboard `IS_SENSITIVE`.
-
-### Pass Tech protège contre
-
-- Vol physique de l'appareil (verrouillage écran + biométrique hardware-bound + lockout progressif)
-- Lecture du fichier vault sans le mot de passe maître (AES-GCM-256, Argon2id 19 MiB / t=2)
-- Attaque hors-ligne sur le vault exfiltré : sans la KEK Keystore (liée à l'appareil), le vault est inutilisable même avec le master password
-- Downgrade silencieux de version : l'AAD GCM lie `v=4|alias=…|kdf=argon2id|m=…|t=…|p=…` au tag
-- Capture d'écran et aperçu du sélecteur récent (FLAG_SECURE)
-- Backup cloud Android (allowBackup=false + dataExtractionRules)
-- Brute-force du master password (lockout progressif 5 fails → 30s à 30min)
-- Réutilisation après timeout (auto-lock configurable + wipe clé RAM)
-- Trafic réseau MITM partiel (HIBP en k-anonymity, network_security_config)
-
-### Pass Tech NE protège PAS contre
-
-- Appareil rooté + Frida actif (un avertissement RASP est affiché mais l'utilisateur peut continuer à ses risques)
-- Keylogger système / clavier compromis
-- Compromission complète du Keystore Android matériel (extraction TEE / StrongBox)
-- Factory reset ou wipe Keystore (Samsung Auto Blocker, restauration usine) :
-  la KEK est perdue → coffre **irrécupérable** même avec master password.
-  Mitigation : exporter une `.ptbak` AVANT factory reset.
-- Attaquant ayant le mot de passe maître ET un accès au device déverrouillé
-
-### Limitations connues
-
-- **Dart `String` non zeroizable** (M-4) : la VM Dart ne permet pas
-  d'effacer fiablement une `String` en mémoire. Les master passwords
-  sont saisis dans des `TextEditingController` puis convertis le plus
-  rapidement possible en `Uint8List` zeroizables. Une fenêtre
-  temporelle résiduelle existe (quelques ms à quelques s en cas de pause
-  GC). **Cette limitation s'étend à plusieurs chemins** :
-  - **Import `.ptbak`** : après déchiffrement, `Uint8List plain` est
-    explicitement wipé, mais `utf8.decode(plain)` puis `jsonDecode(...)`
-    créent des `String` Dart intermédiaires non-wipables qui contiennent
-    les mots de passe jusqu'au GC. Le wipe de `plain` réduit la surface
-    sans la fermer.
-  - **TOTP `DateTime.now()`** : `TotpService` utilise le wall-clock
-    (RFC 6238 oblige le sync horloge avec le serveur). Un attaquant
-    root capable de modifier l'horloge système (`adb shell date -s`)
-    peut rejouer un code TOTP expiré dans la fenêtre ±30 s tolérée.
-    Mitigations partielles : pas de stockage TOTP en clair (le secret
-    Base32 est dans le vault chiffré), wall-clock pas utilisable pour
-    déverrouiller le vault lui-même — depuis v2.5.2 le lockout est ancré
-    sur `SystemClock.elapsedRealtime()`, insensible aux Réglages Date et
-    heure comme à NTP.
-
-    > **Correction v2.5.2 (SEC F5/F17).** Cette affirmation était FAUSSE
-    > jusqu'à la v2.5.1. `MonotonicClock.nowMs()` rend
-    > `max(DateTime.now(), maxSeen)` : la monotonie ne jouait que contre
-    > les RECULS d'horloge, alors que l'AVANCE est la direction
-    > attaquante. Avancer la date d'un jour dans les Réglages Android
-    > effaçait le verrouillage anti-force-brute, sans root ni ADB. Le
-    > verrouillage persiste désormais une durée restante plus une ancre
-    > `elapsedRealtime`, et décompte le temps réellement écoulé.
-  Mitigation globale : auto-lock court + FLAG_SECURE + Keystore
-  hardware-backed quand disponible.
-- **Wipe Keystore = perte du coffre** : factory reset, restauration usine,
-  certaines opérations Samsung Auto Blocker invalident la KEK. Sans la
-  KEK, le coffre est mathématiquement irrécupérable même avec le master
-  password. Mitigation : exporter régulièrement un `.ptbak` (pack Argon2id
-  + AES-GCM portable, indépendant du Keystore).
-- **Mode panique non-instantané sur certains OEM** : le camouflage d'icône
-  via alias d'activité peut prendre 1–3 s sur Samsung One UI à cause du
-  cache du launcher.
-- **Biométrie post-réenrôlement empreinte** (M-6) : `biometric_storage`
-  (6.0.0-dev.5 depuis la v2.7.0, et toute version antérieure) n'expose pas
-  `setInvalidatedByBiometricEnrollment(true)` dans son API publique —
-  vérifié sur tout le paquet, côté Dart comme côté Kotlin. Si un attaquant ayant accès physique au device et
-  au PIN Android ajoute sa propre empreinte, il pourrait théoriquement
-  déverrouiller la biométrie sans connaître le master password.
-  Mitigation v2.5.0 : note UI dans Réglages → désactiver/réactiver la
-  biométrie après chaque modification d'empreinte/visage Android. Fix
-  définitif (KeystoreBridge custom) en backlog ROADMAP_HARDENING.
-
-### Migration v3 → v4
-
-À la 1ʳᵉ ouverture après mise à jour vers la v2.0.0, Pass Tech détecte
-automatiquement un coffre v3 et le convertit en v4 :
-
-1. Le master password est demandé via l'UI normale d'unlock.
-2. Le coffre v3 est déchiffré (PBKDF2 + AES-CBC + HMAC) en mémoire.
-3. Une copie `pt_vault_v3.enc.bak` est créée à côté du fichier original.
-4. Un nouveau salt + hwSecret sont générés ; la KEK Keystore est créée.
-5. Le coffre est ré-écrit en format v4 (atomic tmp+rename).
-6. La biométrique éventuelle (cache 64 octets v3) est invalidée — il faut
-   la réactiver dans Réglages.
-
-Aucun retour en arrière : v3 ne peut plus être réécrit. Les fichiers
-`.ptbak` v3 restent compatibles en lecture jusqu'à la v2.1.
+→ [THREAT_MODEL.fr.md](THREAT_MODEL.fr.md)
 
 ## Périmètre
 
-Vulnérabilités acceptées :
+**Dans le périmètre** : le coffre et son chiffrement, la dérivation de clé et son étape matérielle,
+la garde anti-force-brute, la liaison biométrique, le coffre leurre et le mode panique, l'instantané
+d'héritage, le contrôle d'adresse et le service d'accessibilité qu'il utilise, le presse-papiers, les
+chemins de sauvegarde et d'import, la vérification de mise à jour, et le jeu d'autorisations de l'APK
+publié.
 
-- Faiblesse cryptographique (Argon2id, AES-GCM, HKDF, AAD, nonce, IV)
-- Bypass de la biométrie hardware-bound
-- Bypass du lockout / brute-force facilité
-- Fuite du vault chiffré ou de la clé maître hors processus
-- Side-channels timing exploitables
+**Hors périmètre** : un téléphone rooté ou compromis, une attaque physique sur le matériel sécurisé,
+Android lui-même, et tout navigateur ou site que le contrôle d'adresse lit. Ces points sont énoncés
+au §5 de [THREAT_MODEL.fr.md](THREAT_MODEL.fr.md) plutôt que traités comme des défauts.
 
-Hors périmètre :
+## Ce que la construction vérifie à chaque commit
 
-- Bugs UX sans impact sécurité
-- Vulnérabilités dans `flutter_secure_storage`, `biometric_storage`, `encrypt`, `crypto` déjà reportées en amont
-- Attaques nécessitant un appareil rooté/compromis (déjà couvert par RASP)
-- Attaques physiques sur l'appareil déverrouillé avec le vault ouvert
+- `CI` — construction, tests unitaires, lint Android et detekt, sans baseline et sans écart toléré.
+- `Promises` — construit un APK **release** et compare son manifeste **fusionné** à
+  [`config/expected-permissions.txt`](config/expected-permissions.txt), dans les deux sens. Une
+  autorisation qui apparaît sans y figurer fait échouer la construction, et une qui y figure et
+  disparaît aussi. L'app Flutter a livré `ACCESS_NETWORK_STATE` sans que ce soit déclaré nulle part
+  dans le dépôt ; cela ne peut plus se reproduire en silence.
+- `CodeQL` — analyse statique des sources Kotlin.
