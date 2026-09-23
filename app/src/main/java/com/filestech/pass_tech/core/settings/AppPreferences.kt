@@ -72,6 +72,18 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         store.edit { it[SCREENSHOT_PROTECTION] = enabled }
     }
 
+    /**
+     * Whether the owner asked for the anti-phishing check (2.7.1: `anti_phishing_enabled`, off by
+     * default). It belongs to the phone and not to a vault, like the theme: it describes a service
+     * anyone can see in the Android settings, so holding it per vault would say nothing more and
+     * would let one vault's setting answer for another's.
+     */
+    val antiPhishing: Flow<Boolean> = data.map { it[ANTI_PHISHING] == true }
+
+    suspend fun setAntiPhishing(enabled: Boolean) {
+        store.edit { it[ANTI_PHISHING] = enabled }
+    }
+
     /** The order of the home list, kept from one opening to the next (2.7.1: `sort_mode`). */
     val sortMode: Flow<EntryQuery.Sort> = data.map { EntryQuery.Sort.fromKey(it[SORT_MODE]) }
 
@@ -103,5 +115,6 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         private val SORT_MODE = stringPreferencesKey("sort_mode")
         private val THEME = stringPreferencesKey("theme_mode")
         private val SCREENSHOT_PROTECTION = booleanPreferencesKey("screenshot_protection_enabled")
+        private val ANTI_PHISHING = booleanPreferencesKey("anti_phishing_enabled")
     }
 }

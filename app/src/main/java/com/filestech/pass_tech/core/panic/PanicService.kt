@@ -1,6 +1,7 @@
 package com.filestech.pass_tech.core.panic
 
 import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
+import com.filestech.pass_tech.core.phishing.AntiPhishing
 import com.filestech.pass_tech.core.vault.VaultManager
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -8,14 +9,18 @@ import javax.inject.Singleton
 /**
  * Panic mode (design v2.1 §11 bis, point 7): the owner is being made to hand the phone over.
  *
- * Four steps, in this order, each on its own: **a step that fails never stops the next**. The vault
+ * Five steps, in this order, each on its own: **a step that fails never stops the next**. The vault
  * first, because that is the one that matters and the only one that cannot be undone from outside.
  *
  * 1. lock the vault — the key leaves memory;
  * 2. clear the clipboard, and the clearing it was waiting for;
  * 3. disarm the fingerprint — otherwise someone can hold the owner's finger to the sensor and open
  *    the very vault this exists to protect. Re-arming asks for the master password anyway;
- * 4. disguise the launcher.
+ * 4. withdraw the anti-phishing service. Its name is the app's, and Settings › Accessibility shows
+ *    it whatever the launcher has been made to say: a phone showing "Calculator" on its home screen
+ *    and "Pass Tech" one settings screen away is not disguised. It also takes away, from whoever is
+ *    holding the phone, a service allowed to read the address bar of every browser;
+ * 5. disguise the launcher.
  *
  * **It writes no vault file.** Nothing is erased: the owner unlocks with their password afterwards.
  *
@@ -31,6 +36,7 @@ import javax.inject.Singleton
 class PanicService @Inject constructor(
     private val vault: VaultManager,
     private val clipboard: SensitiveClipboard,
+    private val antiPhishing: AntiPhishing,
     private val disguise: LauncherDisguise,
 ) {
 
@@ -38,10 +44,17 @@ class PanicService @Inject constructor(
         step { vault.lock() }
         step { clipboard.clear() }
         step { vault.disarmBiometrics() }
+        step { antiPhishing.turnOff() }
         step { disguise.set(true) }
     }
 
-    /** Shows the Pass Tech name and icon again, from the settings, once the owner is safe. */
+    /**
+     * Shows the Pass Tech name and icon again, from the settings, once the owner is safe.
+     *
+     * The anti-phishing service is **not** put back: the system dropped its grant when the component
+     * went away, so listing it again would put the app's name back under Settings › Accessibility
+     * while nothing was watching anything. The owner turns it back on from its own switch.
+     */
     fun reveal(): Boolean = disguise.set(false)
 
     /** `null` when the system did not answer: see [LauncherDisguise.disguised]. */

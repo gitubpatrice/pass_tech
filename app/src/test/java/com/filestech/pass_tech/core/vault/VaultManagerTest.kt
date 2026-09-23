@@ -11,6 +11,7 @@ import com.filestech.pass_tech.core.vault.VaultManager.DecoyOutcome
 import com.filestech.pass_tech.core.vault.VaultManager.State
 import com.filestech.pass_tech.core.vault.VaultManager.UnlockOutcome
 import com.filestech.pass_tech.testing.FakeClock
+import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.GatedFiles
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
@@ -38,6 +39,7 @@ class VaultManagerTest {
     lateinit var dir: File
 
     private val keystore = InMemorySlotKeystore()
+    private val domain = FixedDomain()
     private val fastParams = KdfParams(memoryKiB = KdfParams.MIN_MEMORY_KIB, iterations = 1, parallelism = 1)
     private lateinit var files: GatedFiles
     private lateinit var manager: VaultManager
@@ -49,7 +51,7 @@ class VaultManagerTest {
         val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
         val guard = BruteForceGuard.forVault(store, clock)
         val heir = heirRepository(dir, keystore, store, clock, fastParams)
-        manager = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), Dispatchers.IO)
+        manager = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), domain, Dispatchers.IO)
     }
 
     // A fresh array for every call: the manager wipes what it is given.
@@ -236,6 +238,16 @@ class VaultManagerTest {
         gate.open()
         joinAll(first, second)
         assertThat(titles()).containsExactly("first", "second").inOrder()
+    }
+
+    @Test
+    fun `locking forgets the site the browser was last seen on`() = runTest {
+        manager.openOrCreate(owner())
+        domain.host = "mabanque.fr"
+        manager.lock()
+        // It expires by itself fifteen seconds later; a closed vault leaves nothing of what its
+        // owner was doing sitting in this process until then.
+        assertThat(domain.host).isNull()
     }
 
     private companion object {

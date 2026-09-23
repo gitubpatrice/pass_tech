@@ -13,7 +13,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +37,7 @@ import com.filestech.pass_tech.ui.entries.EntriesViewModel.Message
 import com.filestech.pass_tech.ui.entries.EntriesViewModel.Screen
 import com.filestech.pass_tech.ui.entries.EntryDetailScreen
 import com.filestech.pass_tech.ui.entries.EntryEditScreen
+import com.filestech.pass_tech.ui.entries.PhishingDialog
 import com.filestech.pass_tech.ui.entry.EntryScreen
 import com.filestech.pass_tech.ui.entry.EntryViewModel
 import com.filestech.pass_tech.ui.generator.GeneratorScreen
@@ -90,6 +93,12 @@ fun PassTechApp(
         }
     }
     if (entryState.backupReminder) BackupReminderDialog(onDismiss = entry::backupReminderSeen)
+
+    // Over whichever screen raised it, and gone with the lock: the copy it holds back is a password.
+    val domainAlert by entries.domainAlert.collectAsStateWithLifecycle()
+    domainAlert?.let {
+        PhishingDialog(it, onClose = entries::dismissDomainAlert, onCopyAnyway = entries::copyAnyway)
+    }
 }
 
 /** The home, or the screen on top of it: an entry's detail or the editor. */
@@ -156,7 +165,17 @@ private fun Messages(entries: EntriesViewModel, snackbar: SnackbarHostState) {
     LaunchedEffect(entries, snackbar) {
         entries.messages.collect { message ->
             snackbar.currentSnackbarData?.dismiss()
-            launch { snackbar.showSnackbar(message.text(resources)) }
+            // Only the unchecked-domain warning carries a button, and it stays up longer: it is the
+            // one message that asks the owner to go and do something.
+            val action = if (message == Message.DomainUnchecked) resources.getString(R.string.phishing_unchecked_action) else null
+            launch {
+                val result = snackbar.showSnackbar(
+                    message = message.text(resources),
+                    actionLabel = action,
+                    duration = if (action == null) SnackbarDuration.Short else SnackbarDuration.Long,
+                )
+                if (result == SnackbarResult.ActionPerformed) entries.openAccessibilitySettings()
+            }
         }
     }
 }
@@ -175,6 +194,7 @@ private fun Message.text(resources: Resources): String = when (this) {
     Message.SecretAdded -> resources.getString(R.string.entry_edit_secret_added)
     Message.GeneratedCopied -> resources.getString(R.string.generator_copied_snack)
     Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
+    Message.DomainUnchecked -> resources.getString(R.string.phishing_unchecked_snack)
 }
 
 /** 2.7.1: shown once, right after the creation, one button. */

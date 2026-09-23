@@ -13,6 +13,7 @@ import com.filestech.pass_tech.core.backup.ImportParser
 import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
 import com.filestech.pass_tech.core.crypto.KdfParams
 import com.filestech.pass_tech.core.panic.PanicService
+import com.filestech.pass_tech.core.phishing.AntiPhishing
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.StateStore
@@ -25,6 +26,8 @@ import com.filestech.pass_tech.testing.FakeBiometricKeys
 import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FakeLauncherDisguise
+import com.filestech.pass_tech.testing.FakePhishingComponent
+import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
 import com.filestech.pass_tech.ui.components.PromptResult
@@ -63,6 +66,11 @@ class SettingsViewModelTest {
     private val bioKeys = FakeBiometricKeys()
     private val clipboard = FakeClipboard()
     private val disguise = FakeLauncherDisguise()
+    private val phishing = FakePhishingComponent()
+
+    /** The second setup below checks one thing and needs no anti-phishing state of its own. */
+    private fun phishingOf(store: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>) =
+        AntiPhishing(AppPreferences(store), FakePhishingComponent(), FixedDomain())
 
     private fun entry(title: String) = com.filestech.pass_tech.core.model.Entry(
         id = title,
@@ -98,10 +106,11 @@ class SettingsViewModelTest {
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
             val repository = VaultRepository(files, keystore, guard, heir, StoredBiometricBinding(state, bioKeys), fastParams)
-            val vault = VaultManager(repository, io)
+            val vault = VaultManager(repository, FixedDomain(), io)
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "settings.preferences_pb") })
             val preferences = AppPreferences(store)
+            val antiPhishing = AntiPhishing(preferences, phishing, FixedDomain())
             val settings = ViewModelProvider.create(
                 viewModels,
                 viewModelFactory {
@@ -113,7 +122,8 @@ class SettingsViewModelTest {
                             // Storage is never touched here: the tests hand the file's content straight over.
                             documents = NoDocuments,
                             autoLock = AutoLock(vault, MutableStateFlow(AppPreferences.AUTO_LOCK_DEFAULT), FakeClock(), backgroundScope),
-                            panicService = PanicService(vault, clipboard, disguise),
+                            panicService = PanicService(vault, clipboard, antiPhishing, disguise),
+                            antiPhishing = antiPhishing,
                             io = io,
                         )
                     }
@@ -364,7 +374,7 @@ class SettingsViewModelTest {
             val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
-            val vault = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), io)
+            val vault = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), FixedDomain(), io)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "now.preferences_pb") })
             val settings = ViewModelProvider.create(
                 viewModels,
@@ -376,7 +386,8 @@ class SettingsViewModelTest {
                             biometricSupport = { true },
                             documents = NoDocuments,
                             autoLock = AutoLock(vault, MutableStateFlow(AppPreferences.AUTO_LOCK_DEFAULT), FakeClock(), backgroundScope),
-                            panicService = PanicService(vault, clipboard, disguise),
+                            panicService = PanicService(vault, clipboard, phishingOf(store), disguise),
+                            antiPhishing = phishingOf(store),
                             io = io,
                         )
                     }
@@ -538,6 +549,70 @@ class SettingsViewModelTest {
             )
             store.edit { it[stringPreferencesKey("theme_mode")] = "purple" }
             assertThat(AppPreferences(store).theme.first()).isEqualTo(AppPreferences.Theme.SYSTEM)
+        }
+    }
+
+    @Test
+    fun `turning the anti-phishing on lists the service and opens the Android screen that grants it`() = runTest {
+        opened { settings, _, preferences ->
+            settings.enableAntiPhishing()
+            testScheduler.advanceUntilIdle()
+            assertThat(phishing.listed).isTrue()
+            assertThat(preferences.antiPhishing.first()).isTrue()
+            assertThat(phishing.settingsOpened).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `the tile says it is waiting until Android grants it`() = runTest {
+        opened { settings, _, _ ->
+            settings.enableAntiPhishing()
+            testScheduler.advanceUntilIdle()
+            assertThat(settings.antiPhishingUi.value.enabled).isTrue()
+            assertThat(settings.antiPhishingUi.value.granted).isFalse()
+
+            phishing.granted = true
+            settings.refreshAntiPhishing()
+            testScheduler.advanceUntilIdle()
+            assertThat(settings.antiPhishingUi.value.granted).isTrue()
+        }
+    }
+
+    @Test
+    fun `turning it off takes the grant back, and not only the setting`() = runTest {
+        opened { settings, _, preferences ->
+            settings.enableAntiPhishing()
+            testScheduler.advanceUntilIdle()
+            phishing.granted = true
+
+            settings.disableAntiPhishing()
+            testScheduler.advanceUntilIdle()
+            assertThat(preferences.antiPhishing.first()).isFalse()
+            assertThat(phishing.listed).isFalse()
+            assertThat(phishing.granted).isFalse()
+            assertThat(settings.antiPhishingUi.value.granted).isFalse()
+        }
+    }
+
+    @Test
+    fun `a system that will not list the service leaves the switch alone and says so`() = runTest {
+        opened { settings, _, preferences ->
+            phishing.answers = false
+            settings.enableAntiPhishing()
+            assertThat(settings.nextMessage()).isEqualTo(Message.AntiPhishingOnFailed)
+            assertThat(preferences.antiPhishing.first()).isFalse()
+        }
+    }
+
+    @Test
+    fun `a system that will not withdraw it says so, and the setting goes off anyway`() = runTest {
+        opened { settings, _, preferences ->
+            settings.enableAntiPhishing()
+            testScheduler.advanceUntilIdle()
+            phishing.answers = false
+            settings.disableAntiPhishing()
+            assertThat(settings.nextMessage()).isEqualTo(Message.AntiPhishingOffFailed)
+            assertThat(preferences.antiPhishing.first()).isFalse()
         }
     }
 }

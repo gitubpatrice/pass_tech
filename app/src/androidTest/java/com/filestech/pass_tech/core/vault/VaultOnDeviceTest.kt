@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.filestech.pass_tech.core.model.DartDateTime
 import com.filestech.pass_tech.core.model.Entry
+import com.filestech.pass_tech.core.phishing.DomainSnapshot
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.vault.VaultManager.CreateOutcome
 import com.filestech.pass_tech.core.vault.VaultManager.DecoyOutcome
@@ -61,7 +62,7 @@ class VaultOnDeviceTest {
             VaultModule.heirRepository(context, keystore, state, clock),
             BiometricBinding.NONE,
         )
-        manager = VaultManager(repository, Dispatchers.IO)
+        manager = VaultManager(repository, DomainSnapshot(clock), Dispatchers.IO)
     }
 
     @After

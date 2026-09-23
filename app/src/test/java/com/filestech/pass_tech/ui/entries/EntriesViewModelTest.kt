@@ -4,13 +4,19 @@ import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.crypto.KdfParams
 import com.filestech.pass_tech.core.model.EntryType
+import com.filestech.pass_tech.core.phishing.AntiPhishing
+import com.filestech.pass_tech.core.phishing.DomainMatch
 import com.filestech.pass_tech.core.security.BruteForceGuard
+import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.vault.OccupancyMark
 import com.filestech.pass_tech.core.vault.VaultFiles
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.testing.FakeClock
+import com.filestech.pass_tech.testing.FakePhishingComponent
+import com.filestech.pass_tech.testing.FixedDomain
+import com.filestech.pass_tech.testing.InMemoryPreferences
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
 import com.filestech.pass_tech.ui.entries.EntriesViewModel.Message
@@ -56,6 +62,9 @@ class EntriesViewModelTest {
         val vault: VaultManager,
         val messages: List<Message>,
         val clipboard: FakeClipboard,
+        val domain: FixedDomain,
+        val phishing: FakePhishingComponent,
+        val antiPhishing: AntiPhishing,
     )
 
     private suspend fun TestScope.opened(block: suspend TestScope.(Setup) -> Unit) {
@@ -67,13 +76,17 @@ class EntriesViewModelTest {
             val heir = heirRepository(dir, keystore, store, clock, fastParams)
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams), io)
+            val domain = FixedDomain()
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams), domain, io)
             assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val clipboard = FakeClipboard(clearAfter = 30)
-            val viewModel = EntriesViewModel(vault, clipboard)
+            val preferences = AppPreferences(InMemoryPreferences())
+            val phishing = FakePhishingComponent()
+            val antiPhishing = AntiPhishing(preferences, phishing, domain)
+            val viewModel = EntriesViewModel(vault, clipboard, antiPhishing)
             val messages = mutableListOf<Message>()
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.messages.toList(messages) }
-            block(Setup(viewModel, vault, messages, clipboard))
+            block(Setup(viewModel, vault, messages, clipboard, domain, phishing, antiPhishing))
         } finally {
             Dispatchers.resetMain()
         }
@@ -235,6 +248,114 @@ class EntriesViewModelTest {
             viewModel.save(editor)
             settle()
             assertThat(vault.entries().map { it.title }).containsExactly("Wi-Fi")
+        }
+    }
+
+    // The browser the password is about to be pasted into.
+
+    /** The protection on and granted, with the browser wherever [showing] says. */
+    private suspend fun Setup.watching(showing: String?) {
+        phishing.granted = true
+        antiPhishing.turnOn()
+        domain.host = showing
+    }
+
+    @Test
+    fun `off, a password copies with nothing said, whatever the browser shows`() = runTest {
+        opened { setup ->
+            setup.domain.host = "evil.com"
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("s3cret")
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+            assertThat(setup.messages.map { it::class }).containsExactly(Message.Copied::class)
+        }
+    }
+
+    @Test
+    fun `on the right site, a password copies with nothing said`() = runTest {
+        opened { setup ->
+            setup.watching("login.mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("s3cret")
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+        }
+    }
+
+    @Test
+    fun `no browser read, the copy goes ahead and says the check could not be made`() = runTest {
+        opened { setup ->
+            setup.watching(showing = null)
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("s3cret")
+            assertThat(setup.messages).contains(Message.DomainUnchecked)
+        }
+    }
+
+    @Test
+    fun `a look-alike domain holds the copy back, and can be overridden`() = runTest {
+        opened { setup ->
+            setup.watching("mabanque.co")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            settle()
+            assertThat(setup.clipboard.copied).isEmpty()
+            val alert = setup.viewModel.domainAlert.value
+            assertThat(alert?.check?.verdict).isEqualTo(DomainMatch.Verdict.TYPOSQUATTING)
+            assertThat(alert?.check?.active).isEqualTo("mabanque.co")
+
+            setup.viewModel.copyAnyway()
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("s3cret")
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+        }
+    }
+
+    @Test
+    fun `another domain holds the copy back, and there is no way through`() = runTest {
+        opened { setup ->
+            setup.watching("evil.com")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            settle()
+            assertThat(setup.viewModel.domainAlert.value?.check?.verdict).isEqualTo(DomainMatch.Verdict.MISMATCH)
+
+            // The screen draws no button for it, and the model refuses it as well.
+            setup.viewModel.copyAnyway()
+            settle()
+            assertThat(setup.clipboard.copied).isEmpty()
+        }
+    }
+
+    @Test
+    fun `only a value that belongs to a site is checked`() = runTest {
+        opened { setup ->
+            setup.watching("evil.com")
+            // A username, a card number, a note: nothing the browser could be compared against.
+            setup.viewModel.copy("alice", R.string.entry_detail_field_username)
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("alice")
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+
+            // An entry that names no site copies the same way.
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "")
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("alice", "s3cret").inOrder()
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+        }
+    }
+
+    @Test
+    fun `the held-back copy goes with the lock`() = runTest {
+        opened { setup ->
+            setup.watching("evil.com")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            settle()
+            assertThat(setup.viewModel.domainAlert.value).isNotNull()
+
+            setup.vault.lock()
+            settle()
+            assertThat(setup.viewModel.domainAlert.value).isNull()
         }
     }
 }

@@ -12,6 +12,7 @@ import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.panic.PanicService
 import com.filestech.pass_tech.core.password.PasswordPolicy
+import com.filestech.pass_tech.core.phishing.AntiPhishing
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.AutoLock
 import com.filestech.pass_tech.core.vault.KeystoreUnavailableException
@@ -56,6 +57,7 @@ class SettingsViewModel @Inject constructor(
     private val documents: DocumentStore,
     private val autoLock: AutoLock,
     private val panicService: PanicService,
+    private val antiPhishing: AntiPhishing,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -73,6 +75,13 @@ class SettingsViewModel @Inject constructor(
         val available: Boolean = false,
         val status: BiometricStatus = BiometricStatus.OFF,
     )
+
+    /**
+     * [granted] is Android's answer, not ours: the owner gives it in the accessibility settings and
+     * can take it back there. Unknown counts as not granted — the screen never claims a protection
+     * is watching when it could not find out.
+     */
+    data class AntiPhishingUi(val enabled: Boolean = false, val granted: Boolean = false)
 
     /** What the change dialog refuses before anything reaches the vault (2.7.1's order). */
     enum class ChangeProblem { CURRENT_REQUIRED, TOO_SHORT, TOO_WEAK, MISMATCH }
@@ -144,6 +153,11 @@ class SettingsViewModel @Inject constructor(
         data class Locked(val remainingMillis: Long) : Message
 
         data object KeystoreUnavailable : Message
+
+        /** The system refused to add or withdraw the accessibility service. */
+        data object AntiPhishingOnFailed : Message
+
+        data object AntiPhishingOffFailed : Message
     }
 
     private val busy = MutableStateFlow(false)
@@ -175,6 +189,12 @@ class SettingsViewModel @Inject constructor(
         .map { (it as? VaultManager.State.Open)?.hasDecoy == true }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    private val antiPhishingGranted = MutableStateFlow(false)
+
+    val antiPhishingUi: StateFlow<AntiPhishingUi> = combine(antiPhishing.enabled, antiPhishingGranted) { enabled, granted ->
+        AntiPhishingUi(enabled, granted)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AntiPhishingUi())
+
     private val promptChannel = Channel<Cipher>(Channel.CONFLATED)
 
     /** The ciphers the screen hands to the system prompt; the result comes back to [armResult]. */
@@ -183,6 +203,30 @@ class SettingsViewModel @Inject constructor(
     /** Read each time the screen shows: a fingerprint may have been enrolled or removed in between. */
     fun refreshBiometricSupport() {
         biometricAvailable.value = biometricSupport.available()
+    }
+
+    /**
+     * Read each time the app comes back, and not only when the screen is built: the grant is given on
+     * an Android screen, so the owner returns to a tile that would otherwise still say it is waiting.
+     */
+    fun refreshAntiPhishing() {
+        antiPhishingGranted.value = antiPhishing.granted() == true
+    }
+
+    /** After the consent dialog. Lists the service, then opens the Android screen that grants it. */
+    fun enableAntiPhishing() = save {
+        if (antiPhishing.turnOn()) antiPhishing.openSystemSettings() else messageChannel.trySend(Message.AntiPhishingOnFailed)
+        refreshAntiPhishing()
+    }
+
+    /** Takes the grant back with the setting: see [AntiPhishing]. */
+    fun disableAntiPhishing() = save {
+        if (!antiPhishing.turnOff()) messageChannel.trySend(Message.AntiPhishingOffFailed)
+        refreshAntiPhishing()
+    }
+
+    fun openAccessibilitySettings() {
+        antiPhishing.openSystemSettings()
     }
 
     /** Disarms whatever was armed, then the prompt: arming seals this vault's key once it is authenticated. */

@@ -94,5 +94,32 @@
         <receiver
             android:name=".core.clipboard.SecureClipboard$ClearReceiver"
             android:exported="false" />
+
+        <!--
+          Reads the address bar of a browser in front, to tell the owner when they are about to paste
+          a password on the wrong site.
+
+          enabled="false" is the point, and 2.7.1 does not do it. A declared accessibility service is
+          listed under Settings › Accessibility for as long as its component is enabled, under its own
+          name: an owner who never asked for this would find "Pass Tech — anti-phishing" there, and a
+          phone whose launcher has been turned into a calculator would say "Pass Tech" one settings
+          screen away. The app enables the component when the protection is switched on and disables
+          it when it is switched off — which is also what withdraws the grant, so "off" stops the
+          reading instead of only writing a preference (2.7.1 wrote the preference and left the
+          service running).
+        -->
+        <service
+            android:name=".core.phishing.PhishingDetectorService"
+            android:enabled="false"
+            android:exported="false"
+            android:label="@string/phishing_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/phishing_detector" />
+        </service>
     </application>
 </manifest>

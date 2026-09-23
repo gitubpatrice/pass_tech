@@ -7,6 +7,7 @@ import com.filestech.pass_tech.core.di.IoDispatcher
 import com.filestech.pass_tech.core.heir.HeirRepository
 import com.filestech.pass_tech.core.heir.HeirState
 import com.filestech.pass_tech.core.model.Entry
+import com.filestech.pass_tech.core.phishing.ActiveDomain
 import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,7 @@ import javax.inject.Singleton
 @Singleton
 class VaultManager @Inject constructor(
     private val repository: VaultRepository,
+    private val domain: ActiveDomain,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) {
 
@@ -517,6 +519,9 @@ class VaultManager @Inject constructor(
         session?.close()
         session = null
         heirEntries = null
+        // The site the browser was last seen on. It expires by itself fifteen seconds later, but a
+        // closed vault should leave nothing of what its owner was doing sitting in this process.
+        domain.clear()
         publish()
     }
 

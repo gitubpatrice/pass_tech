@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,10 +39,12 @@ import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SettingsAccessibility
 import androidx.compose.material.icons.outlined.SettingsBrightness
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -82,6 +85,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.backup.ImportParser
@@ -112,6 +116,7 @@ private enum class SettingsDialog {
     HEIR_UPDATE_PASSPHRASE,
     HEIR_MANAGE,
     HEIR_THRESHOLD,
+    ANTI_PHISHING,
     PANIC_BIOMETRIC_WARNING,
     PANIC_CONFIRM,
     DELETE_ALL,
@@ -136,6 +141,8 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
     val disguised by settings.disguised.collectAsStateWithLifecycle()
     val heir by settings.heir.collectAsStateWithLifecycle()
     val heirOn = heir?.enabled == true
+    val antiPhishing by settings.antiPhishingUi.collectAsStateWithLifecycle()
+    val serviceName = stringResource(R.string.phishing_service_label)
     val resources = LocalResources.current
     val pending by settings.pending.collectAsStateWithLifecycle()
     val openImport = remember { mutableStateOf(false) }
@@ -240,6 +247,8 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
                     ) { dialog = SettingsDialog.HEIR_THRESHOLD }
                 }
             }
+            antiPhishingSection(antiPhishing, serviceName, settings) { dialog = SettingsDialog.ANTI_PHISHING }
+
             item { SectionTitle(R.string.settings_section_panic) }
             item {
                 Tile(
@@ -384,6 +393,13 @@ private fun SettingsDialogs(
         )
         SettingsDialog.DECOY_SETUP, SettingsDialog.DECOY_PASSWORD, SettingsDialog.DECOY_MANAGE ->
             DecoyDialogs(dialog, settings, armedHere, onDialog)
+        SettingsDialog.ANTI_PHISHING -> AntiPhishingConsentDialog(
+            onConfirm = {
+                close()
+                settings.enableAntiPhishing()
+            },
+            onDismiss = close,
+        )
         SettingsDialog.PANIC_BIOMETRIC_WARNING, SettingsDialog.PANIC_CONFIRM ->
             PanicDialogs(dialog, settings, haptics, onDialog)
         SettingsDialog.HEIR_SETUP, SettingsDialog.HEIR_PASSPHRASE, SettingsDialog.HEIR_UPDATE_PASSPHRASE,
@@ -552,6 +568,32 @@ private fun HeirManageDialog(onUpdate: () -> Unit, onDisable: () -> Unit, onDism
             }
         },
         confirmButton = { Button(onClick = onUpdate) { Text(stringResource(R.string.heir_update)) } },
+    )
+}
+
+/**
+ * What the accessibility service reads, what it does not, and what turning it off later does. The
+ * last line names the service exactly as Android will list it — from the same string Android reads,
+ * so no one can reword one without the other (2.7.1 kept the two apart, and a check in its build
+ * made sure they had not drifted).
+ */
+@Composable
+private fun AntiPhishingConsentDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.VerifiedUser, contentDescription = null) },
+        title = { Text(stringResource(R.string.settings_anti_phishing_dialog_title)) },
+        text = {
+            Text(
+                text = stringResource(R.string.settings_anti_phishing_dialog_body, stringResource(R.string.phishing_service_label)),
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.action_continue)) } },
     )
 }
 
@@ -788,6 +830,12 @@ private fun ArmingPrompts(settings: SettingsViewModel) {
         settings.refreshDisguise()
         settings.refreshHeir()
     }
+    // Not LaunchedEffect: the grant is given on an Android screen, so the owner comes back to this
+    // one without it being built again, and a tile still asking for what they have just given.
+    LifecycleResumeEffect(settings) {
+        settings.refreshAntiPhishing()
+        onPauseOrDispose {}
+    }
     val activity = LocalActivity.current as? FragmentActivity ?: return
     LaunchedEffect(settings, activity) {
         settings.prompts.collect { cipher -> settings.armResult(activity.authenticate(cipher)) }
@@ -836,6 +884,8 @@ private fun messageText(resources: Resources, message: Message): String = when (
     Message.PasswordRefused -> resources.getString(R.string.change_password_refused)
     is Message.Locked -> resources.getString(R.string.settings_locked_retry, countdownText(resources, message.remainingMillis))
     Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
+    Message.AntiPhishingOnFailed -> resources.getString(R.string.settings_anti_phishing_on_failed)
+    Message.AntiPhishingOffFailed -> resources.getString(R.string.settings_anti_phishing_off_failed)
     else -> vaultMessageText(resources, message)
 }
 
@@ -936,6 +986,61 @@ private fun ScreenshotTile(enabled: Boolean, onChange: (Boolean) -> Unit) {
             trailingContent = { Switch(checked = enabled, onCheckedChange = onChange) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { onChange(!enabled) },
+        )
+    }
+}
+
+/** Its title, its switch, and the way to the Android screen while that screen still has the say. */
+private fun LazyListScope.antiPhishingSection(
+    ui: SettingsViewModel.AntiPhishingUi,
+    serviceName: String,
+    settings: SettingsViewModel,
+    onConsent: () -> Unit,
+) {
+    item { SectionTitle(R.string.settings_section_anti_phishing) }
+    item {
+        AntiPhishingTile(ui, serviceName) { on -> if (on) onConsent() else settings.disableAntiPhishing() }
+    }
+    // The grant lives in the Android settings, and only the owner can give it there.
+    if (ui.enabled && !ui.granted) {
+        item {
+            Tile(
+                icon = Icons.Outlined.SettingsAccessibility,
+                title = stringResource(R.string.settings_anti_phishing_open_title),
+                subtitle = stringResource(R.string.settings_anti_phishing_open_subtitle, serviceName),
+                onClick = settings::openAccessibilitySettings,
+            )
+        }
+    }
+}
+
+/**
+ * On, waiting for the Android grant, or off — three states, and the middle one is the honest answer
+ * to "the switch is on but nothing is watching". 2.7.1 showed the same three; what is new is that
+ * turning the switch off takes the grant back instead of only remembering a preference.
+ */
+@Composable
+private fun AntiPhishingTile(ui: SettingsViewModel.AntiPhishingUi, serviceName: String, onChange: (Boolean) -> Unit) {
+    val watching = ui.enabled && ui.granted
+    val subtitle = when {
+        watching -> stringResource(R.string.settings_anti_phishing_active)
+        ui.enabled -> stringResource(R.string.settings_anti_phishing_needs_grant, serviceName)
+        else -> stringResource(R.string.settings_anti_phishing_description)
+    }
+    PtCard(Modifier.fillMaxWidth()) {
+        ListItem(
+            leadingContent = {
+                Icon(
+                    Icons.Outlined.VerifiedUser,
+                    contentDescription = null,
+                    tint = if (watching) MaterialTheme.colorScheme.primary else iconTint(),
+                )
+            },
+            headlineContent = { Text(stringResource(R.string.settings_anti_phishing_title)) },
+            supportingContent = { Text(subtitle, fontSize = 12.sp) },
+            trailingContent = { Switch(checked = ui.enabled, onCheckedChange = onChange) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { onChange(!ui.enabled) },
         )
     }
 }

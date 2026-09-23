@@ -11,6 +11,7 @@ import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
 import com.filestech.pass_tech.testing.FakeBiometricKeys
 import com.filestech.pass_tech.testing.FakeClock
+import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
 import com.filestech.pass_tech.ui.components.PromptResult
@@ -63,7 +64,7 @@ class EntryViewModelTest {
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, biometrics, fastParams), io)
+            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, biometrics, fastParams), FixedDomain(), io)
             val viewModel = EntryViewModel(vault, clock) { biometricHardware }
             block(viewModel, vault)
         } finally {

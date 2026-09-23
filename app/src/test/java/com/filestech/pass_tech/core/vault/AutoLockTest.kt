@@ -5,6 +5,7 @@ import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.state.StateStore
+import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
@@ -47,7 +48,8 @@ class AutoLockTest {
         val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
         val guard = BruteForceGuard.forVault(store, clock)
         val heir = heirRepository(dir, keystore, store, clock, fastParams)
-        val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams), Dispatchers.IO)
+        val repository = VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams)
+        val vault = VaultManager(repository, FixedDomain(), Dispatchers.IO)
         assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
         val delay = MutableStateFlow(seconds)
         block(Setup(vault, AutoLock(vault, delay, clock, backgroundScope), clock, delay))

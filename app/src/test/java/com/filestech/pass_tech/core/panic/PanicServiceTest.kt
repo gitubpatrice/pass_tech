@@ -1,7 +1,9 @@
 package com.filestech.pass_tech.core.panic
 
 import com.filestech.pass_tech.core.crypto.KdfParams
+import com.filestech.pass_tech.core.phishing.AntiPhishing
 import com.filestech.pass_tech.core.security.BruteForceGuard
+import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.StateStore
 import com.filestech.pass_tech.core.vault.BiometricBinding
 import com.filestech.pass_tech.core.vault.KeystoreUnavailableException
@@ -12,10 +14,14 @@ import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FakeLauncherDisguise
+import com.filestech.pass_tech.testing.FakePhishingComponent
+import com.filestech.pass_tech.testing.FixedDomain
+import com.filestech.pass_tech.testing.InMemoryPreferences
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -35,6 +41,11 @@ class PanicServiceTest {
     private val fastParams = KdfParams(memoryKiB = KdfParams.MIN_MEMORY_KIB, iterations = 1, parallelism = 1)
     private val clipboard = FakeClipboard()
     private val disguise = FakeLauncherDisguise()
+    private val preferences = AppPreferences(InMemoryPreferences())
+
+    /** Listed and granted at the start of every test: what a phone whose owner asked for it looks like. */
+    private val phishing = FakePhishingComponent(listed = true, granted = true)
+    private val domain = FixedDomain("mabanque.fr")
     private val biometrics = CountingBiometrics()
     private lateinit var vault: VaultManager
     private lateinit var guard: BruteForceGuard
@@ -60,8 +71,8 @@ class PanicServiceTest {
         guard = BruteForceGuard.forVault(state, clock)
         val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
         val heir = heirRepository(dir, keystore, state, clock, fastParams)
-        vault = VaultManager(VaultRepository(files, keystore, guard, heir, biometrics, fastParams), Dispatchers.Unconfined)
-        panic = PanicService(vault, clipboard, disguise)
+        vault = VaultManager(VaultRepository(files, keystore, guard, heir, biometrics, fastParams), domain, Dispatchers.Unconfined)
+        panic = PanicService(vault, clipboard, AntiPhishing(preferences, phishing, domain), disguise)
     }
 
     private suspend fun open() {
@@ -151,6 +162,47 @@ class PanicServiceTest {
         val before = Slot.entries.map { File(dir, "vault/${it.vaultFileName}").readText() }
         panic.panic()
         assertThat(Slot.entries.map { File(dir, "vault/${it.vaultFileName}").readText() }).isEqualTo(before)
+    }
+
+    @Test
+    fun `it withdraws the anti-phishing service, which carries the app's name`() = runTest {
+        open()
+        preferences.setAntiPhishing(true)
+        panic.panic()
+        // Settings > Accessibility would otherwise say "Pass Tech" on a phone whose launcher has
+        // just been made to say "Calculator".
+        assertThat(phishing.listed).isFalse()
+        assertThat(phishing.granted).isFalse()
+        assertThat(preferences.antiPhishing.first()).isFalse()
+    }
+
+    @Test
+    fun `the site the browser was on is forgotten`() = runTest {
+        open()
+        panic.panic()
+        assertThat(domain.host).isNull()
+    }
+
+    @Test
+    fun `a system that refuses to withdraw the service still leaves the launcher disguised`() = runTest {
+        open()
+        preferences.setAntiPhishing(true)
+        phishing.answers = false
+        panic.panic()
+        assertThat(panic.disguised()).isTrue()
+        assertThat(vault.state.value).isEqualTo(VaultManager.State.Locked)
+    }
+
+    @Test
+    fun `revealing does not put the anti-phishing service back`() = runTest {
+        open()
+        preferences.setAntiPhishing(true)
+        panic.panic()
+        panic.reveal()
+        // The system dropped its grant with the component: listing it again would put the app's name
+        // back under the accessibility settings while nothing was watching anything.
+        assertThat(phishing.listed).isFalse()
+        assertThat(preferences.antiPhishing.first()).isFalse()
     }
 
     private companion object {

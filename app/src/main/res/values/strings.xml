@@ -364,16 +364,50 @@
     <string name="calculator_error">Error</string>
     <string name="settings_section_panic">Panic mode</string>
     <string name="panic_trigger_title">Activate panic mode</string>
-    <string name="panic_trigger_subtitle">Locks, clears the clipboard, disables biometrics and replaces the app with a working calculator (name + icon)</string>
+    <string name="panic_trigger_subtitle">Locks, clears the clipboard, disables biometrics and anti-phishing, and replaces the app with a working calculator (name + icon)</string>
     <string name="panic_reveal_title">Restore the Pass Tech name</string>
     <string name="panic_reveal_subtitle">The app currently looks like a calculator. To get back without coming here: long-press its display for 2 s</string>
     <string name="panic_reveal_snack">Pass Tech icon restored — relaunch the launcher if it does not appear</string>
     <string name="panic_dialog_title">Panic mode?</string>
-    <string name="panic_dialog_body">This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Replaces the app with a CALCULATOR on the launcher: name, icon and opening screen. The calculator really works.\n\n⚠ TO COME BACK: long-press for 2 seconds on the calculator\'s DISPLAY (the result area, at the top). Remember this — it is the only way back to your vault while the disguise is active.\n\nNothing is deleted: your master password still opens the vault. You will need it to enable biometrics again. Name and icon can be restored from Settings once you are safe.</string>
+    <string name="panic_dialog_body">This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Withdraws the anti-phishing service from Android\'s accessibility settings, where it carries the Pass Tech name\n• Replaces the app with a CALCULATOR on the launcher: name, icon and opening screen. The calculator really works.\n\n⚠ TO COME BACK: long-press for 2 seconds on the calculator\'s DISPLAY (the result area, at the top). Remember this — it is the only way back to your vault while the disguise is active.\n\nNothing is deleted: your master password still opens the vault. You will need it to enable biometrics again. Name and icon can be restored from Settings once you are safe.</string>
     <string name="panic_dialog_activate">Activate</string>
     <!-- Shown only when a fingerprint opens THIS vault (design v2.3 §1), and not dismissible. -->
     <string name="panic_warn_biometric_title">Biometric unlock will be disabled</string>
     <string name="panic_warn_biometric_body">Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.</string>
+
+    <!-- Anti-phishing (2.7.1 anti_phishing_service.dart, PhishingDetectorService.kt) -->
+    <!--
+      These two are drawn by ANDROID, in its accessibility settings, so they follow the language of
+      the PHONE like the disguise label above. They are also the only place the owner meets this
+      service outside the app, which is why the description says what is read and what is not.
+    -->
+    <string name="phishing_service_label">Pass Tech — anti-phishing</string>
+    <string name="phishing_detector_description">Reads the domain shown by the browser in front, to check that it matches the Pass Tech entry before a password is copied. Only the domain is read, in memory only: nothing is stored and nothing is sent. Only recognised browsers are read. This is turned on at your request, and disappears from this list when you turn it off in Pass Tech.</string>
+
+    <string name="settings_section_anti_phishing">Anti-phishing</string>
+    <string name="settings_anti_phishing_title">Check the domain before copying</string>
+    <string name="settings_anti_phishing_description">Compares the browser\'s domain with the entry\'s</string>
+    <string name="settings_anti_phishing_active">On — warns when the browser is not on the right domain</string>
+    <!-- The name in quotes is the service label itself, so the two cannot drift apart. -->
+    <string name="settings_anti_phishing_needs_grant">⚠ Turn \"%1$s\" on under Accessibility</string>
+    <string name="settings_anti_phishing_open_title">Open Settings &gt; Accessibility</string>
+    <string name="settings_anti_phishing_open_subtitle">Turn \"%1$s\" on in the list</string>
+    <string name="settings_anti_phishing_dialog_title">Anti-phishing</string>
+    <string name="settings_anti_phishing_dialog_body">Pass Tech can check that the browser in front is on the entry\'s domain BEFORE copying your password, and warn you when it is not — a look-alike name, a fake site.\n\nFor that it uses an Android accessibility service:\n• it reads the domain from the address bar, and nothing else\n• only on recognised browsers (Chrome, Firefox, Brave, Edge, Opera, Vivaldi, Samsung, DuckDuckGo)\n• nothing is stored, nothing is sent\n\nTurning it off here takes the permission back: the service leaves Android\'s accessibility list, and turning it on again asks you for it.\n\nOn the next screen, turn \"%1$s\" on.</string>
+    <string name="settings_anti_phishing_on_failed">Android refused to add the service</string>
+    <string name="settings_anti_phishing_off_failed">Android refused to withdraw the service — remove it by hand under Settings &gt; Accessibility</string>
+
+    <string name="phishing_unchecked_snack">⚠ Domain not checked — the anti-phishing service is not running</string>
+    <string name="phishing_unchecked_action">Settings</string>
+    <string name="phishing_typo_title">Suspicious domain</string>
+    <string name="phishing_typo_body">The domain in the browser looks like yours, one or two letters apart — the usual shape of a fake site. It can be a false alarm.</string>
+    <string name="phishing_mismatch_title">Not the same domain</string>
+    <string name="phishing_mismatch_body">The browser is on a completely different domain. The copy was blocked.</string>
+    <string name="phishing_expected">Expected</string>
+    <string name="phishing_active">In the browser</string>
+    <string name="phishing_distance">Distance: %1$d</string>
+    <string name="phishing_close">Close</string>
+    <string name="phishing_copy_anyway">Copy anyway</string>
 
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
     <string name="settings_section_data">Data</string>

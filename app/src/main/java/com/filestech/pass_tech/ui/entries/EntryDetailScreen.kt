@@ -85,14 +85,25 @@ fun EntryDetailScreen(
     onToggleFavorite: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onCopy: CopyAction,
+    onCopy: (value: String, label: Int, site: String?) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val copy: CopyAction = { value, label ->
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        onCopy(value, label)
+        onCopy(value, label, null)
+    }
+
+    /**
+     * The two values an impostor site is after. They are the only ones checked against the browser,
+     * as in 2.7.1: a card number has no site to be compared with, and a note is not typed into a
+     * login form. The entry's own URL is what the check compares against, so an entry that names no
+     * site copies like any other.
+     */
+    val copyForSite: CopyAction = { value, label ->
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onCopy(value, label, entry.url)
     }
 
     Scaffold(
@@ -137,7 +148,7 @@ fun EntryDetailScreen(
             Header(entry)
             Spacer(Modifier.height(14.dp))
             when (entry.type) {
-                EntryType.PASSWORD -> PasswordView(entry, copy)
+                EntryType.PASSWORD -> PasswordView(entry, copy, copyForSite)
                 EntryType.NOTE -> NoteView(entry, copy)
                 EntryType.CARD -> CardView(entry, copy)
             }
@@ -198,7 +209,7 @@ private fun Badge(text: String, color: Color) {
 }
 
 @Composable
-private fun PasswordView(entry: Entry, copy: CopyAction) {
+private fun PasswordView(entry: Entry, copy: CopyAction, copyForSite: CopyAction) {
     val usernameLabel = R.string.entry_detail_field_username
     Field(
         label = stringResource(usernameLabel),
@@ -211,11 +222,11 @@ private fun PasswordView(entry: Entry, copy: CopyAction) {
         // The real length between 8 and 24, never the exact one (2.7.1, QW11 v2.4.0).
         masked = "•".repeat(entry.password.length.coerceIn(MASK_MIN, MASK_MAX)),
         maskedSpacing = 2,
-        onCopy = { copy(entry.password, R.string.entry_detail_field_password) },
+        onCopy = { copyForSite(entry.password, R.string.entry_detail_field_password) },
         monospace = true,
     )
     if (entry.totpSecret.isNotEmpty()) {
-        TotpCard(secret = entry.totpSecret, onCopy = { copy(it, R.string.entry_detail_field_2fa_code) })
+        TotpCard(secret = entry.totpSecret, onCopy = { copyForSite(it, R.string.entry_detail_field_2fa_code) })
     }
     if (entry.url.isNotEmpty()) {
         Field(stringResource(R.string.entry_detail_field_url), entry.url, onCopy = { copy(entry.url, R.string.entry_detail_field_url) })
