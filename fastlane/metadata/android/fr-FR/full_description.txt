@@ -1,36 +1,64 @@
-Pass Tech est un gestionnaire de mots de passe 100 % local pour Android.
-Aucun cloud, aucun compte, aucun serveur, aucun tracker, aucune publicité.
+Pass Tech garde vos mots de passe sur votre téléphone et nulle part ailleurs.
+Aucun compte, aucun serveur à nous, aucun cloud, aucun traceur, aucune
+publicité.
 
-<b>Cryptographie (v4)</b>
-* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
-* AES-256-GCM avec AAD anti-downgrade
-* KEK Keystore-bound (StrongBox/TEE) avec HKDF-SHA256
-* CSPRNG via Random.secure
-* Vérification HMAC en temps constant
-* Brute-force lockout exponentiel (1, 2, 4, 8, 16 minutes) basé sur une
-  horloge monotonique (anti rollback root)
+<b>Le coffre</b>
+* AES-256-GCM. La clé vient de votre mot de passe maître par Argon2id
+  (19 Mio de mémoire, 2 passes — la référence OWASP 2024 pour le mobile) et
+  d'une clé gardée dans la puce sécurisée du téléphone, qui participe à chaque
+  essai sans exception : une copie du coffre emportée sur une autre machine ne
+  peut pas y être attaquée.
+* Votre mot de passe maître n'est jamais enregistré, sous aucune forme. Il ne
+  peut pas être récupéré — ni par nous, ni par personne.
+* Cinq essais libres, puis une attente qui passe de 30 secondes à 30 minutes,
+  comptée dans un fichier, donc elle survit à un redémarrage.
+* Déverrouillage par empreinte, sa clé dans le Keystore d'Android, détruite si
+  les empreintes du téléphone changent.
+* Se verrouille quand vous le quittez. Aucune capture d'écran et aucun aperçu
+  dans la liste des applications récentes.
+* Écarté de la sauvegarde dans le cloud d'Android et du transfert d'un
+  téléphone à l'autre : la seule copie qui existe est celle que vous faites.
 
-<b>Confidentialité</b>
-* Anti-phishing par domaine (AccessibilityService minimal)
-* Coffre leurre anti-coercition (déni plausible avec timing aligné)
-* Mode panique : verrouillage immédiat, biométrie désarmée, exports en cache déchiquetés
-* Camouflage launcher (icône déguisée en Calculatrice)
-* Héritage post-inactivité (dead-man's switch)
-* FLAG_SECURE actif par défaut sur les entrées mot de passe / carte /
-  identité (réglable dans les Paramètres depuis v2.3.11) — les entrées
-  Note relâchent FLAG_SECURE pour que Samsung Knox n'occulte pas la
-  suggestion de coller
-* Permission INTERNET utilisée uniquement pour la vérification de mise
-  à jour anonyme via l'API GitHub Releases ; aucune collecte de données
+<b>Si on vous force à l'ouvrir</b>
+* Coffre leurre : un deuxième mot de passe ouvre un deuxième coffre avec ses
+  propres entrées, et rien sur le téléphone ne dit si vous en avez un.
+* Mode panique : verrouille, vide le presse-papiers, désarme l'empreinte,
+  retire le contrôle d'adresse et transforme l'application en une calculatrice
+  qui fonctionne vraiment. Rien n'est supprimé.
+* Héritage : une personne que vous choisissez ouvre un instantané en lecture
+  seule de votre coffre après un silence assez long de votre côté. Sur le
+  téléphone, sans cloud et sans tiers.
+
+<b>Ce qu'il contient</b>
+Mots de passe, cartes bancaires et notes sécurisées. Codes à deux facteurs
+générés ici, depuis un lien otpauth:// collé. Recherche et tri. Un générateur
+de mots de passe, et de passphrases tirées d'une liste de mots dans la langue
+de l'application.
+
+<b>Ce qu'il surveille pour vous</b>
+* Un audit de sécurité du coffre : ce qui est faible, ce qui est réutilisé, ce
+  qui n'a pas de deuxième facteur.
+* Un contrôle des fuites que vous lancez vous-même, qui n'envoie jamais le mot
+  de passe — seulement les cinq premiers caractères de son empreinte, que des
+  dizaines de milliers d'autres partagent.
+* Un contrôle d'adresse : avant qu'un mot de passe soit copié, il compare le
+  site ouvert dans votre navigateur avec ceux que l'entrée déclare, et retient
+  la copie quand aucun ne correspond. Il utilise un service d'accessibilité
+  Android, éteint tant que vous ne le demandez pas, qui lit la barre d'adresse
+  des navigateurs qu'il connaît et rien d'autre, et garde ce qu'il lit en
+  mémoire pendant quinze secondes.
+
+<b>Les deux moments où il se sert du réseau</b>
+Demander à GitHub si une version plus récente est parue, deux fois par jour au
+maximum, et le contrôle des fuites ci-dessus. Ni l'un ni l'autre ne transporte
+ce que vous avez saisi, et les deux s'arrêtent complètement quand
+l'application est camouflée.
 
 <b>Langues</b>
-Français, anglais, allemand, italien et espagnol — au choix dans les
-Réglages, indépendamment de la langue de l'appareil.
+Anglais, français, allemand, italien et espagnol, choisies dans l'application
+quelle que soit la langue du téléphone.
 
-<b>Audit (v2.3.8 → v2.4.0)</b>
-Audit expert zéro-vuln zéro-faille : A1-A20 + B1-B24 corrigés.
-FLAG_SECURE dynamique via Kotlin MethodChannel avec refcount, service
-MonotonicClock partagé, version dynamique via PackageInfo, contrôleurs
-sensibles clear()+dispose(), purge du snapshot anti-phishing en panique.
-
-<b>Open source</b> Apache 2.0 — code intégral sur GitHub.
+<b>Code ouvert</b>
+Licence Apache 2.0. Tout le code source est sur GitHub, et chaque version
+publie le SHA-256 de chacun de ses fichiers : vous pouvez vérifier que ce que
+vous avez installé est bien ce qui a été publié.

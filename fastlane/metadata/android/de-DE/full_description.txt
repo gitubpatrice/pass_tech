@@ -1,38 +1,61 @@
-Pass Tech ist ein zu 100 % lokaler Passwort-Manager für Android. Keine
-Cloud, kein Konto, kein Server, kein Tracker, keine Werbung.
+Pass Tech bewahrt Ihre Passwörter auf Ihrem Telefon auf und sonst nirgends.
+Kein Konto, kein Server von uns, keine Cloud, kein Tracker, keine Werbung.
 
-<b>Kryptografie (v4)</b>
-* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
-* AES-256-GCM mit Anti-Downgrade-AAD
-* An den Keystore gebundener KEK (StrongBox/TEE) mit HKDF-SHA256
-* CSPRNG über Random.secure
-* HMAC-Prüfung in konstanter Zeit
-* Exponentielle Brute-Force-Sperre (1, 2, 4, 8, 16 Minuten) auf Basis
-  einer monotonen Uhr (schützt vor Rücksetzen der Zeit durch Root)
+<b>Der Tresor</b>
+* AES-256-GCM. Der Schlüssel kommt aus Ihrem Master-Passwort über Argon2id
+  (19 MiB Speicher, 2 Durchläufe — der OWASP-Richtwert 2024 für Mobilgeräte)
+  und aus einem Schlüssel im Sicherheitschip des Telefons, der an jedem
+  einzelnen Versuch beteiligt ist: eine Kopie des Tresors auf einem anderen
+  Rechner lässt sich dort nicht angreifen.
+* Ihr Master-Passwort wird nie gespeichert, in keiner Form. Es kann nicht
+  wiederhergestellt werden — nicht von uns, von niemandem.
+* Fünf freie Versuche, dann eine Wartezeit, die von 30 Sekunden auf 30 Minuten
+  wächst und in einer Datei steht, also einen Neustart übersteht.
+* Entsperren per Fingerabdruck, sein Schlüssel im Android-Keystore, zerstört,
+  sobald sich die Fingerabdrücke auf dem Telefon ändern.
+* Sperrt sich, wenn Sie die App verlassen. Kein Screenshot und keine Vorschau
+  in der App-Übersicht.
+* Ausgenommen von Androids Cloud-Sicherung und von der Übertragung von Telefon
+  zu Telefon: die einzige Kopie ist die, die Sie selbst anlegen.
 
-<b>Privatsphäre</b>
-* Phishing-Schutz pro Domain (minimaler AccessibilityService)
-* Schein-Tresor gegen Nötigung (glaubhafte Abstreitbarkeit, zeitlich
-  angeglichen)
-* Panikmodus: sofortige Sperrung, Biometrie entschärft, Export-Cache vernichtet
-* Launcher-Tarnung (Symbol als Rechner getarnt)
-* Nachlass nach Inaktivität (Totmannschalter)
-* FLAG_SECURE standardmäßig aktiv bei Einträgen vom Typ Passwort /
-  Karte / Identität (seit v2.3.11 in den Einstellungen abschaltbar) —
-  Notiz-Einträge lockern FLAG_SECURE, damit Samsung Knox den
-  Einfügen-Vorschlag nicht verbirgt
-* Die INTERNET-Berechtigung dient allein der anonymen Update-Prüfung
-  über die GitHub-Releases-API; es werden keine Daten erhoben
+<b>Wenn Sie jemand zum Öffnen zwingt</b>
+* Schein-Tresor: Ein zweites Passwort öffnet einen zweiten Tresor mit eigenen
+  Einträgen, und nichts auf dem Telefon verrät, ob Sie einen haben.
+* Panikmodus: sperrt, leert die Zwischenablage, entschärft den Fingerabdruck,
+  nimmt die Domain-Prüfung zurück und macht aus der App einen Taschenrechner,
+  der wirklich rechnet. Nichts wird gelöscht.
+* Erbenzugang: eine Person Ihrer Wahl öffnet ein Abbild Ihres Tresors nur zum
+  Lesen, nachdem es von Ihrer Seite lange genug still war. Auf dem Telefon,
+  ohne Cloud und ohne Dritte.
+
+<b>Was er enthält</b>
+Passwörter, Bankkarten und sichere Notizen. Zwei-Faktor-Codes, hier erzeugt,
+aus einem eingefügten otpauth://-Link. Suchen und Sortieren. Ein Generator für
+Passwörter und für Passphrasen aus einer Wortliste in der Sprache der App.
+
+<b>Was er für Sie im Auge behält</b>
+* Eine Sicherheitsprüfung des Tresors: was schwach ist, was mehrfach benutzt
+  wird, was keinen zweiten Faktor hat.
+* Eine Leck-Prüfung, die Sie selbst starten und die das Passwort nie sendet —
+  nur die ersten fünf Zeichen seines Fingerabdrucks, die Zehntausende andere
+  ebenfalls haben.
+* Eine Domain-Prüfung: bevor ein Passwort kopiert wird, vergleicht sie die im
+  Browser geöffnete Seite mit denen, die der Eintrag angibt, und hält die Kopie
+  zurück, wenn keine passt. Sie nutzt einen Android-Bedienungshilfedienst, der
+  aus ist, bis Sie ihn verlangen, der die Adresszeile der Browser liest, die er
+  kennt, und sonst nichts, und der das Gelesene fünfzehn Sekunden lang im
+  Speicher behält.
+
+<b>Die zwei Male, die er das Netz nutzt</b>
+Bei GitHub nachfragen, ob eine neuere Fassung erschienen ist, höchstens zweimal
+am Tag, und die Leck-Prüfung oben. Keines von beiden trägt etwas, das Sie
+eingegeben haben, und beide hören vollständig auf, solange die App getarnt ist.
 
 <b>Sprachen</b>
-Deutsch, Englisch, Spanisch, Französisch und Italienisch — frei wählbar
-in den Einstellungen, unabhängig von der Sprache des Geräts.
+Englisch, Französisch, Deutsch, Italienisch und Spanisch, in der App gewählt,
+gleich worauf das Telefon eingestellt ist.
 
-<b>Audit (v2.3.8 → v2.4.0)</b>
-Fachaudit ohne offene Schwachstellen: A1-A20 und B1-B24 behoben.
-Dynamisches FLAG_SECURE über einen Kotlin-MethodChannel mit Refcount,
-gemeinsamer MonotonicClock-Dienst, Versionsanzeige über PackageInfo,
-sensible Controller geleert und freigegeben, Phishing-Momentaufnahme im
-Panikmodus gelöscht.
-
-<b>Open Source</b> Apache 2.0 — vollständiger Quellcode auf GitHub.
+<b>Quelloffen</b>
+Apache License 2.0. Der gesamte Quellcode liegt auf GitHub, und jede
+Veröffentlichung nennt den SHA-256 jeder ihrer Dateien: Sie können prüfen, dass
+das Installierte das Veröffentlichte ist.

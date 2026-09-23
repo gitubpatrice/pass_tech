@@ -1,1 +1,1 @@
-Gestor de contraseñas 100 % local. Argon2id + AES-256-GCM.
+Gestor de contraseñas 100% local. Argon2id, AES-256-GCM, ligado a este teléfono.

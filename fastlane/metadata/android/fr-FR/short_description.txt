@@ -1,1 +1,1 @@
-Gestionnaire de mots de passe 100 % local. Argon2id + AES-256-GCM.
+Gestionnaire 100 % local. Argon2id, AES-256-GCM, lié à ce téléphone.

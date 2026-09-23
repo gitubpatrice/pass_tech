@@ -1,39 +1,64 @@
-Pass Tech es un gestor de contraseñas 100 % local para Android. Sin
-nube, sin cuenta, sin servidor, sin rastreadores, sin publicidad.
+Pass Tech guarda tus contraseñas en tu teléfono y en ningún otro sitio. Ninguna
+cuenta, ningún servidor nuestro, ninguna nube, ningún rastreador, ninguna
+publicidad.
 
-<b>Criptografía (v4)</b>
-* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
-* AES-256-GCM con AAD anti-degradación
-* KEK ligada al Keystore (StrongBox/TEE) con HKDF-SHA256
-* CSPRNG mediante Random.secure
-* Verificación HMAC en tiempo constante
-* Bloqueo antifuerza bruta exponencial (1, 2, 4, 8, 16 minutos) basado
-  en un reloj monótono (resiste al retroceso del reloj con root)
+<b>La caja fuerte</b>
+* AES-256-GCM. La clave viene de tu contraseña maestra a través de Argon2id
+  (19 MiB de memoria, 2 pasadas — la referencia OWASP 2024 para el móvil) y de
+  una clave guardada en el chip seguro del teléfono, que participa en cada
+  intento sin excepción: una copia de la caja fuerte llevada a otra máquina no
+  puede atacarse allí.
+* Tu contraseña maestra no se guarda nunca, de ninguna forma. No puede
+  recuperarse — ni por nosotros, ni por nadie.
+* Cinco intentos libres, y luego una espera que crece de 30 segundos a 30
+  minutos, contada en un archivo, así que sobrevive a un reinicio.
+* Desbloqueo con la huella, su clave en el Keystore de Android, destruida si
+  las huellas del teléfono cambian.
+* Se bloquea cuando la dejas. Ninguna captura de pantalla y ninguna vista
+  previa en la lista de apps recientes.
+* Excluida de la copia en la nube de Android y de la transferencia entre
+  teléfonos: la única copia que existe es la que haces tú.
 
-<b>Privacidad</b>
-* Antiphishing por dominio (AccessibilityService mínimo)
-* Caja fuerte señuelo anticoacción (negación plausible, tiempos
-  alineados)
-* Modo pánico: bloqueo inmediato, biometría desarmada, caché de exportación destruida
-* Camuflaje en el lanzador (icono disfrazado de Calculadora)
-* Herencia tras una larga inactividad (interruptor de hombre muerto)
-* FLAG_SECURE activo por defecto en las entradas de contraseña /
-  tarjeta / identidad (ajustable en Ajustes desde la v2.3.11) — las
-  entradas de tipo Nota relajan FLAG_SECURE para que Samsung Knox no
-  oculte la sugerencia de pegar
-* El permiso INTERNET solo sirve para la comprobación anónima de
-  actualizaciones mediante la API de GitHub Releases; no se recogen
-  datos
+<b>Si alguien te obliga a abrirla</b>
+* Caja fuerte señuelo: una segunda contraseña abre una segunda caja fuerte con
+  sus propias entradas, y nada en el teléfono dice si tienes una.
+* Modo pánico: bloquea, vacía el portapapeles, desarma la huella, retira la
+  comprobación del dominio y convierte la app en una calculadora que funciona
+  de verdad. No se borra nada.
+* Acceso de heredero: una persona que elijas abre una instantánea de solo
+  lectura de tu caja fuerte tras un silencio suficientemente largo por tu
+  parte. En el teléfono, sin nube y sin terceros.
+
+<b>Qué contiene</b>
+Contraseñas, tarjetas bancarias y notas seguras. Códigos de doble factor
+generados aquí, desde un enlace otpauth:// pegado. Búsqueda y orden. Un
+generador de contraseñas y de frases de contraseña sacadas de una lista de
+palabras en el idioma de la app.
+
+<b>Qué vigila por ti</b>
+* Una auditoría de seguridad de la caja fuerte: qué es débil, qué se reutiliza,
+  qué no tiene segundo factor.
+* Una comprobación de filtraciones que inicias tú, que no envía nunca la
+  contraseña — solo los cinco primeros caracteres de su huella, que comparten
+  decenas de miles de otras.
+* Una comprobación del dominio: antes de copiar una contraseña, compara el
+  sitio abierto en tu navegador con los que declara la entrada, y retiene la
+  copia cuando ninguno coincide. Usa un servicio de accesibilidad de Android,
+  apagado mientras no lo pidas, que lee la barra de direcciones de los
+  navegadores que conoce y nada más, y guarda lo que lee en memoria durante
+  quince segundos.
+
+<b>Las dos veces que usa la red</b>
+Preguntar a GitHub si ha salido una versión más reciente, dos veces al día como
+máximo, y la comprobación de filtraciones de arriba. Ninguna de las dos
+transporta lo que has escrito, y las dos se detienen por completo cuando la app
+está camuflada.
 
 <b>Idiomas</b>
-Español, inglés, francés, alemán e italiano — a tu elección en Ajustes,
-con independencia del idioma del dispositivo.
+Inglés, francés, alemán, italiano y español, elegidos en la app sea cual sea el
+idioma del teléfono.
 
-<b>Auditoría (v2.3.8 → v2.4.0)</b>
-Auditoría experta sin vulnerabilidades abiertas: A1-A20 y B1-B24
-cerrados. FLAG_SECURE dinámico mediante MethodChannel de Kotlin con
-refcount, servicio MonotonicClock compartido, versión leída de
-PackageInfo, controladores sensibles vaciados y liberados, instantánea
-antiphishing purgada en modo pánico.
-
-<b>Código abierto</b> Apache 2.0 — código íntegro en GitHub.
+<b>Código abierto</b>
+Licencia Apache 2.0. Todo el código fuente está en GitHub, y cada versión
+publica el SHA-256 de cada uno de sus archivos: puedes comprobar que lo que has
+instalado es lo que se publicó.

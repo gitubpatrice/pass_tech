@@ -1,0 +1,8 @@
+Pass Tech 3.0.0 — entièrement réécrite en Kotlin.
+
+Une nouvelle application à côté de la 2.x, pas une mise à jour. Exportez une sauvegarde .ptbak depuis l'ancienne, importez-la ici, puis retirez l'ancienne.
+
+Nouveau avec la réécriture :
+• Trois emplacements de coffre de même taille : rien ne dit si vous utilisez un leurre.
+• Le contrôle d'adresse lit neuf navigateurs, et une entrée peut déclarer plusieurs adresses.
+• Cinq langues, choisies dans l'application.

@@ -1,0 +1,8 @@
+Pass Tech 3.0.0 — rewritten from the ground up in Kotlin.
+
+This is a new app beside the 2.x one, not an update of it. Export a .ptbak backup from the old one, import it here, and remove the old one once you are satisfied.
+
+New with the rewrite:
+• Three vault slots of equal size, so nothing on the phone says whether you use a decoy.
+• The address check reads nine browsers, and an entry can declare several addresses.
+• Five languages, picked in the app.

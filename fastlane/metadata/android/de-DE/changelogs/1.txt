@@ -1,0 +1,8 @@
+Pass Tech 3.0.0 — von Grund auf in Kotlin neu geschrieben.
+
+Eine neue App neben der 2.x, keine Aktualisierung davon. Legen Sie in der alten eine .ptbak-Sicherung an, importieren Sie sie hier, und entfernen Sie die alte, wenn alles passt.
+
+Neu mit der Neufassung:
+• Drei gleich große Tresor-Plätze: nichts verrät, ob Sie einen Schein-Tresor nutzen.
+• Die Domain-Prüfung liest neun Browser, und ein Eintrag darf mehrere Adressen angeben.
+• Fünf Sprachen, in der App gewählt.
