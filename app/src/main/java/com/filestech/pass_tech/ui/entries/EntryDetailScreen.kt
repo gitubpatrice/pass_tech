@@ -85,7 +85,7 @@ fun EntryDetailScreen(
     onToggleFavorite: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onCopy: (value: String, label: Int, site: String?) -> Unit,
+    onCopy: (value: String, label: Int, site: Entry?) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
@@ -98,12 +98,12 @@ fun EntryDetailScreen(
     /**
      * The two values an impostor site is after. They are the only ones checked against the browser,
      * as in 2.7.1: a card number has no site to be compared with, and a note is not typed into a
-     * login form. The entry's own URL is what the check compares against, so an entry that names no
-     * site copies like any other.
+     * login form. The entry's own addresses are what the check compares against, so an entry that
+     * names no site copies like any other.
      */
     val copyForSite: CopyAction = { value, label ->
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        onCopy(value, label, entry.url)
+        onCopy(value, label, entry)
     }
 
     Scaffold(
@@ -230,6 +230,10 @@ private fun PasswordView(entry: Entry, copy: CopyAction, copyForSite: CopyAction
     }
     if (entry.url.isNotEmpty()) {
         Field(stringResource(R.string.entry_detail_field_url), entry.url, onCopy = { copy(entry.url, R.string.entry_detail_field_url) })
+    }
+    // Shown, or the check would accept domains the owner can no longer see they ever declared.
+    if (entry.otherDomains.isNotEmpty()) {
+        Field(stringResource(R.string.entry_detail_field_other_domains), entry.otherDomains.joinToString("\n"))
     }
     if (entry.notes.isNotEmpty()) Field(stringResource(R.string.entry_detail_field_notes), entry.notes)
 }

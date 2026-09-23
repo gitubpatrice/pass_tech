@@ -113,7 +113,12 @@ fun PassTechApp(
     // Over whichever screen raised it, and gone with the lock: the copy it holds back is a password.
     val domainAlert by entries.domainAlert.collectAsStateWithLifecycle()
     domainAlert?.let {
-        PhishingDialog(it, onClose = entries::dismissDomainAlert, onCopyAnyway = entries::copyAnyway)
+        PhishingDialog(
+            alert = it,
+            onClose = entries::dismissDomainAlert,
+            onCopyAnyway = entries::copyAnyway,
+            onDeclareDomain = entries::openToDeclareDomain,
+        )
     }
 }
 

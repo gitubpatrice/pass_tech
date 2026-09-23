@@ -135,4 +135,44 @@ class EntryFormTest {
         assertThat(form.hasChanges).isTrue()
         assertThat(EntryForm.new(EntryType.NOTE).hasChanges).isFalse()
     }
+
+    @Test
+    fun `the other domains are one list, however they were typed or pasted`() {
+        val form = EntryForm.new(EntryType.PASSWORD)
+        form.otherDomains = " login.microsoftonline.com \n portal.office.com, login.microsoftonline.com;\n\n x.com "
+        assertThat(form.toEntry(later) { "new" }.otherDomains)
+            .containsExactly("login.microsoftonline.com", "portal.office.com", "x.com")
+            .inOrder()
+    }
+
+    @Test
+    fun `no entry leaves the editor with more domains than the check can measure`() {
+        val form = EntryForm.new(EntryType.PASSWORD)
+        form.otherDomains = (1..Entry.MAX_OTHER_DOMAINS + 5).joinToString("\n") { "d$it.com" }
+        assertThat(form.toEntry(later) { "new" }.otherDomains).hasSize(Entry.MAX_OTHER_DOMAINS)
+    }
+
+    @Test
+    fun `a refused domain is offered, and declared only by a save`() {
+        val entry = saved().copy(otherDomains = listOf("portal.office.com"))
+        val form = EntryForm.edit(entry, suggest = "login.microsoftonline.com")
+        // Offered, not added: leaving now changes nothing, and the entry keeps what it had.
+        assertThat(form.otherDomains).isEqualTo("portal.office.com")
+        assertThat(form.hasChanges).isFalse()
+
+        form.acceptSuggestedDomain()
+        assertThat(form.suggestedDomain).isNull()
+        assertThat(form.hasChanges).isTrue()
+        assertThat(form.toEntry(later) { error("edited") }.otherDomains)
+            .containsExactly("portal.office.com", "login.microsoftonline.com").inOrder()
+        // Nothing left to accept, and tapping again adds nothing.
+        form.acceptSuggestedDomain()
+        assertThat(form.toEntry(later) { error("edited") }.otherDomains).hasSize(2)
+    }
+
+    @Test
+    fun `an editor opened by hand offers nothing`() {
+        assertThat(EntryForm.edit(saved()).suggestedDomain).isNull()
+        assertThat(EntryForm.new(EntryType.PASSWORD).suggestedDomain).isNull()
+    }
 }

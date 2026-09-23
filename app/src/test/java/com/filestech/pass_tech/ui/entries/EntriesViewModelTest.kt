@@ -3,6 +3,8 @@ package com.filestech.pass_tech.ui.entries
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.crypto.KdfParams
+import com.filestech.pass_tech.core.model.DartDateTime
+import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.model.EntryType
 import com.filestech.pass_tech.core.phishing.AntiPhishing
 import com.filestech.pass_tech.core.phishing.DomainMatch
@@ -253,6 +255,17 @@ class EntriesViewModelTest {
 
     // The browser the password is about to be pasted into.
 
+    /** An entry belonging to [url], and declaring [otherDomains] on top of it. */
+    private fun site(url: String, vararg otherDomains: String) = Entry(
+        id = "e1",
+        title = "Ma banque",
+        category = Entry.DEFAULT_CATEGORY,
+        url = url,
+        otherDomains = otherDomains.toList(),
+        createdAt = DartDateTime.nowLocal(),
+        updatedAt = DartDateTime.nowLocal(),
+    )
+
     /** The protection on and granted, with the browser wherever [showing] says. */
     private suspend fun Setup.watching(showing: String?) {
         phishing.granted = true
@@ -264,7 +277,7 @@ class EntriesViewModelTest {
     fun `off, a password copies with nothing said, whatever the browser shows`() = runTest {
         opened { setup ->
             setup.domain.host = "evil.com"
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
             settle()
             assertThat(setup.clipboard.copied).containsExactly("s3cret")
             assertThat(setup.viewModel.domainAlert.value).isNull()
@@ -276,7 +289,7 @@ class EntriesViewModelTest {
     fun `on the right site, a password copies with nothing said`() = runTest {
         opened { setup ->
             setup.watching("login.mabanque.fr")
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
             settle()
             assertThat(setup.clipboard.copied).containsExactly("s3cret")
             assertThat(setup.viewModel.domainAlert.value).isNull()
@@ -287,7 +300,7 @@ class EntriesViewModelTest {
     fun `no browser read, the copy goes ahead and says the check could not be made`() = runTest {
         opened { setup ->
             setup.watching(showing = null)
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
             settle()
             assertThat(setup.clipboard.copied).containsExactly("s3cret")
             assertThat(setup.messages).contains(Message.DomainUnchecked)
@@ -298,7 +311,7 @@ class EntriesViewModelTest {
     fun `a look-alike domain holds the copy back, and can be overridden`() = runTest {
         opened { setup ->
             setup.watching("mabanque.co")
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
             settle()
             assertThat(setup.clipboard.copied).isEmpty()
             val alert = setup.viewModel.domainAlert.value
@@ -316,7 +329,7 @@ class EntriesViewModelTest {
     fun `another domain holds the copy back, and there is no way through`() = runTest {
         opened { setup ->
             setup.watching("evil.com")
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
             settle()
             assertThat(setup.viewModel.domainAlert.value?.check?.verdict).isEqualTo(DomainMatch.Verdict.MISMATCH)
 
@@ -324,6 +337,58 @@ class EntriesViewModelTest {
             setup.viewModel.copyAnyway()
             settle()
             assertThat(setup.clipboard.copied).isEmpty()
+        }
+    }
+
+    @Test
+    fun `a domain the entry declares copies with nothing said`() = runTest {
+        opened { setup ->
+            setup.watching("login.microsoftonline.com")
+            val office = site("office.com", "login.microsoftonline.com")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = office)
+            settle()
+            assertThat(setup.clipboard.copied).containsExactly("s3cret")
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+        }
+    }
+
+    @Test
+    fun `a plain mismatch opens the entry with the refused domain offered, and copies nothing`() = runTest {
+        opened { setup ->
+            setup.watching("login.microsoftonline.com")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("office.com"))
+            settle()
+            assertThat(setup.viewModel.domainAlert.value?.check?.verdict).isEqualTo(DomainMatch.Verdict.MISMATCH)
+
+            setup.viewModel.openToDeclareDomain()
+            settle()
+            // The way out is an editor, not a copy: nothing reached the clipboard.
+            assertThat(setup.clipboard.copied).isEmpty()
+            assertThat(setup.viewModel.domainAlert.value).isNull()
+            val editor = setup.viewModel.stack.value.last() as Screen.Edit
+            assertThat(editor.form.suggestedDomain).isEqualTo("login.microsoftonline.com")
+            assertThat(editor.form.otherDomains).isEmpty()
+
+            // And offering it is not declaring it: the field only fills when the owner taps.
+            editor.form.acceptSuggestedDomain()
+            assertThat(editor.form.otherDomains).isEqualTo("login.microsoftonline.com")
+            assertThat(editor.form.suggestedDomain).isNull()
+        }
+    }
+
+    @Test
+    fun `a look-alike domain cannot be declared, only copied past`() = runTest {
+        opened { setup ->
+            setup.watching("mabanque.co")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
+            settle()
+            assertThat(setup.viewModel.domainAlert.value?.check?.verdict).isEqualTo(DomainMatch.Verdict.TYPOSQUATTING)
+
+            // The dialog draws no such button here, and the model refuses it as well: a name one
+            // letter from the owner's is the shape of an attack, never a domain to trust for good.
+            setup.viewModel.openToDeclareDomain()
+            settle()
+            assertThat(setup.viewModel.stack.value.filterIsInstance<Screen.Edit>()).isEmpty()
         }
     }
 
@@ -338,7 +403,7 @@ class EntriesViewModelTest {
             assertThat(setup.viewModel.domainAlert.value).isNull()
 
             // An entry that names no site copies the same way.
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site(""))
             settle()
             assertThat(setup.clipboard.copied).containsExactly("alice", "s3cret").inOrder()
             assertThat(setup.viewModel.domainAlert.value).isNull()
@@ -349,7 +414,7 @@ class EntriesViewModelTest {
     fun `the held-back copy goes with the lock`() = runTest {
         opened { setup ->
             setup.watching("evil.com")
-            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = "mabanque.fr")
+            setup.viewModel.copy("s3cret", R.string.entry_detail_field_password, site = site("mabanque.fr"))
             settle()
             assertThat(setup.viewModel.domainAlert.value).isNotNull()
 

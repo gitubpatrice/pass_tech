@@ -55,12 +55,16 @@ class AntiPhishing @Inject constructor(
     fun openSystemSettings(): Boolean = component.openSystemSettings()
 
     /**
-     * The verdict for an entry whose URL is [url]. Switched off, it is always [DomainMatch.Verdict.OK]:
-     * with no service running there is nothing to compare against, and warning on every copy would
-     * teach the owner to ignore the warning.
+     * The verdict for an entry whose URL is [url] and which also declares [otherDomains]. Switched
+     * off, it is always [DomainMatch.Verdict.OK]: with no service running there is nothing to compare
+     * against, and warning on every copy would teach the owner to ignore the warning.
      */
-    suspend fun check(url: String): DomainMatch.Check =
-        if (!enabled.first()) DomainMatch.Check(DomainMatch.Verdict.OK) else DomainMatch.check(url, domain.current())
+    suspend fun check(url: String, otherDomains: List<String> = emptyList()): DomainMatch.Check =
+        if (!enabled.first()) {
+            DomainMatch.Check(DomainMatch.Verdict.OK)
+        } else {
+            DomainMatch.check(url, domain.current(), otherDomains)
+        }
 
     /** The vault closing, or the panic mode: the last site read has no reason to outlive either. */
     fun forget() = domain.clear()

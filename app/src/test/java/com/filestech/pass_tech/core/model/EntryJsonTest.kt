@@ -65,6 +65,47 @@ class EntryJsonTest {
     }
 
     @Test
+    fun `an entry that declares no other domain writes the key nowhere`() {
+        val entry = requireNotNull(EntryJson.fromJsonOrNull(dartJson[0]))
+        assertThat(entry.otherDomains).isEmpty()
+        // The round-trip above already pins it; said here for the key itself, because this is what
+        // lets a 3.0 backup of an ordinary vault stay exactly the file 2.7.1 would have written.
+        assertThat(EntryJson.toJson(entry).keys).doesNotContain("otherDomains")
+    }
+
+    @Test
+    fun `other domains survive a round trip, trimmed and deduplicated`() {
+        val entry = parse(
+            """{"id":"a","title":"t","otherDomains":["b.com"," a.com ","b.com",""],
+               "createdAt":"2024-01-01","updatedAt":"2024-01-01"}""",
+        )!!
+        assertThat(entry.otherDomains).containsExactly("b.com", "a.com").inOrder()
+        assertThat(EntryJson.fromJsonOrNull(EntryJson.toJson(entry))?.otherDomains)
+            .containsExactly("b.com", "a.com").inOrder()
+    }
+
+    /**
+     * Strict everywhere else: a field of the wrong type rejects the entry. Not here. This key can
+     * only come from another tool, and reading it as none makes the domain check refuse MORE, not
+     * less — whereas rejecting the entry would cost a password.
+     */
+    @Test
+    fun `a malformed list of other domains costs the domains, never the entry`() {
+        val base = """"createdAt":"2024-01-01","updatedAt":"2024-01-01""""
+        assertThat(parse("""{"id":"a","title":"t","otherDomains":"b.com",$base}""")).isNotNull()
+        assertThat(parse("""{"id":"a","title":"t","otherDomains":"b.com",$base}""")?.otherDomains).isEmpty()
+        assertThat(parse("""{"id":"a","title":"t","otherDomains":[1,true,null],$base}""")?.otherDomains).isEmpty()
+        assertThat(parse("""{"id":"a","title":"t","otherDomains":null,$base}""")?.otherDomains).isEmpty()
+    }
+
+    @Test
+    fun `no entry carries more domains than the check can be asked to measure`() {
+        val many = (1..Entry.MAX_OTHER_DOMAINS + 5).joinToString(",") { """"d$it.com"""" }
+        val entry = parse("""{"id":"a","title":"t","otherDomains":[$many],"createdAt":"2024-01-01","updatedAt":"2024-01-01"}""")!!
+        assertThat(entry.otherDomains).hasSize(Entry.MAX_OTHER_DOMAINS)
+    }
+
+    @Test
     fun `toString never prints a secret`() {
         val entry = requireNotNull(EntryJson.fromJsonOrNull(dartJson[0]))
         assertThat(entry.toString()).doesNotContain(entry.password)

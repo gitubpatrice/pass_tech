@@ -43,8 +43,16 @@ class EntriesViewModel @Inject constructor(
      * A copy held back because the browser is not where the entry says it should be. Not a data
      * class: [value] is the secret itself, and a generated `toString` would put it in any log that
      * ever printed this object.
+     *
+     * [entry] is carried so the dialog's way out of a plain mismatch can open that entry's editor —
+     * the domain is declared there, deliberately, and never from the dialog itself.
      */
-    class DomainAlert(val check: DomainMatch.Check, internal val value: String, @StringRes internal val label: Int)
+    class DomainAlert(
+        val check: DomainMatch.Check,
+        val entry: Entry,
+        internal val value: String,
+        @StringRes internal val label: Int,
+    )
 
     sealed interface Screen {
         data class Detail(val id: String) : Screen
@@ -165,14 +173,14 @@ class EntriesViewModel @Inject constructor(
     }
 
     /**
-     * [site] is the URL the entry belongs to, and is given only for what an impostor site is after: a
-     * password, a two-factor code. Everything else copies straight away, as does a secret from an
+     * [site] is the entry the secret belongs to, and is given only for what an impostor site is after:
+     * a password, a two-factor code. Everything else copies straight away, as does a secret from an
      * entry that names no site — there would be nothing to compare the browser against.
      */
-    fun copy(value: String, @StringRes label: Int, site: String? = null) {
-        if (site.isNullOrBlank()) return copyNow(value, label)
+    fun copy(value: String, @StringRes label: Int, site: Entry? = null) {
+        if (site == null || (site.url.isBlank() && site.otherDomains.isEmpty())) return copyNow(value, label)
         viewModelScope.launch {
-            val check = antiPhishing.check(site)
+            val check = antiPhishing.check(site.url, site.otherDomains)
             when (check.verdict) {
                 DomainMatch.Verdict.OK -> copyNow(value, label)
                 // Asked for, and could not be made. Saying nothing would let a protection that sees
@@ -183,7 +191,7 @@ class EntriesViewModel @Inject constructor(
                 }
                 DomainMatch.Verdict.TYPOSQUATTING,
                 DomainMatch.Verdict.MISMATCH,
-                -> mutableAlert.value = DomainAlert(check, value, label)
+                -> mutableAlert.value = DomainAlert(check, site, value, label)
             }
         }
     }
@@ -196,6 +204,21 @@ class EntriesViewModel @Inject constructor(
         // that must not depend on which buttons a screen happened to draw.
         if (alert.check.verdict != DomainMatch.Verdict.TYPOSQUATTING) return
         copyNow(alert.value, alert.label)
+    }
+
+    /**
+     * The way out of a plain mismatch, and it is not a way through: the copy stays held back and the
+     * entry's editor opens, offering the refused domain. Declaring it costs a save on the vault, which
+     * is not the reflex an impostor site is counting on — whereas a "trust this once" button beside a
+     * warning is exactly that. A look-alike domain has no such door: the one an attacker registers is
+     * one letter away, and that is precisely what must never become declarable in two taps.
+     */
+    fun openToDeclareDomain() {
+        val alert = mutableAlert.value ?: return
+        mutableAlert.value = null
+        if (alert.check.verdict != DomainMatch.Verdict.MISMATCH) return
+        val refused = alert.check.active ?: return
+        push(Screen.Edit(EntryForm.edit(alert.entry, suggest = refused)))
     }
 
     fun dismissDomainAlert() {

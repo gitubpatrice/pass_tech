@@ -28,12 +28,21 @@ import com.filestech.pass_tech.core.phishing.DomainMatch
 /**
  * The copy is held: the browser in front is not on the site the entry belongs to.
  *
- * A look-alike domain can be a false alarm — an owner who knows their site keeps a way through. A
- * plainly different one has none, and the dialog cannot be dismissed by tapping beside it either:
- * the one action left is to read the two domains.
+ * A look-alike domain can be a false alarm — an owner who knows their site keeps a way through, and
+ * nothing more: a name one letter from theirs is the shape of an attack, and must never become a
+ * domain the entry trusts for good.
+ *
+ * A plainly different domain is the other case, and it is usually a real sign-in page somewhere else:
+ * Microsoft, Apple, a company's SSO. The copy is still held — but instead of a dead end, the entry
+ * opens and the domain can be declared there, which costs a save on the vault.
  */
 @Composable
-fun PhishingDialog(alert: EntriesViewModel.DomainAlert, onClose: () -> Unit, onCopyAnyway: () -> Unit) {
+fun PhishingDialog(
+    alert: EntriesViewModel.DomainAlert,
+    onClose: () -> Unit,
+    onCopyAnyway: () -> Unit,
+    onDeclareDomain: () -> Unit,
+) {
     val lookAlike = alert.check.verdict == DomainMatch.Verdict.TYPOSQUATTING
     AlertDialog(
         onDismissRequest = { if (lookAlike) onClose() },
@@ -76,6 +85,9 @@ fun PhishingDialog(alert: EntriesViewModel.DomainAlert, onClose: () -> Unit, onC
                 TextButton(onClick = onCopyAnyway) {
                     Text(stringResource(R.string.phishing_copy_anyway), color = MaterialTheme.colorScheme.error)
                 }
+            } else {
+                // Not "copy anyway": it opens the entry, and the copy stays held back.
+                TextButton(onClick = onDeclareDomain) { Text(stringResource(R.string.phishing_declare_domain)) }
             }
         },
     )

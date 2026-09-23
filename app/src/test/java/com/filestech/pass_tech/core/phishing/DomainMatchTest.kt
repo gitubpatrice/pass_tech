@@ -124,6 +124,68 @@ class DomainMatchTest {
     }
 
     /**
+     * The real sign-in pages of the accounts people keep here, every one of them a dead end before an
+     * entry could declare more than one domain — and none of them within [DomainMatch.TYPO_DISTANCE],
+     * so there was not even a "copy anyway" to fall back on.
+     */
+    @Test
+    fun `a domain the entry declares is the entry's, whatever the distance`() {
+        val federated = listOf(
+            "office.com" to "login.microsoftonline.com",
+            "icloud.com" to "appleid.apple.com",
+            "steampowered.com" to "steamcommunity.com",
+            "sosh.fr" to "orange.fr",
+            "twitter.com" to "x.com",
+            "boursorama.com" to "boursobank.com",
+            "amazon.fr" to "amazon.com",
+        )
+        federated.forEach { (entry, signIn) ->
+            assertThat(DomainMatch.check(entry, signIn).verdict).isEqualTo(Verdict.MISMATCH)
+            assertThat(DomainMatch.check(entry, signIn, listOf(signIn)).verdict).isEqualTo(Verdict.OK)
+        }
+        // A name under a declared domain is covered as one under the URL is.
+        assertThat(DomainMatch.check("office.com", "eu.login.microsoftonline.com", listOf("login.microsoftonline.com")).verdict)
+            .isEqualTo(Verdict.OK)
+        // And the domain reported is the one that matched, not the entry's first.
+        val ok = DomainMatch.check("office.com", "login.microsoftonline.com", listOf("login.microsoftonline.com"))
+        assertThat(ok.expected).isEqualTo("login.microsoftonline.com")
+    }
+
+    /**
+     * Declaring a domain adds one, it does not lower the bar. The distance is untouched and the top
+     * level is still compared, so the two shapes an attack takes stay refused: the look-alike name and
+     * the same name under another extension.
+     */
+    @Test
+    fun `declaring other domains refuses no less than before`() {
+        val declared = listOf("appleid.apple.com", "icloud.com")
+        assertThat(DomainMatch.check("apple.com", "paypal.tk", declared).verdict).isEqualTo(Verdict.MISMATCH)
+        // The same name under another extension is not the same site, whatever else is declared.
+        assertThat(DomainMatch.check("paypal.com", "paypal.tk", listOf("paypal.co.uk")).verdict).isEqualTo(Verdict.MISMATCH)
+        // A declared domain used as a PREFIX by someone else is not that domain.
+        assertThat(DomainMatch.check("apple.com", "appleid.apple.com.evil.net", declared).verdict).isEqualTo(Verdict.MISMATCH)
+        // The closest declared domain is what the dialog holds up, and it is still a warning.
+        val typo = DomainMatch.check("apple.com", "icloud.co", declared)
+        assertThat(typo.verdict).isEqualTo(Verdict.TYPOSQUATTING)
+        assertThat(typo.expected).isEqualTo("icloud.com")
+        assertThat(typo.distance).isEqualTo(1)
+        // A declared domain that is not a host at all is dropped, and changes no verdict.
+        assertThat(DomainMatch.check("apple.com", "evil.com", listOf("", "   ", "not a host")).verdict)
+            .isEqualTo(Verdict.MISMATCH)
+    }
+
+    @Test
+    fun `an entry with no URL is still checked against the domains it declares`() {
+        assertThat(DomainMatch.check("", "evil.com", listOf("mabanque.fr")).verdict).isEqualTo(Verdict.MISMATCH)
+        assertThat(DomainMatch.check("", "mabanque.fr", listOf("mabanque.fr")).verdict).isEqualTo(Verdict.OK)
+        // Nothing to compare against on either side keeps its 2.7.1 answer: the copy goes ahead.
+        assertThat(DomainMatch.check("", "evil.com").verdict).isEqualTo(Verdict.OK)
+        assertThat(DomainMatch.check("", "evil.com", listOf("")).verdict).isEqualTo(Verdict.OK)
+        // No browser read, and the entry's own URL is what "expected" names.
+        assertThat(DomainMatch.check("office.com", null, listOf("login.microsoftonline.com")).expected).isEqualTo("office.com")
+    }
+
+    /**
      * 2.7.1 cut both sides at fifty characters, and this test used to assert that cut as intended:
      * `distance(long + "x.com", long + "y.com") == 0`. Two different hosts reading as identical is
      * not a saving, it is the wrong answer — and the owner was shown "Distance: 0" under a "copy

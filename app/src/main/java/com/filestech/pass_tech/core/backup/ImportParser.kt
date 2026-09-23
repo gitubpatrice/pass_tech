@@ -160,7 +160,14 @@ object ImportParser {
     ): Entry {
         val login = item["login"] as? JsonObject
         val uris = login?.get("uris") as? JsonArray
-        val url = (uris?.firstOrNull() as? JsonObject)?.optString("uri") ?: ""
+        // 2.7.1 kept the first and dropped the rest. Bitwarden lists exactly what an entry needs to
+        // be usable — `office.com` AND `login.microsoftonline.com` — and dropping them is what made
+        // an imported entry unable to copy its own password on its own sign-in page.
+        val addresses = uris.orEmpty()
+            .mapNotNull { (it as? JsonObject)?.optString("uri")?.dartTrim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        val url = addresses.firstOrNull() ?: ""
         return newEntry(
             type = EntryType.PASSWORD,
             title = name,
@@ -168,6 +175,7 @@ object ImportParser {
             username = login?.optString("username") ?: "",
             password = login?.optString("password") ?: "",
             url = url,
+            otherDomains = addresses.drop(1).take(Entry.MAX_OTHER_DOMAINS),
             totp = boundTotp(login?.optString("totp") ?: ""),
             notes = notes,
             favorite = favorite,
@@ -341,6 +349,7 @@ object ImportParser {
         username: String = "",
         password: String = "",
         url: String = "",
+        otherDomains: List<String> = emptyList(),
         totp: String = "",
         notes: String = "",
         favorite: Boolean = false,
@@ -361,6 +370,7 @@ object ImportParser {
             username = username,
             password = password,
             url = url,
+            otherDomains = otherDomains,
             totpSecret = totp,
             notes = notes,
             isFavorite = favorite,

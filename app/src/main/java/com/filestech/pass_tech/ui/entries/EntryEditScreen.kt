@@ -2,6 +2,7 @@ package com.filestech.pass_tech.ui.entries
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material.icons.outlined.Shield
@@ -59,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.model.Categories
+import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.model.EntryType
 import com.filestech.pass_tech.core.totp.Totp
 import com.filestech.pass_tech.ui.components.PasswordField
@@ -213,6 +218,21 @@ private fun PasswordFields(form: EntryForm, onSecretAdded: () -> Unit, onGenerat
             keyboardType = KeyboardType.Uri,
         )
     }
+    LabelledField(stringResource(R.string.entry_edit_field_other_domains_optional)) {
+        Column {
+            form.suggestedDomain?.let { RefusedDomainRow(it, onAdd = form::acceptSuggestedDomain) }
+            TextInput(
+                value = form.otherDomains,
+                onValueChange = { form.otherDomains = it },
+                label = stringResource(R.string.entry_edit_field_other_domains_optional),
+                placeholder = stringResource(R.string.entry_edit_hint_other_domains),
+                icon = Icons.Outlined.Language,
+                keyboardType = KeyboardType.Uri,
+                minLines = 2,
+                supportingText = stringResource(R.string.entry_edit_helper_other_domains, Entry.MAX_OTHER_DOMAINS),
+            )
+        }
+    }
     LabelledField(stringResource(R.string.entry_edit_field_2fa_optional)) {
         PasswordField(
             value = form.totpSecret,
@@ -350,6 +370,40 @@ private fun CategoryChips(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
+/**
+ * The domain the anti-phishing check has just refused, on its way into the field below. Shown in
+ * full, in the monospace the dialog used, so the name about to be trusted is read rather than tapped
+ * past — and adding it still changes nothing until the entry is saved.
+ */
+@Composable
+private fun RefusedDomainRow(domain: String, onAdd: () -> Unit) {
+    val color = MaterialTheme.colorScheme.error
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .background(color.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
+            .padding(start = 12.dp, top = 6.dp, end = 4.dp, bottom = 6.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.entry_edit_refused_domain),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = domain,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+            )
+        }
+        TextButton(onClick = onAdd) { Text(stringResource(R.string.entry_edit_refused_domain_add)) }
+    }
+}
+
 /** 2.7.1 puts a small bold label above each field, then the field with its own floating label. */
 @Composable
 private fun LabelledField(label: String, field: @Composable () -> Unit) {
@@ -380,6 +434,7 @@ private fun TextInput(
     keyboardType: KeyboardType = KeyboardType.Text,
     capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
     minLines: Int = 1,
+    supportingText: String? = null,
 ) {
     OutlinedTextField(
         value = value,
@@ -387,6 +442,7 @@ private fun TextInput(
         label = { Text(label) },
         placeholder = { Text(placeholder) },
         leadingIcon = icon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(20.dp)) } },
+        supportingText = supportingText?.let { { Text(it) } },
         keyboardOptions = KeyboardOptions(capitalization = capitalization, autoCorrectEnabled = false, keyboardType = keyboardType),
         singleLine = minLines == 1,
         minLines = minLines,

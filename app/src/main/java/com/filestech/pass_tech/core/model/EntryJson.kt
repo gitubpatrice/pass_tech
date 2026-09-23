@@ -7,14 +7,20 @@ import com.filestech.pass_tech.core.json.requireString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /**
  * JSON form of [Entry], identical to `Entry.toJson` / `Entry.fromJson` of the Flutter app: same keys,
- * same order, same defaults, same strictness.
+ * same order, same defaults, same strictness — plus [Entry.otherDomains], the one field 2.7.1 knows
+ * nothing about, written only when it holds something.
  */
 object EntryJson {
+
+    private const val OTHER_DOMAINS = "otherDomains"
 
     /**
      * `Entry.fromJson`, returning `null` where Dart throws: missing `id` or `title`, a field of the wrong
@@ -37,6 +43,7 @@ object EntryJson {
                 username = text("username"),
                 password = text("password"),
                 url = text("url"),
+                otherDomains = otherDomains(json),
                 totpSecret = text("totpSecret"),
                 notes = text("notes"),
                 isFavorite = json.optBoolean("isFavorite") ?: false,
@@ -54,6 +61,20 @@ object EntryJson {
         }
     }
 
+    /**
+     * Lenient where the rest of this reader is strict, and deliberately so: a field the Flutter app
+     * never wrote can only come from another tool, and a value of the wrong shape there must not cost
+     * the owner a password. Reading it as none leaves the check comparing against [Entry.url] alone,
+     * which refuses more, not less.
+     */
+    private fun otherDomains(json: JsonObject): List<String> =
+        (json[OTHER_DOMAINS] as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.takeIf { primitive -> primitive.isString }?.content?.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.distinct()
+            ?.take(Entry.MAX_OTHER_DOMAINS)
+            .orEmpty()
+
     fun toJson(entry: Entry): JsonObject = buildJsonObject {
         put("id", entry.id)
         put("type", entry.type.wireName)
@@ -62,6 +83,10 @@ object EntryJson {
         put("username", entry.username)
         put("password", entry.password)
         put("url", entry.url)
+        // Absent when empty: an entry that does not use it writes exactly the JSON 2.7.1 wrote.
+        if (entry.otherDomains.isNotEmpty()) {
+            putJsonArray(OTHER_DOMAINS) { entry.otherDomains.forEach { add(it) } }
+        }
         put("totpSecret", entry.totpSecret)
         put("notes", entry.notes)
         put("isFavorite", entry.isFavorite)

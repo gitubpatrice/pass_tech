@@ -134,6 +134,29 @@ class ImportParserTest {
         assertThat(result.entries.single().type).isEqualTo(EntryType.NOTE)
     }
 
+    /**
+     * 2.7.1 kept the first address of a Bitwarden item and dropped the rest — and the rest is exactly
+     * what a federated sign-in needs, so an imported entry could not copy its own password on its own
+     * sign-in page. They are all kept now, in order, without blanks or repeats.
+     */
+    @Test
+    fun `every address of a Bitwarden login is kept, not only the first`() {
+        val file = """{"items":[{"type":1,"name":"Office","login":{"uris":[""" +
+            """{"uri":"https://office.com"},{"uri":"https://login.microsoftonline.com"},""" +
+            """{"uri":" https://office.com "},{"uri":""},{"uri":"https://portal.office.com"}]}}]}"""
+        val entry = parse(file).entries.single()
+        assertThat(entry.url).isEqualTo("https://office.com")
+        assertThat(entry.otherDomains)
+            .containsExactly("https://login.microsoftonline.com", "https://portal.office.com")
+            .inOrder()
+    }
+
+    @Test
+    fun `a Bitwarden login with no address at all keeps none`() {
+        assertThat(parse("""{"items":[{"type":1,"name":"Bare","login":{"username":"u"}}]}""").entries.single().otherDomains)
+            .isEmpty()
+    }
+
     private companion object {
         const val UNTITLED = "Untitled"
     }

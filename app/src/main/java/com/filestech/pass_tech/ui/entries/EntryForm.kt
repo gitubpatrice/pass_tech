@@ -19,7 +19,7 @@ import com.filestech.pass_tech.core.totp.Totp
  * A field is only reformatted when the user edits it, never on load, as 2.7.1 does: a card number
  * imported with other characters stays as it is until the user touches it.
  */
-class EntryForm private constructor(val type: EntryType, private val original: Entry?) {
+class EntryForm private constructor(val type: EntryType, private val original: Entry?, suggest: String?) {
 
     enum class Problem { TITLE_REQUIRED, INVALID_TOTP }
 
@@ -31,6 +31,9 @@ class EntryForm private constructor(val type: EntryType, private val original: E
     var username by mutableStateOf(original?.username.orEmpty())
     var password by mutableStateOf(original?.password.orEmpty())
     var url by mutableStateOf(original?.url.orEmpty())
+
+    /** Free text, one domain per line: the list is rebuilt from it at save, never as it is typed. */
+    var otherDomains by mutableStateOf(original?.otherDomains.orEmpty().joinToString("\n"))
     var totpSecret by mutableStateOf(original?.totpSecret.orEmpty())
         private set
     var notes by mutableStateOf(original?.notes.orEmpty())
@@ -48,6 +51,21 @@ class EntryForm private constructor(val type: EntryType, private val original: E
     /** Set by [validate] when the 2FA secret is refused; cleared as soon as the field changes. */
     var totpError by mutableStateOf<Totp.SecretError?>(null)
         private set
+
+    /**
+     * The domain the anti-phishing check has just refused, offered above the field so it need not be
+     * read off a dialog and typed back in. Only ever set when the editor was opened from that refusal,
+     * and gone once added — adding it changes nothing until the entry is saved.
+     */
+    var suggestedDomain by mutableStateOf(suggest)
+        private set
+
+    /** Puts [suggestedDomain] into the field. The save is what declares it. */
+    fun acceptSuggestedDomain() {
+        val domain = suggestedDomain ?: return
+        otherDomains = (domains(otherDomains) + domain).distinct().joinToString("\n")
+        suggestedDomain = null
+    }
 
     /** A save is running: the Save button waits. */
     var saving by mutableStateOf(false)
@@ -111,6 +129,7 @@ class EntryForm private constructor(val type: EntryType, private val original: E
             username = username.trim(),
             password = password,
             url = url.trim(),
+            otherDomains = domains(otherDomains).take(Entry.MAX_OTHER_DOMAINS),
             totpSecret = totpSecret.trim(),
             notes = notes.trim(),
             isFavorite = favorite,
@@ -125,7 +144,7 @@ class EntryForm private constructor(val type: EntryType, private val original: E
         )
 
     private fun snapshot(): List<Any> = listOf(
-        category, favorite, title, username, password, url, totpSecret, notes,
+        category, favorite, title, username, password, url, otherDomains, totpSecret, notes,
         cardholder, cardNumber.text, cardExpiry.text, cardCvv, cardPin, cardIssuer,
     )
 
@@ -136,12 +155,19 @@ class EntryForm private constructor(val type: EntryType, private val original: E
         private const val CVV_DIGITS = 4
         private const val PIN_DIGITS = 8
 
-        fun new(type: EntryType) = EntryForm(type, null)
+        fun new(type: EntryType) = EntryForm(type, null, suggest = null)
 
-        /** The type of an entry cannot change once created (2.7.1). */
-        fun edit(entry: Entry) = EntryForm(entry.type, entry)
+        /**
+         * The type of an entry cannot change once created (2.7.1). [suggest] is the domain a refused
+         * copy wants declared here: it is offered, never added.
+         */
+        fun edit(entry: Entry, suggest: String? = null) = EntryForm(entry.type, entry, suggest)
 
         private fun digits(text: String) = text.filter { it in '0'..'9' }
+
+        /** No domain holds a space, a comma or a semicolon, so all three separate a pasted list. */
+        private fun domains(text: String): List<String> =
+            text.split('\n', ',', ';', ' ').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 
         /** 2.7.1's formatters put the cursor at the end. */
         private fun atEnd(text: String) = TextFieldValue(text, TextRange(text.length))

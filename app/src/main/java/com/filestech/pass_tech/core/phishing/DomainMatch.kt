@@ -107,18 +107,41 @@ object DomainMatch {
     fun fromAddressBar(raw: String): String? = normalize(raw)?.takeIf { TOP_LEVEL.containsMatchIn(it) }
 
     /**
-     * [url] is what the entry stores, [active] what the browser is showing. Both are normalised here,
-     * so a caller cannot hand in one form and be compared against another.
+     * [url] is what the entry stores, [otherDomains] the other addresses it declares, [active] what
+     * the browser is showing. Every side is normalised here, so a caller cannot hand in one form and
+     * be compared against another.
+     *
+     * **Any declared domain is enough**, and that is the defect this fixes. An entry held ONE
+     * address, while a federated sign-in moves the browser to another: `office.com` signs in at
+     * `login.microsoftonline.com`, an Apple account at `appleid.apple.com`, a company at its Okta or
+     * Auth0 host, `twitter.com` at `x.com`. Those are far more than [TYPO_DISTANCE] edits away, so
+     * the verdict was [Verdict.MISMATCH] — the one with no way through at all. The owner could not
+     * copy their own password on their own sign-in page, and the import made these entries itself:
+     * the browsers and the other managers export the address of the login FORM.
+     *
+     * **Nothing is loosened to get there.** The distance is not relaxed and the top-level label is
+     * still compared, so `paypal.tk` stays refused for a `paypal.com` entry: what changes is that the
+     * owner can say, once and deliberately, which other domains are theirs. The distance reported is
+     * the smallest of them and [Check.expected] the domain that gave it, so the dialog holds up the
+     * closest thing the entry knows.
      */
-    fun check(url: String, active: String?): Check {
-        val expected = normalize(url) ?: return Check(Verdict.OK)
-        val seen = active?.let { normalize(it) } ?: return Check(Verdict.UNKNOWN, expected = expected)
-        // A name under the expected domain is served by whoever holds that domain. The reverse is
-        // not true and is refused: an entry noted `login.example.com` does not cover `example.com`.
-        if (seen == expected || seen.endsWith(".$expected")) return Check(Verdict.OK, expected, seen)
-        val distance = distance(seen, expected)
+    fun check(url: String, active: String?, otherDomains: List<String> = emptyList()): Check {
+        val expected = (listOf(url) + otherDomains).mapNotNull(::normalize).distinct()
+        if (expected.isEmpty()) return Check(Verdict.OK)
+        val seen = active?.let { normalize(it) }
+        // The entry's own URL is what "expected" names when there was nothing to compare against.
+        return if (seen == null) Check(Verdict.UNKNOWN, expected = expected.first()) else compare(expected, seen)
+    }
+
+    /** [expected] holds at least one normalised host, and [seen] is one. */
+    private fun compare(expected: List<String>, seen: String): Check {
+        // A name under a declared domain is served by whoever holds that domain. The reverse is not
+        // true and is refused: an entry noted `login.example.com` does not cover `example.com`.
+        val covering = expected.firstOrNull { seen == it || seen.endsWith(".$it") }
+        if (covering != null) return Check(Verdict.OK, covering, seen)
+        val (closest, distance) = expected.map { it to distance(seen, it) }.minBy { it.second }
         val verdict = if (distance <= TYPO_DISTANCE) Verdict.TYPOSQUATTING else Verdict.MISMATCH
-        return Check(verdict, expected, seen, distance)
+        return Check(verdict, closest, seen, distance)
     }
 
     /** Levenshtein, one row at a time, on at most [MAX_COMPARED] characters of each side. */

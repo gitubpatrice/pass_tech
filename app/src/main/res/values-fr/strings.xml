@@ -98,6 +98,11 @@
     <string name="entry_edit_field_password">Mot de passe</string>
     <string name="entry_edit_field_url_optional">URL (optionnel)</string>
     <string name="entry_edit_hint_url">https://…</string>
+    <string name="entry_edit_field_other_domains_optional">Autres domaines (optionnel)</string>
+    <string name="entry_edit_hint_other_domains">login.microsoftonline.com</string>
+    <string name="entry_edit_helper_other_domains">Les autres adresses où ce même compte se connecte : une page de connexion Microsoft ou Apple, le SSO d\'une entreprise, une autre extension de pays. Un par ligne, %1$d au maximum. Le contrôle du domaine les accepte comme l\'URL ci-dessus.</string>
+    <string name="entry_edit_refused_domain">Refusé à l\'instant</string>
+    <string name="entry_edit_refused_domain_add">Ajouter</string>
     <string name="entry_edit_field_2fa_optional">Code 2FA — secret TOTP (optionnel)</string>
     <string name="entry_edit_hint_2fa">Collez l\'URI otpauth:// ou la clé Base32</string>
     <string name="entry_edit_helper_2fa">Génère des codes à 6 chiffres. Collez l\'URI otpauth:// affichée sous le QR code du service — le secret en est extrait automatiquement.</string>
@@ -134,6 +139,7 @@
     <string name="entry_detail_field_2fa_totp">Code 2FA — TOTP</string>
     <string name="entry_detail_field_2fa_code">Code 2FA</string>
     <string name="entry_detail_field_url">URL</string>
+    <string name="entry_detail_field_other_domains">Autres domaines</string>
     <string name="entry_detail_field_notes">Notes</string>
     <string name="entry_detail_field_content">Contenu</string>
     <string name="entry_detail_copy_notes_tooltip">Copier les notes</string>
@@ -399,7 +405,7 @@
 
     <string name="settings_section_anti_phishing">Anti-phishing</string>
     <string name="settings_anti_phishing_title">Vérifier le domaine avant de copier</string>
-    <string name="settings_anti_phishing_description">Compare le domaine du navigateur à celui de l\'entrée</string>
+    <string name="settings_anti_phishing_description">Compare le domaine du navigateur à ceux que déclare l\'entrée</string>
     <string name="settings_anti_phishing_active">Activé — prévient si le navigateur n\'est pas sur le bon domaine</string>
     <string name="settings_anti_phishing_needs_grant">⚠ Activez « %1$s » dans Accessibilité</string>
     <string name="settings_anti_phishing_open_title">Ouvrir Réglages &gt; Accessibilité</string>
@@ -414,12 +420,13 @@
     <string name="phishing_typo_title">Domaine suspect</string>
     <string name="phishing_typo_body">Le domaine du navigateur ressemble au vôtre, à une ou deux lettres près — la forme habituelle d\'un faux site. Cela peut être une fausse alerte.</string>
     <string name="phishing_mismatch_title">Ce n\'est pas le même domaine</string>
-    <string name="phishing_mismatch_body">Le navigateur est sur un domaine totalement différent. La copie a été bloquée.</string>
+    <string name="phishing_mismatch_body">Le navigateur est sur un domaine totalement différent. La copie a été bloquée.\n\nSi cette page appartient bien à cette entrée — une page de connexion Microsoft ou Apple, le SSO d\'une entreprise — ouvrez l\'entrée et ajoutez-y le domaine. La copie reste bloquée tant que ce n\'est pas fait.</string>
     <string name="phishing_expected">Attendu</string>
     <string name="phishing_active">Dans le navigateur</string>
     <string name="phishing_distance">Distance : %1$d</string>
     <string name="phishing_close">Fermer</string>
     <string name="phishing_copy_anyway">Copier quand même</string>
+    <string name="phishing_declare_domain">Ouvrir l\'entrée</string>
 
     <string name="settings_section_data">Données</string>
     <string name="settings_backup_encrypted_title">Sauvegarde chiffrée (.ptbak)</string>
@@ -553,7 +560,7 @@
     <string name="about_feature_breach">Contrôle des fuites</string>
     <string name="about_feature_breach_desc">Demande à Have I Been Pwned si un mot de passe figure dans une fuite publique, sans jamais envoyer ce mot de passe.</string>
     <string name="about_feature_phishing">Contrôle de l\'adresse</string>
-    <string name="about_feature_phishing_desc">Avant de copier un mot de passe, compare l\'adresse ouverte dans votre navigateur avec celle de l\'entrée, et retient la copie devant un sosie.</string>
+    <string name="about_feature_phishing_desc">Avant de copier un mot de passe, compare l\'adresse ouverte dans votre navigateur avec celles que déclare l\'entrée, et retient la copie quand aucune ne correspond.</string>
     <string name="about_feature_clipboard">Presse-papiers vidé</string>
     <string name="about_feature_clipboard_desc">Au bout de %1$s à %2$s, ou jamais — à votre choix.</string>
     <string name="about_feature_update">Vérification des mises à jour</string>

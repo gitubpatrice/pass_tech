@@ -109,6 +109,11 @@
     <string name="entry_edit_field_password">Password</string>
     <string name="entry_edit_field_url_optional">URL (optional)</string>
     <string name="entry_edit_hint_url">https://…</string>
+    <string name="entry_edit_field_other_domains_optional">Other domains (optional)</string>
+    <string name="entry_edit_hint_other_domains">login.microsoftonline.com</string>
+    <string name="entry_edit_helper_other_domains">The other addresses where this same account signs in: a Microsoft or Apple sign-in page, a company SSO, another country\'s extension. One per line, %1$d at most. The domain check accepts them like the URL above.</string>
+    <string name="entry_edit_refused_domain">Refused a moment ago</string>
+    <string name="entry_edit_refused_domain_add">Add</string>
     <string name="entry_edit_field_2fa_optional">2FA code — TOTP secret (optional)</string>
     <string name="entry_edit_hint_2fa">Paste the otpauth:// URI or the Base32 key</string>
     <string name="entry_edit_helper_2fa">Generates 6-digit codes. Paste the otpauth:// URI shown below the service\'s QR code — the secret is extracted automatically.</string>
@@ -146,6 +151,7 @@
     <string name="entry_detail_field_2fa_totp">2FA code — TOTP</string>
     <string name="entry_detail_field_2fa_code">2FA code</string>
     <string name="entry_detail_field_url">URL</string>
+    <string name="entry_detail_field_other_domains">Other domains</string>
     <string name="entry_detail_field_notes">Notes</string>
     <string name="entry_detail_field_content">Content</string>
     <string name="entry_detail_copy_notes_tooltip">Copy notes</string>
@@ -442,7 +448,7 @@
 
     <string name="settings_section_anti_phishing">Anti-phishing</string>
     <string name="settings_anti_phishing_title">Check the domain before copying</string>
-    <string name="settings_anti_phishing_description">Compares the browser\'s domain with the entry\'s</string>
+    <string name="settings_anti_phishing_description">Compares the browser\'s domain with those the entry declares</string>
     <string name="settings_anti_phishing_active">On — warns when the browser is not on the right domain</string>
     <!-- The name in quotes is the service label itself, so the two cannot drift apart. -->
     <string name="settings_anti_phishing_needs_grant">⚠ Turn \"%1$s\" on under Accessibility</string>
@@ -458,12 +464,13 @@
     <string name="phishing_typo_title">Suspicious domain</string>
     <string name="phishing_typo_body">The domain in the browser looks like yours, one or two letters apart — the usual shape of a fake site. It can be a false alarm.</string>
     <string name="phishing_mismatch_title">Not the same domain</string>
-    <string name="phishing_mismatch_body">The browser is on a completely different domain. The copy was blocked.</string>
+    <string name="phishing_mismatch_body">The browser is on a completely different domain. The copy was blocked.\n\nIf this page really belongs to this entry — a Microsoft or Apple sign-in page, a company SSO — open the entry and add the domain to it. The copy stays blocked until you have.</string>
     <string name="phishing_expected">Expected</string>
     <string name="phishing_active">In the browser</string>
     <string name="phishing_distance">Distance: %1$d</string>
     <string name="phishing_close">Close</string>
     <string name="phishing_copy_anyway">Copy anyway</string>
+    <string name="phishing_declare_domain">Open the entry</string>
 
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
     <string name="settings_section_data">Data</string>
@@ -602,7 +609,7 @@
     <string name="about_feature_breach">Breach check</string>
     <string name="about_feature_breach_desc">Asks Have I Been Pwned whether a password appears in a public leak, without ever sending the password.</string>
     <string name="about_feature_phishing">Address check</string>
-    <string name="about_feature_phishing_desc">Before a password is copied, compares the address open in your browser with the one on the entry, and holds the copy back on a look-alike.</string>
+    <string name="about_feature_phishing_desc">Before a password is copied, compares the address open in your browser with the ones the entry declares, and holds the copy back when none of them matches.</string>
     <string name="about_feature_clipboard">Clipboard cleared</string>
     <string name="about_feature_clipboard_desc">After %1$s to %2$s, or never — your choice.</string>
     <string name="about_feature_update">Update check</string>
