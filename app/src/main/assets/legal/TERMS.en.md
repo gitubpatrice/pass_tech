@@ -1,77 +1,103 @@
 # Terms of Use — Pass Tech
 
-**Document version**: September 20, 2026 (Pass Tech v2.7.0)
-**App**: Pass Tech
-**Official website**: https://www.files-tech.com
+**Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+**Last changed**: 23 September 2026
+**Publisher**: Files Tech — Patrice Haltaya
 **Contact**: contact@files-tech.com
-**Source code**: https://github.com/gitubpatrice/pass_tech
-**Code license**: Apache License 2.0
+**Source code**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
+
+> This document covers the **Kotlin** version of Pass Tech, 3.0.0. It is not the one for the earlier
+> Flutter versions (2.x, `com.passtech.pass_tech`).
 
 ---
 
-## 1. Purpose
+## 1. What this is
 
-These Terms of Use define the rules applicable to the use of the **Pass Tech** application — a 100% local password manager.
+Pass Tech keeps passwords, two-factor secrets, bank cards and notes on your phone, encrypted by a
+master password you choose. There is no account and no server of ours. Using the app means accepting
+what follows.
 
-## 2. Acceptance
+## 2. The one thing to understand before you start
 
-Using the application implies acceptance of these terms.
+**Your master password cannot be recovered.** Not by us, not by anyone, by any means. It is never
+stored — the app keeps no copy, no hint and no reset. If you forget it, the vault is gone, and so is
+everything in it.
 
-## 3. General operation
+That is not a limitation we could lift. It is the reason the vault cannot be opened by us, by a
+court order served on us, or by whoever takes your phone.
 
-Pass Tech is a 100% local password vault. It stores passwords, TOTP 2FA secrets, bank cards and secure notes in an encrypted file on the device, protected by a master password and, optionally, an Android Keystore biometric key.
+So, before you put anything important in it:
 
-## 4. No advertising, trackers or telemetry
+- choose a master password of at least 12 characters, and one you will still know in a year;
+- make a `.ptbak` backup, with a passphrase of its own, and keep it somewhere other than the phone;
+- remember that the backup is only as safe as the place you put it.
 
-The developer declares that the application contains no advertising, no tracker, no analytics, no behavioral analysis, no profiling system, no telemetry and no remote crash reporting. The vault is never transmitted to any server operated by the developer.
+## 3. What we promise
 
-## 5. Source code license
+- **No advertising, no tracker, no analytics, no telemetry, no crash report.** Nothing about you or
+  your use of the app reaches us, ever.
+- **Your vault is never sent anywhere.** The two network calls the app makes are listed in the
+  privacy policy, and neither carries anything you typed.
+- **The source code is public**, under the Apache License 2.0, and every release publishes the
+  SHA-256 of each file so you can check that what you installed is what was published.
 
-Source code published under **Apache License 2.0**.
+## 4. What we do not promise
 
-- Repository: https://github.com/gitubpatrice/pass_tech
-- Official website: https://www.files-tech.com
-- Contact: contact@files-tech.com
+The app is provided as it is. We work at it carefully — the code is public, so you can judge for
+yourself — but no one can promise that software is free of defects, and we do not.
 
-## 6. User responsibilities
+In particular:
 
-- **Choose a strong master password** (12+ characters recommended) and keep it safe. **It cannot be recovered** by the developer.
-- Make your own encrypted backups (`.ptbak` export with a strong passphrase).
-- Protect your device with a suitable lock, security updates and useful backups.
-- Comply with copyright, privacy, professional secrecy obligations and applicable law.
+- **A phone that is compromised compromises the app.** On a rooted phone, one with a debugger
+  attached, or an emulator, anything with that access can read the memory of any app, this one
+  included. Pass Tech says so on its unlock screen when it notices; those checks are easy to hide
+  from and are a reminder, never a guarantee.
+- **The decoy vault and the panic mode raise the cost of a search; they do not make one impossible.**
+  They are designed so that nothing on the phone says whether a second vault exists. Someone who
+  knows this app exists knows that too.
+- **The heir feature is a countdown on your phone**, not a service. If the phone is lost, wiped or
+  broken, the snapshot goes with it.
+- **The domain check reads only what the browser shows.** A browser it does not know, or a page
+  inside another app, cannot be read — and the app then says the check could not be made rather than
+  saying all is well.
 
-## 7. App-specific points
+To the extent the law allows, we cannot be held responsible for data lost through a forgotten master
+password, a backup kept badly, a mishandled deletion, a third-party service failing, or use of the
+app outside what it is meant for.
 
-- **The master password cannot be recovered.** If forgotten, the vault is permanently inaccessible.
-- Biometric unlock is a convenience layer; the master password remains the root of trust.
-- Pass Tech is best-effort against device compromise: on a rooted, debuggable or emulated device, the user is warned and uses the app at their own risk.
-- HIBP check is opt-in and uses a k-anonymity protocol (only the first 5 characters of the password's SHA-1 are sent).
+## 5. What is yours to do
 
-## 8. Warranty disclaimer
+- Keep your master password, and keep it to yourself.
+- Make your own backups, and check from time to time that you can still open one.
+- Keep the phone itself protected: a lock screen, its updates.
+- Obey the law where you are — copyright, other people's privacy, professional confidentiality, and
+  any rule about encryption that applies to you.
 
-The application is provided as-is. The developer makes best efforts to deliver a secure tool but does not guarantee absolute security. The user remains responsible for the master password choice and device protection.
+## 6. Third-party services
 
-## 9. Limitation of liability
+Two, both described in the privacy policy, both over HTTPS:
 
-To the extent permitted by law, the developer cannot be held liable for data loss (in particular a forgotten master password making the vault unrecoverable), handling errors, third-party service issues or consequences of non-conforming use.
+- **GitHub** — asked whether a newer version has been published.
+- **Have I Been Pwned** — asked whether a password appears in a public breach, when you press the
+  button, and never told the password itself.
 
-## 10. Third-party services
+Their own terms and privacy policies apply to them, not to us.
 
-- **GitHub Releases API** for update checks (HTTPS, no authentication, no cookie).
-- **Have I Been Pwned API** for breach checks (HTTPS, k-anonymity, opt-in).
+## 7. Licence and name
 
-## 11. Intellectual property
+The source code is published under the **Apache License 2.0**. The name Pass Tech, the icons and the
+visual identity are not covered by that licence and remain the publisher's.
 
-The name, content, texts, icons, visuals and resources specific to the project remain protected. The main source code is released under Apache License 2.0.
+## 8. Changes
 
-## 12. Security
+These terms ship with the app and with its source code. A change ships in a version; the date at the
+top says which.
 
-The user must protect their master password, their device and avoid using Pass Tech on rooted/compromised devices. See [SECURITY.md](./SECURITY.md).
+## 9. Law
 
-## 13. Modification of terms
+These terms are written under French and European law, save where a mandatory provision says
+otherwise.
 
-These terms may be updated. The document date indicates the version in force.
+## 10. Contact
 
-## 14. Governing law
-
-Save for mandatory legal provisions to the contrary, these terms are drafted within the framework of French and European law.
+contact@files-tech.com

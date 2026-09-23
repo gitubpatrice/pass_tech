@@ -1,20 +1,16 @@
 # Privacy policy — Pass Tech
 
-The privacy policy is the one displayed in the app (About → Privacy policy):
+The policy that applies is the one shipped inside the app, so that it can be read without a network
+and matches the version installed:
 
-- English: [assets/legal/PRIVACY.en.md](assets/legal/PRIVACY.en.md)
-- Français : [assets/legal/PRIVACY.fr.md](assets/legal/PRIVACY.fr.md)
-- Deutsch: [assets/legal/PRIVACY.de.md](assets/legal/PRIVACY.de.md)
-- Italiano: [assets/legal/PRIVACY.it.md](assets/legal/PRIVACY.it.md)
-- Español: [assets/legal/PRIVACY.es.md](assets/legal/PRIVACY.es.md)
+- English: [app/src/main/assets/legal/PRIVACY.en.md](app/src/main/assets/legal/PRIVACY.en.md)
+- Français : [app/src/main/assets/legal/PRIVACY.fr.md](app/src/main/assets/legal/PRIVACY.fr.md)
 
-Any other language falls back to English.
+German, Italian and Spanish were dropped in 3.0.0 rather than shipped stale: they still described
+the Flutter app — two vault slots instead of three, a key that no longer exists, and no word about
+the accessibility service or the heir feature. **A document that is wrong is worse than one in
+another language.** They are being rewritten against the Kotlin app; until then those languages read
+the English one.
 
-Only those five files are maintained, so the repository and the app cannot say
-different things. They had diverged: until v2.7.0 this page was a separate copy,
-and the one shipped to users declared a `CAMERA` permission the app does not
-have, for a QR scanner removed in v2.6.0.
-
-The permission table is section 10 of each file. It is the one to update when
-`.github/workflows/promesses.yml` reports that the APK permission surface has
-changed.
+For the earlier Flutter versions (2.x, `com.passtech.pass_tech`), the policy in force is the one
+shipped with them.

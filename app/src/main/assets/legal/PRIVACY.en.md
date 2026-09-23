@@ -1,109 +1,144 @@
 # Privacy Policy — Pass Tech
 
-**Document version**: September 20, 2026 (Pass Tech v2.7.0)
-**App**: Pass Tech
-**Official website**: https://www.files-tech.com
+**Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+**Last changed**: 23 September 2026
+**Publisher**: Files Tech — Patrice Haltaya
 **Contact**: contact@files-tech.com
-**Source code**: https://github.com/gitubpatrice/pass_tech
-**Code license**: Apache License 2.0
+**Source code**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
+
+> This document describes the **Kotlin** version of Pass Tech, 3.0.0. It is not the policy of the
+> earlier Flutter versions (2.x, `com.passtech.pass_tech`), which worked differently.
 
 ---
 
-## 1. Purpose
+## 1. In short
 
-This Privacy Policy explains how the **Pass Tech** application — a 100% local password manager — handles user data and permissions.
+Pass Tech keeps passwords, bank cards and notes on your phone, encrypted. There is no account, no
+server of ours, and no copy of your data anywhere else.
 
-## 2. Summary for the user
+- **We collect nothing.** No advertising, no tracker, no analytics, no crash report, no identifier.
+- **We receive nothing.** Not a name, not an address, not a password, not a statistic.
+- **There is nothing to delete on our side**, because there is nothing on our side.
 
-- ✅ **No advertising** in the application.
-- ✅ **No trackers**, analytics, behavioral analysis or profiling.
-- ✅ **No app-specific account**.
-- ✅ **No cloud sync** — your vault stays on your device, encrypted.
-- ✅ **No telemetry** — no usage data, no crash reports sent to the developer.
+The app uses the network for **two things only**, both described in §5. Neither sends anything you
+typed into it.
 
-**General principle**: Pass Tech is a 100% local password vault. All sensitive data (passwords, TOTP secrets, bank cards, secure notes) stays encrypted on the device. No remote server is operated by the developer.
+## 2. What is on your phone, and where
 
-## 3. Controller / developer
+Everything lives in the app's private directory, which no other app can read.
 
-- **Developer**: Files Tech / Patrice
-- **Website**: https://www.files-tech.com
-- **Privacy contact**: contact@files-tech.com
-- **Source repository**: https://github.com/gitubpatrice/pass_tech
-- **Source code license**: Apache License 2.0
+| File | What it holds |
+| --- | --- |
+| `pt_vault_a.enc`, `pt_vault_b.enc`, `pt_vault_c.enc` | Three vault slots. **All three always exist and are the same size**, whether you use one, two or three. |
+| `pt_heir_a.enc`, `pt_heir_b.enc`, `pt_heir_c.enc` | Three heir snapshots, if inheritance is set up. **All three always exist and are the same size**, for the same reason. |
+| `pt_state.enc` | Counters the app needs before any vault is open: failed attempts, the last time it ran, the date of the last update check. |
+| Android preferences | Theme, auto-lock delay, clipboard delay, whether screenshots are blocked, whether the domain check is on. No secret. |
 
-## 4. Data accessed or stored
+**Why three of everything.** A second password opens a second vault, and nothing on the phone says
+whether you use it. That only works if a slot in use and a slot unused look exactly alike — same
+name, same size, same content to anyone reading the bytes. The slots you do not use hold random
+data encrypted under a key that exists nowhere: neither you nor we can ever open them.
 
-| Data type                              | Use                                                          | Processing location                              |
-| -------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
-| Passwords, TOTP secrets, bank cards, secure notes | Vault entries created by the user            | Encrypted at rest on device (`pt_vault_a.enc`)   |
-| Second vault slot (`pt_vault_b.enc`)   | Plausible deniability — **always present**, whether or not you configured a decoy | Encrypted on device with its own Keystore key |
-| Master password                        | Derives the encryption key (Argon2id, OWASP 2024 baseline)   | Never persisted; wiped from RAM on lock          |
-| Biometric key                          | Optional fingerprint / face unlock                           | Android Keystore (hardware-bound), `setUserAuthenticationRequired(true)` |
-| Encrypted backups (`.ptbak`)           | Optional export triggered by the user                        | User-chosen location                             |
-| Local preferences                      | Theme, auto-lock duration, clipboard timeout                 | Local device storage                             |
+## 3. How it is encrypted
 
-## 5. Encryption & key derivation
+- **AES-256-GCM** for the vault, the heir snapshots and the state file.
+- The key is derived from your master password with **Argon2id** (19 MiB of memory, 2 passes, 1
+  thread — the OWASP 2024 baseline for mobile) **and** with a key held in the phone's secure chip
+  that takes part in every single attempt. A copy of your vault taken to another machine cannot be
+  attacked there: that chip is not in it.
+- **Your master password is never stored**, in any form, anywhere. It cannot be recovered — not by
+  us, not by anyone. Forgetting it means losing the vault.
+- Biometric unlock, if you turn it on, keeps its key in the Android Keystore, unreadable without
+  your fingerprint and destroyed if the fingerprints on the phone change.
+- After **5 wrong attempts**, the app waits: 30 seconds, then 1, 5, 15 and 30 minutes. The wait is
+  counted in the state file and survives a restart.
 
-- **AES-256-GCM** (AEAD) with bound AAD for downgrade resistance.
-- **Argon2id** (m = 19 MiB, t = 2, p = 1, OWASP 2024 baseline) for the vault master key derivation.
-- **Hardware-bound KEK** in Android Keystore (StrongBox best-effort) wraps a per-vault hardware secret.
-- **Biometric key tied to hardware** via Android Keystore; non-extractible without biometric authentication.
-- **Plausible deniability** — nobody inspecting the device can tell whether you keep a second, hidden vault. Both vault slots carry neutral, indistinguishable names (`pt_vault_a.enc` / `pt_vault_b.enc`) and **both always exist**: with no decoy configured, the app still writes a dummy one — an empty list, encrypted under a random password stored nowhere, so it can never be opened, by you or by us. Keystore aliases, salts and unlock timing are aligned between the two paths.
+## 4. What you can export
 
-## 6. Network
+- **`.ptbak` backup**: you choose when, and a passphrase of your own encrypts it. We never see it.
+  Where you put it afterwards is your decision — a backup on a cloud drive is on that cloud drive.
+- **Plain export**: offered for moving to another manager. It is **not encrypted**, and the app says
+  so before writing it.
 
-- The app uses the network for **two strictly local-impact functions**:
-  1. **Update check**: queries `api.github.com/repos/gitubpatrice/pass_tech/releases/latest` (HTTPS, no auth, no cookie).
-  2. **HIBP check** (Have I Been Pwned, opt-in): sends only the **first 5 characters of the SHA-1** of a password (k-anonymity model). The password never leaves the device.
-- Network Security Config rejects cleartext HTTP and user-installed authorities in release.
-- No telemetry, crash reporting or analytics.
+Nothing is exported on its own. There is no automatic backup: Android's cloud backup and
+phone-to-phone transfer are both switched off for this app.
 
-## 7. Sharing and transmission of data
+## 5. The two times the app uses the network
 
-The application does not transmit any data to a server operated by the developer. Sharing outside the device requires:
+1. **Update check.** Once your vault is open, the app asks GitHub whether a newer version has been
+   published — at most **twice a day**. It asks `api.github.com` for the latest release of this
+   project. No account, no cookie, nothing of yours is sent. It downloads and installs nothing; it
+   shows you what it found and a link.
+2. **Breach check**, on the audit screen, **which you start yourself**. The password is never sent.
+   The app computes its SHA-1 fingerprint and sends **the first five characters only** to Have I
+   Been Pwned, which answers with every fingerprint beginning that way — tens of thousands of them.
+   The comparison happens on your phone. This is the k-anonymity model that service publishes.
 
-- a `.ptbak` export explicitly triggered by the user (encrypted with a user-chosen passphrase);
-- voluntary use of an Android share / email function.
+**What these two do reveal**, and it is worth saying plainly: whoever can see your connection —
+your provider, GitHub, Have I Been Pwned — learns that someone at your address uses this app. They
+learn nothing about your vault. If that matters to you, both stop entirely when the app is
+disguised as a calculator (§7), and the breach check simply never runs unless you press it.
 
-## 8. Retention and deletion
+The app refuses unencrypted HTTP and refuses certificate authorities added to the phone by someone
+else.
 
-- Vault data is stored locally and remains under user control.
-- Uninstalling the app deletes all data (the vault file is in the app's private directory, excluded from cloud backup via `dataExtractionRules`).
-- The user can also delete the vault from within the app (`Settings → Delete vault`).
-- **No leftover copy of an older vault** — upgrading a legacy v3 vault used to leave a `.bak` copy behind, encrypted with the older, weaker scheme and attackable offline. Since v2.5.1 it is deleted as soon as the upgrade succeeds.
+## 6. The domain check, and the Android permission it needs
 
-## 9. Security
+If you turn on **"Check the domain before copying"**, the app uses an Android accessibility
+service. This is the most intrusive thing it ever asks for, so here is exactly what it does.
 
-- Sandbox isolation, `FLAG_SECURE` (blocks screenshots and Recents preview).
-- `allowBackup=false` and `dataExtractionRules` exclude the vault from any Android cloud or device-transfer backup.
-- Progressive lockout after 5 failed attempts (30 s → 30 min).
-- Configurable auto-lock after inactivity (5 min default).
-- Master-password key wiped from RAM on lock.
-- RASP detection (root, emulator, debugger) with explicit user disclosure.
-- Sensitive clipboard flag (Android 13+) and immediate clipboard clearing on pause.
+- It is **off when you install the app**, and it does not even appear in Android's accessibility
+  list until you ask for it.
+- It receives events **only from the browsers it knows** — Chrome, Firefox and its beta builds,
+  Brave, Edge, Opera, Vivaldi, Samsung Internet, DuckDuckGo. Android sends it nothing from any other
+  app: not your bank app, not your messages, not your keyboard.
+- From those browsers it reads **the address bar and nothing else** — the host, not the path, not
+  the query, not a word of the page.
+- That host is kept **in memory only**, one at a time, replaced at each reading and forgotten after
+  fifteen seconds. It is never written to disk and never sent anywhere.
+- Turning the setting off **withdraws the permission**: the service leaves Android's list, and
+  turning it back on asks you for it again.
 
-See [SECURITY.md](./SECURITY.md).
+## 7. Panic mode
 
-## 10. Android permissions
+If you use it, the app locks, empties the clipboard, disarms the fingerprint, withdraws the
+accessibility service and replaces its own name and icon on your home screen with a working
+calculator. **Nothing is deleted**: your master password still opens the vault. While disguised, the
+app makes no network call at all.
 
-| Permission / access                  | Reason                                                                                              |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Optional biometric unlock via Android BiometricPrompt.                                              |
-| `INTERNET`                           | Update checks (GitHub Releases) and HIBP (k-anonymity, opt-in).                                     |
+## 8. Inheritance
 
-`CAMERA` and `ACCESS_NETWORK_STATE` were **removed on 2026-08-03** together
-with QR code scanning, which relied on Google ML Kit. A 2FA secret is now
-added by pasting the `otpauth://` URI that services display under their QR
-code.
+If you set it up, someone you choose can open a **read-only snapshot** of your vault after a long
+enough silence on your side — 90 days by default, plus 7 days of grace, and any unlock starts the
+count again. The snapshot is encrypted with a passphrase of its own that you hand over yourself. It
+never leaves the phone, there is no cloud and no third party, and we are not involved.
 
-## 11. Children
+## 9. Android permissions
 
-The application is not specifically intended for children and contains no behavioral advertising or profiling mechanism.
+Measured on the published APK, not on the source:
 
-## 12. Changes
+| Permission | Why |
+| --- | --- |
+| `INTERNET` | The two calls of §5. |
+| `USE_BIOMETRIC`, `USE_FINGERPRINT` | Fingerprint unlock, if you turn it on. |
+| `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | Added by an Android library; it lets the app talk to itself and nothing else. |
 
-This policy may be updated as the application evolves.
+The accessibility service of §6 is **not** a permission in this list: Android grants it separately,
+from its own settings, and you can take it back there at any time.
 
-## 13. Contact
+There is no camera permission, no contacts, no location, no storage: Pass Tech asks the system for
+a file when you export or import one, and the system hands it that one file.
 
-📧 **contact@files-tech.com**
+## 10. Children
+
+The app is not aimed at children and contains no advertising, no profiling and no behavioural
+mechanism of any kind.
+
+## 11. Changes to this document
+
+It is published with the app and with its source code. A change ships in a version; the date at the
+top says which.
+
+## 12. Contact
+
+contact@files-tech.com

@@ -1,110 +1,151 @@
 # Politique de confidentialité — Pass Tech
 
-**Version du document** : 20 septembre 2026 (Pass Tech v2.7.0)
-**App** : Pass Tech
-**Site officiel** : https://www.files-tech.com
+**S'applique à** : Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+**Dernière modification** : 23 septembre 2026
+**Éditeur** : Files Tech — Patrice Haltaya
 **Contact** : contact@files-tech.com
-**Code source** : https://github.com/gitubpatrice/pass_tech
-**Licence du code** : Apache License 2.0
+**Code source** : https://github.com/gitubpatrice/pass_tech — Apache License 2.0
+
+> Ce document décrit la version **Kotlin** de Pass Tech, la 3.0.0. Ce n'est pas la politique des
+> versions Flutter précédentes (2.x, `com.passtech.pass_tech`), qui fonctionnaient autrement.
 
 ---
 
-## 1. Objet
+## 1. En bref
 
-La présente Politique de confidentialité explique comment l'application **Pass Tech** — un gestionnaire de mots de passe 100 % local — traite les données et permissions de l'utilisateur.
+Pass Tech garde vos mots de passe, cartes bancaires et notes sur votre téléphone, chiffrés. Il n'y a
+ni compte, ni serveur à nous, ni copie de vos données ailleurs.
 
-## 2. Résumé pour l'utilisateur
+- **Nous ne collectons rien.** Aucune publicité, aucun traceur, aucune statistique, aucun rapport de
+  plantage, aucun identifiant.
+- **Nous ne recevons rien.** Ni un nom, ni une adresse, ni un mot de passe, ni un chiffre.
+- **Il n'y a rien à supprimer chez nous**, parce qu'il n'y a rien chez nous.
 
-- ✅ **Aucune publicité** dans l'application.
-- ✅ **Aucun traceur**, mesure d'audience, analyse comportementale ou profilage.
-- ✅ **Aucun compte** propre à l'application.
-- ✅ **Aucune synchronisation cloud** — votre coffre-fort reste sur votre appareil, chiffré.
-- ✅ **Aucune télémétrie** — pas de données d'usage, pas de rapports d'erreur envoyés au développeur.
+L'application se sert du réseau pour **deux choses seulement**, décrites au §5. Ni l'une ni l'autre
+n'envoie ce que vous avez saisi.
 
-**Principe général** : Pass Tech est un coffre-fort de mots de passe 100 % local. Toutes les données sensibles (mots de passe, secrets TOTP, cartes bancaires, notes sécurisées) restent chiffrées sur l'appareil. Aucun serveur distant n'est opéré par le développeur.
+## 2. Ce qui est sur votre téléphone, et où
 
-## 3. Responsable / développeur
+Tout vit dans le dossier privé de l'application, qu'aucune autre application ne peut lire.
 
-- **Développeur** : Files Tech / Patrice
-- **Site internet** : https://www.files-tech.com
-- **Contact confidentialité** : contact@files-tech.com
-- **Dépôt source** : https://github.com/gitubpatrice/pass_tech
-- **Licence du code source** : Apache License 2.0
+| Fichier | Ce qu'il contient |
+| --- | --- |
+| `pt_vault_a.enc`, `pt_vault_b.enc`, `pt_vault_c.enc` | Trois emplacements de coffre. **Les trois existent toujours et font la même taille**, que vous en utilisiez un, deux ou trois. |
+| `pt_heir_a.enc`, `pt_heir_b.enc`, `pt_heir_c.enc` | Trois instantanés d'héritage, si l'héritage est configuré. **Les trois existent toujours et font la même taille**, pour la même raison. |
+| `pt_state.enc` | Les compteurs dont l'app a besoin avant qu'un coffre soit ouvert : essais ratés, dernière exécution, date de la dernière vérification de mise à jour. |
+| Préférences Android | Thème, délai de verrouillage, délai du presse-papiers, blocage des captures d'écran, contrôle du domaine. Aucun secret. |
 
-## 4. Données accessibles ou stockées
+**Pourquoi trois de tout.** Un deuxième mot de passe ouvre un deuxième coffre, et rien sur le
+téléphone ne dit si vous vous en servez. Cela ne tient que si un emplacement utilisé et un
+emplacement inutilisé se ressemblent exactement — même nom, même taille, même contenu pour qui lit
+les octets. Les emplacements dont vous ne vous servez pas contiennent des données au hasard,
+chiffrées avec une clé qui n'existe nulle part : ni vous ni nous ne pourrons jamais les ouvrir.
 
-| Type de donnée                       | Utilisation                                              | Lieu de traitement                                |
-| ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------- |
-| Mots de passe, secrets TOTP, cartes bancaires, notes sécurisées | Entrées du coffre créées par l'utilisateur | Chiffré au repos sur l'appareil (`pt_vault_a.enc`) |
-| Second emplacement de coffre (`pt_vault_b.enc`) | Déni plausible — **toujours présent**, que vous ayez configuré un leurre ou non | Chiffré sur l'appareil avec sa propre clé Keystore |
-| Mot de passe maître                  | Dérive la clé de chiffrement (Argon2id, référence OWASP 2024) | Jamais persisté ; effacé de la RAM au verrouillage |
-| Clé biométrique                      | Déverrouillage optionnel par empreinte / face            | Android Keystore (lié au matériel), `setUserAuthenticationRequired(true)` |
-| Sauvegardes chiffrées (`.ptbak`)     | Export optionnel déclenché par l'utilisateur             | Emplacement choisi par l'utilisateur              |
-| Préférences locales                  | Thème, durée auto-lock, timeout presse-papier            | Stockage local sur l'appareil                     |
+## 3. Comment c'est chiffré
 
-## 5. Chiffrement & dérivation de clé
+- **AES-256-GCM** pour le coffre, les instantanés d'héritage et le fichier d'état.
+- La clé est dérivée de votre mot de passe maître par **Argon2id** (19 Mio de mémoire, 2 passes, 1
+  fil — la référence OWASP 2024 pour le mobile) **et** par une clé gardée dans la puce sécurisée du
+  téléphone, qui participe à chaque essai, sans exception. Une copie de votre coffre emportée sur
+  une autre machine ne peut pas y être attaquée : cette puce n'y est pas.
+- **Votre mot de passe maître n'est jamais enregistré**, sous aucune forme, nulle part. Il ne peut
+  pas être récupéré — ni par nous, ni par personne. L'oublier, c'est perdre le coffre.
+- Le déverrouillage par empreinte, si vous l'activez, garde sa clé dans le Keystore d'Android :
+  illisible sans votre empreinte, et détruite si les empreintes du téléphone changent.
+- Après **5 essais faux**, l'application attend : 30 secondes, puis 1, 5, 15 et 30 minutes. L'attente
+  est comptée dans le fichier d'état et survit à un redémarrage.
 
-- **AES-256-GCM** (AEAD), avec AAD liée pour résister au downgrade du fichier.
-- **Argon2id** (m = 19 MiB, t = 2, p = 1, référence OWASP 2024) pour dériver la clé maître du coffre.
-- **KEK liée au matériel** dans l'Android Keystore (StrongBox si disponible), qui enveloppe un secret matériel propre au coffre : celui qui exfiltre le seul fichier ne peut pas le brute-forcer sans votre appareil.
-- **Sauvegardes `.ptbak`** — même pack Argon2id + AES-GCM, avec une passphrase que vous choisissez (sans liaison Keystore, pour rester portables d'un appareil à l'autre).
-- **Clé biométrique liée au matériel** via Android Keystore ; non extractible sans authentification biométrique.
-- **Déni plausible** — personne, en inspectant l'appareil, ne peut savoir si vous gardez un second coffre caché. Les deux emplacements portent des noms neutres et indistinguables (`pt_vault_a.enc` / `pt_vault_b.enc`) et **les deux existent toujours** : sans leurre configuré, l'app en écrit quand même un factice — une liste vide, chiffrée sous un mot de passe aléatoire stocké nulle part, donc jamais ouvrable, ni par vous ni par nous. Alias Keystore, sels et temps de déverrouillage sont alignés entre les deux chemins.
+## 4. Ce que vous pouvez exporter
 
-## 6. Réseau
+- **Sauvegarde `.ptbak`** : vous choisissez le moment, et une phrase de passe à vous la chiffre. Nous
+  ne la voyons jamais. Où vous la rangez ensuite vous appartient — une sauvegarde sur un cloud est
+  sur ce cloud.
+- **Export en clair** : proposé pour partir vers un autre gestionnaire. Il n'est **pas chiffré**, et
+  l'application le dit avant de l'écrire.
 
-- L'app utilise le réseau pour **deux fonctions strictement à impact local** :
-  1. **Vérification de mises à jour** : interroge `api.github.com/repos/gitubpatrice/pass_tech/releases/latest` (HTTPS, sans auth, sans cookie).
-  2. **Vérification HIBP** (Have I Been Pwned, opt-in) : envoie uniquement les **5 premiers caractères du SHA-1** d'un mot de passe (modèle k-anonymity). Le mot de passe ne quitte jamais l'appareil.
-- Network Security Config refuse le HTTP en clair et les autorités utilisateur en release.
-- Aucune télémétrie, rapport de crash ou analytics.
+Rien ne part tout seul. Il n'y a aucune sauvegarde automatique : la sauvegarde dans le cloud
+d'Android et le transfert d'un téléphone à l'autre sont désactivés pour cette application.
 
-## 7. Partage et transmission de données
+## 5. Les deux moments où l'application se sert du réseau
 
-L'application ne transmet aucune donnée à un serveur opéré par le développeur. Le partage hors de l'appareil nécessite :
+1. **Vérification de mise à jour.** Une fois votre coffre ouvert, l'application demande à GitHub si
+   une version plus récente est parue — **deux fois par jour au maximum**. Elle interroge
+   `api.github.com` sur la dernière version de ce projet. Aucun compte, aucun cookie, rien de vous
+   n'est envoyé. Elle ne télécharge et n'installe rien : elle montre ce qu'elle a trouvé, et un lien.
+2. **Contrôle des fuites**, sur l'écran d'audit, **que vous lancez vous-même**. Le mot de passe n'est
+   jamais envoyé. L'application calcule son empreinte SHA-1 et en envoie **les cinq premiers
+   caractères seulement** à Have I Been Pwned, qui répond avec toutes les empreintes commençant
+   ainsi — des dizaines de milliers. La comparaison se fait sur votre téléphone. C'est le modèle de
+   k-anonymat que ce service publie.
 
-- un export `.ptbak` explicitement déclenché par l'utilisateur (chiffré avec une passphrase choisie par l'utilisateur) ;
-- l'utilisation volontaire d'une fonction de partage / email Android.
+**Ce que ces deux appels montrent quand même**, et il vaut mieux le dire : qui voit votre connexion —
+votre opérateur, GitHub, Have I Been Pwned — apprend que quelqu'un, à votre adresse, utilise cette
+application. Il n'apprend rien de votre coffre. Si cela compte pour vous : les deux s'arrêtent
+complètement quand l'application est camouflée en calculatrice (§7), et le contrôle des fuites ne
+part jamais tant que vous n'appuyez pas.
 
-## 8. Conservation et suppression
+L'application refuse le HTTP en clair et refuse les autorités de certification ajoutées au téléphone
+par quelqu'un d'autre.
 
-- Les données du coffre sont stockées localement et restent sous le contrôle de l'utilisateur.
-- La désinstallation de l'app efface toutes les données (le fichier coffre est dans le répertoire privé de l'app, exclu du backup cloud via `dataExtractionRules`).
-- L'utilisateur peut aussi supprimer le coffre depuis l'app (`Réglages → Supprimer le coffre`).
-- **Aucune copie résiduelle d'un ancien coffre** — la migration d'un coffre v3 laissait auparavant une copie `.bak`, chiffrée avec l'ancien schéma plus faible et attaquable hors ligne. Depuis la v2.5.1, elle est supprimée dès que la migration réussit.
+## 6. Le contrôle du domaine, et l'autorisation Android qu'il demande
 
-## 9. Sécurité
+Si vous activez **« Vérifier le domaine avant de copier »**, l'application utilise un service
+d'accessibilité Android. C'est la chose la plus intrusive qu'elle demande, alors voici exactement ce
+qu'elle en fait.
 
-- Isolation sandbox, `FLAG_SECURE` (bloque captures et aperçu Recents).
-- `allowBackup=false` et `dataExtractionRules` excluent le coffre de tout backup Android cloud ou device-transfer.
-- Verrouillage progressif après 5 échecs (30s → 30min).
-- Auto-lock après inactivité configurable (5 min par défaut).
-- Clé du mot de passe maître effacée de la RAM au verrouillage.
-- Détection RASP (root, émulateur, debugger) avec décharge utilisateur explicite.
-- Flag clipboard sensible (Android 13+) et effacement immédiat du presse-papier au pause.
+- Il est **éteint à l'installation**, et il n'apparaît même pas dans la liste d'accessibilité
+  d'Android tant que vous ne le demandez pas.
+- Il ne reçoit d'événements que **des navigateurs qu'il connaît** — Chrome, Firefox et ses versions
+  bêta, Brave, Edge, Opera, Vivaldi, Samsung Internet, DuckDuckGo. Android ne lui envoie rien des
+  autres applications : ni votre application bancaire, ni vos messages, ni votre clavier.
+- De ces navigateurs, il lit **la barre d'adresse et rien d'autre** — le nom du site, pas le chemin,
+  pas les paramètres, pas un mot de la page.
+- Ce nom est gardé **en mémoire seulement**, un seul à la fois, remplacé à chaque lecture et oublié
+  au bout de quinze secondes. Il n'est jamais écrit sur le disque et jamais envoyé nulle part.
+- Éteindre le réglage **reprend l'autorisation** : le service quitte la liste d'Android, et le
+  rallumer vous la redemandera.
 
-Voir [SECURITY.md](./SECURITY.md).
+## 7. Mode panique
 
-## 10. Permissions Android
+Si vous vous en servez, l'application se verrouille, vide le presse-papiers, désarme l'empreinte,
+retire le service d'accessibilité et remplace son propre nom et son icône sur votre écran d'accueil
+par une calculatrice qui fonctionne. **Rien n'est supprimé** : votre mot de passe maître ouvre
+toujours le coffre. Tant qu'elle est camouflée, l'application ne fait aucun appel réseau.
 
-| Permission / accès                   | Raison                                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `USE_BIOMETRIC` / `USE_FINGERPRINT`  | Déverrouillage biométrique optionnel via Android BiometricPrompt.                                 |
-| `INTERNET`                           | Vérification de mises à jour (GitHub Releases) et HIBP (k-anonymity, opt-in).                     |
+## 8. Héritage
 
-`CAMERA` et `ACCESS_NETWORK_STATE` ont été **retirées le 2026-08-03** avec le
-scan de QR code, qui reposait sur Google ML Kit. Un secret 2FA s'ajoute
-désormais en collant l'URI `otpauth://` que les services affichent sous leur
-QR code.
+Si vous le configurez, une personne que vous choisissez pourra ouvrir un **instantané en lecture
+seule** de votre coffre après un silence assez long de votre côté — 90 jours par défaut, plus 7 jours
+de grâce, et toute ouverture relance le compte. L'instantané est chiffré par une phrase de passe qui
+lui est propre et que vous transmettez vous-même. Il ne quitte jamais le téléphone, il n'y a ni cloud
+ni tiers, et nous n'y sommes pour rien.
 
-## 11. Enfants
+## 9. Autorisations Android
 
-L'application n'est pas spécifiquement destinée aux enfants et ne contient aucun mécanisme de publicité comportementale ou de profilage.
+Mesurées sur l'APK publié, pas sur le code source :
 
-## 12. Modifications
+| Autorisation | Pourquoi |
+| --- | --- |
+| `INTERNET` | Les deux appels du §5. |
+| `USE_BIOMETRIC`, `USE_FINGERPRINT` | Le déverrouillage par empreinte, si vous l'activez. |
+| `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | Ajoutée par une bibliothèque Android ; elle permet à l'application de se parler à elle-même, et rien d'autre. |
 
-Cette politique peut être mise à jour lors de l'évolution de l'application.
+Le service d'accessibilité du §6 n'est **pas** une autorisation de cette liste : Android l'accorde à
+part, depuis ses propres réglages, et vous pouvez la reprendre là-bas quand vous voulez.
 
-## 13. Contact
+Il n'y a pas d'autorisation caméra, ni contacts, ni position, ni stockage : Pass Tech demande un
+fichier au système quand vous exportez ou importez, et le système lui donne ce fichier-là.
 
-📧 **contact@files-tech.com**
+## 10. Enfants
+
+L'application ne vise pas les enfants et ne contient aucune publicité, aucun profilage et aucun
+mécanisme comportemental d'aucune sorte.
+
+## 11. Modifications de ce document
+
+Il est publié avec l'application et avec son code source. Une modification part dans une version ; la
+date en haut dit laquelle.
+
+## 12. Contact
+
+contact@files-tech.com
