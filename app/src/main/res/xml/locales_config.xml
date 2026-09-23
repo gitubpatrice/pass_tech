@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages this app ships, so that Android 13 and above offer it under
+  Settings › Apps › Pass Tech › Language — a language for this app alone, without
+  changing the phone's.
+
+  The same five appear in `androidResources.localeFilters` of `app/build.gradle.kts`,
+  which is what decides whether their `values-*` survive the build at all, and as
+  `values-fr`, `values-de`, `values-it`, `values-es` beside `values`. A language
+  missing from any one of those places is a language nobody can reach.
+
+  Below Android 13 there is no such setting, and this app follows the phone's language.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="fr" />
+    <locale android:name="de" />
+    <locale android:name="it" />
+    <locale android:name="es" />
+</locale-config>
