@@ -42,6 +42,7 @@ import com.filestech.pass_tech.ui.entries.EntryEditScreen
 import com.filestech.pass_tech.ui.entries.PhishingDialog
 import com.filestech.pass_tech.ui.entry.EntryScreen
 import com.filestech.pass_tech.ui.entry.EntryViewModel
+import com.filestech.pass_tech.ui.entry.IntegrityDialog
 import com.filestech.pass_tech.ui.generator.GeneratorScreen
 import com.filestech.pass_tech.ui.heir.HeirScreen
 import com.filestech.pass_tech.ui.home.HomeScreen
@@ -99,6 +100,8 @@ fun PassTechApp(
         }
     }
     if (entryState.backupReminder) BackupReminderDialog(onDismiss = entry::backupReminderSeen)
+    // Over the unlock form, before anything is typed into it.
+    if (entryState.integrity.isNotEmpty()) IntegrityDialog(entryState.integrity, onDismiss = entry::integritySeen)
 
     val newRelease by update.available.collectAsStateWithLifecycle()
     newRelease?.let { UpdateDialog(it, onDismiss = update::dismiss) }

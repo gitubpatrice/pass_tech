@@ -375,6 +375,16 @@
     <string name="panic_warn_biometric_title">Biometric unlock will be disabled</string>
     <string name="panic_warn_biometric_body">Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.</string>
 
+    <!-- What the phone looks like, said before the master password is typed -->
+    <string name="integrity_title">About this phone</string>
+    <string name="integrity_body">Pass Tech noticed the following. It still works, and none of this touches your vault — but a phone in this state can be read by more than you.</string>
+    <string name="integrity_rooted">This phone can become root. Anything with root can read the memory of any app, this one included.</string>
+    <string name="integrity_debugger">A debugger is attached to Pass Tech right now.</string>
+    <string name="integrity_debuggable">This is a development build. Anything on the phone can read its memory.</string>
+    <string name="integrity_emulator">This is an emulator, not a phone. No key here is held by real secure hardware.</string>
+    <string name="integrity_best_effort">These checks are easy to hide from: read them as a reminder, never as a guarantee.</string>
+    <string name="integrity_understood">Understood</string>
+
     <!-- Update check (2.7.1 app_update.dart + files_tech_core UpdateService) -->
     <string name="update_title">Version %1$s is out</string>
     <string name="update_body">Pass Tech does not update itself and never downloads anything on its own. The button below opens the release page, where the notes and the checksums are.</string>

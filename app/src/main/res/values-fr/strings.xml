@@ -338,6 +338,16 @@
     <string name="panic_warn_biometric_body">Le mode panique supprime l\'enrôlement biométrique — sinon quelqu\'un pourrait ouvrir votre coffre en vous faisant poser le doigt.\n\nAprès activation, SEUL votre mot de passe maître ouvrira le coffre. Il n\'est récupérable par aucun moyen.\n\nAssurez-vous de le connaître avant de continuer.</string>
 
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <!-- Ce à quoi ressemble le téléphone, dit avant la saisie du mot de passe maître -->
+    <string name="integrity_title">À propos de ce téléphone</string>
+    <string name="integrity_body">Pass Tech a remarqué ceci. Elle fonctionne quand même, et rien de tout cela ne touche votre coffre — mais un téléphone dans cet état peut être lu par d\'autres que vous.</string>
+    <string name="integrity_rooted">Ce téléphone peut passer en root. Tout ce qui a le root peut lire la mémoire de n\'importe quelle application, y compris celle-ci.</string>
+    <string name="integrity_debugger">Un débogueur est attaché à Pass Tech en ce moment.</string>
+    <string name="integrity_debuggable">Ceci est une version de développement. N\'importe quoi sur le téléphone peut lire sa mémoire.</string>
+    <string name="integrity_emulator">Ceci est un émulateur, pas un téléphone. Aucune clé n\'y est gardée par du vrai matériel sécurisé.</string>
+    <string name="integrity_best_effort">Ces contrôles sont faciles à tromper : à lire comme un rappel, jamais comme une garantie.</string>
+    <string name="integrity_understood">Compris</string>
+
     <!-- Vérification de mise à jour -->
     <string name="update_title">La version %1$s est sortie</string>
     <string name="update_body">Pass Tech ne se met pas à jour toute seule et ne télécharge jamais rien d\'elle-même. Le bouton ci-dessous ouvre la page de la version, là où se trouvent les notes et les empreintes.</string>

@@ -3,6 +3,8 @@ package com.filestech.pass_tech.ui.entry
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filestech.pass_tech.core.biometric.BiometricSupport
+import com.filestech.pass_tech.core.integrity.IntegrityIssue
+import com.filestech.pass_tech.core.integrity.IntegrityWarning
 import com.filestech.pass_tech.core.password.PasswordPolicy
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.vault.VaultManager
@@ -37,6 +39,7 @@ class EntryViewModel @Inject constructor(
     private val vault: VaultManager,
     private val clock: Clock,
     private val biometricSupport: BiometricSupport,
+    private val integrity: IntegrityWarning,
 ) : ViewModel() {
 
     enum class Problem {
@@ -74,6 +77,11 @@ class EntryViewModel @Inject constructor(
         val heirPrompt: Boolean = false,
         /** Above 0, the heir field is waiting out its own delay, which is not the vault's. */
         val heirLockedForMillis: Long = 0,
+        /**
+         * What this phone looks like, when it is worth saying. Shown BEFORE the master password is
+         * typed: afterwards is too late to be told the phone can be read over your shoulder.
+         */
+        val integrity: Set<IntegrityIssue> = emptySet(),
     )
 
     private val mutableState = MutableStateFlow(UiState())
@@ -217,6 +225,13 @@ class EntryViewModel @Inject constructor(
         mutableState.update { it.copy(backupReminder = false) }
     }
 
+    /** Read once: the same phone stays quiet until something about it changes. */
+    fun integritySeen() {
+        val issues = mutableState.value.integrity
+        mutableState.update { it.copy(integrity = emptySet()) }
+        integrity.seen(issues)
+    }
+
     private suspend fun refresh() {
         val mode = vault.entryMode()
         val biometric = mode == EntryMode.UNLOCK && biometricSupport.available() && vault.biometricsArmed()
@@ -230,6 +245,7 @@ class EntryViewModel @Inject constructor(
                 // form nobody had asked to hide (seen on the emulator, 2026-09-22).
                 heirPrompt = false,
                 heirLockedForMillis = 0,
+                integrity = runCatching { integrity.due() }.getOrDefault(emptySet()),
             )
         }
         lockedFor(vault.lockoutRemainingMillis())

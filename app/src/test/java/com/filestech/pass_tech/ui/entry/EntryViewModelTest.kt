@@ -2,6 +2,8 @@ package com.filestech.pass_tech.ui.entry
 
 import com.filestech.pass_tech.core.biometric.StoredBiometricBinding
 import com.filestech.pass_tech.core.crypto.KdfParams
+import com.filestech.pass_tech.core.integrity.DeviceIntegrity
+import com.filestech.pass_tech.core.integrity.IntegrityWarning
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.state.StateStore
@@ -38,6 +40,8 @@ import java.io.File
 @OptIn(ExperimentalCoroutinesApi::class)
 class EntryViewModelTest {
 
+    private lateinit var heldIntegrity: IntegrityWarning
+
     @TempDir
     lateinit var dir: File
 
@@ -65,7 +69,10 @@ class EntryViewModelTest {
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
             val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, biometrics, fastParams), FixedDomain(), io)
-            val viewModel = EntryViewModel(vault, clock) { biometricHardware }
+            // Nothing to warn about: this screen's other behaviour is what is under test here.
+            val integrity = IntegrityWarning(DeviceIntegrity { emptySet() }, state)
+            val viewModel = EntryViewModel(vault, clock, { biometricHardware }, integrity)
+            heldIntegrity = integrity
             block(viewModel, vault)
         } finally {
             Dispatchers.resetMain()
@@ -107,7 +114,7 @@ class EntryViewModelTest {
             viewModel.settled()
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             // The activity recreated in the background: a new view model, the vault still open.
-            val recreated = EntryViewModel(vault, FakeClock()) { biometricHardware }
+            val recreated = EntryViewModel(vault, FakeClock(), { biometricHardware }, heldIntegrity)
             assertThat(recreated.settled().mode).isEqualTo(EntryMode.UNLOCK)
             // The same read goes on with the lockout: let it end before the test does.
             vault.lockoutRemainingMillis()
