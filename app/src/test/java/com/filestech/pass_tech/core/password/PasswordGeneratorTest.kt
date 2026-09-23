@@ -1,7 +1,6 @@
 package com.filestech.pass_tech.core.password
 
 import com.filestech.pass_tech.core.password.PasswordGenerator.CharClass
-import com.filestech.pass_tech.testing.Resources
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
@@ -45,32 +44,6 @@ class PasswordGeneratorTest {
         assertThat(PasswordGenerator.score(200.0)).isEqualTo(1.0)
     }
 
-    @Test
-    fun `the passphrase list is 2_7_1's, duplicates dropped`() {
-        assertThat(Diceware.WORDS).hasSize(471)
-        assertThat(Diceware.WORDS.toSet()).hasSize(471)
-        assertThat(Diceware.WORDS.first()).isEqualTo("chat")
-        assertThat(Diceware.WORDS.last()).isEqualTo("ile")
-        assertThat(Diceware.WORDS.all { word -> word.all { it in 'a'..'z' } }).isTrue()
-        val bits = Diceware.entropyBits(5, appendNumber = true)
-        assertThat(abs(bits - (5 * log2(471) + log2(90)))).isLessThan(1e-9)
-        assertThat(Diceware.entropyBits(5, appendNumber = false)).isLessThan(bits)
-    }
-
-    @Test
-    fun `a passphrase has its words, its separator, and a number from 10 to 99 at the end`() {
-        repeat(200) {
-            val parts = Diceware.generate(4, ".", appendNumber = true).split(".")
-            assertThat(parts).hasSize(5)
-            assertThat(parts.take(4).all { it in Diceware.WORDS }).isTrue()
-            assertThat(parts.last().toInt()).isIn(10..99)
-        }
-        assertThat(Diceware.generate(3, " ", appendNumber = false).split(" ").all { it in Diceware.WORDS }).isTrue()
-    }
-
-    @Test
-    fun `the list is the one the Dart file holds, in its order`() {
-        val dart = Resources.text("compat/2.7.1/diceware_fr_words.txt").lines().filter { it.isNotBlank() }
-        assertThat(Diceware.WORDS).containsExactlyElementsIn(dart.distinct()).inOrder()
-    }
+    // The word lists and everything drawn from them are in `DicewareTest`: they now number five,
+    // one per language, and the rules they answer to are their own.
 }

@@ -49,14 +49,17 @@ class AppFactsTest {
     fun `the generator's bounds and its word list are the generator's`() {
         assertThat(AppFacts.generatorMinLength).isEqualTo(PasswordGenerator.MIN_LENGTH)
         assertThat(AppFacts.generatorMaxLength).isEqualTo(PasswordGenerator.MAX_LENGTH)
-        assertThat(AppFacts.dicewareWords).isEqualTo(Diceware.WORDS.size)
+        assertThat(AppFacts.dicewareWords()).isEqualTo(Diceware.Language.current().words.size)
         // The values shown today. These two were missing, and the negative control that moved
         // MAX_LENGTH to 128 went uncaught: the binding held, so the screen would have followed, but
         // nothing said a word about a limit the app announces changing under it.
         assertThat(AppFacts.generatorMinLength).isEqualTo(8)
         assertThat(AppFacts.generatorMaxLength).isEqualTo(64)
-        // 2.7.1's own comment said 512 words; the list has never held that many. The screen counts.
-        assertThat(AppFacts.dicewareWords).isEqualTo(471)
+        // 2.7.1's own comment said 512 words for a list of 471, and showed the entropy of neither.
+        // The count is now the one of the list the app's language draws from, so it is checked
+        // against that list and not against a number fixed here.
+        assertThat(AppFacts.dicewareWords()).isAtLeast(400)
+        assertThat(Diceware.Language.FRENCH.words).hasSize(471)
     }
 
     /**

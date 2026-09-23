@@ -539,7 +539,7 @@
     <string name="about_feature_search">Ricerca e ordinamento</string>
     <string name="about_feature_search_desc">Per titolo, nome utente, indirizzo o contenuto; dal più recente, dal più vecchio, dalla A alla Z o dalla Z alla A.</string>
     <string name="about_feature_generator">Generatore</string>
-    <string name="about_feature_generator_desc">Password da %1$d a %2$d caratteri, oppure una passphrase estratta da %3$s. Quella lista è francese qualunque sia la lingua dell\'app.</string>
+    <string name="about_feature_generator_desc">Password da %1$d a %2$d caratteri, oppure una passphrase estratta da %3$s, nella lingua in cui l\'app è visualizzata.</string>
 
     <string name="about_feature_audit">Controllo di sicurezza</string>
     <string name="about_feature_audit_desc">Un voto su 100 per la cassaforte, e ciò che lo fa scendere: le password deboli, quelle usate due volte, quelle senza secondo fattore. L\'età è mostrata e non conta mai contro di te.</string>
@@ -595,8 +595,8 @@
         <item quantity="other">%1$d tipi di voce</item>
     </plurals>
     <plurals name="about_words">
-        <item quantity="one">%1$d parola francese</item>
-        <item quantity="other">%1$d parole francesi</item>
+        <item quantity="one">%1$d parola</item>
+        <item quantity="other">%1$d parole</item>
     </plurals>
 
     <string name="action_about">Informazioni</string>

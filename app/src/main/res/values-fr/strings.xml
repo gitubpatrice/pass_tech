@@ -553,7 +553,7 @@
     <string name="about_feature_search">Recherche et tri</string>
     <string name="about_feature_search_desc">Par titre, identifiant, adresse ou contenu ; du plus récent, du plus ancien, de A à Z ou de Z à A.</string>
     <string name="about_feature_generator">Générateur</string>
-    <string name="about_feature_generator_desc">Des mots de passe de %1$d à %2$d caractères, ou une phrase de passe tirée de %3$s. Cette liste est française quelle que soit la langue de l\'application.</string>
+    <string name="about_feature_generator_desc">Des mots de passe de %1$d à %2$d caractères, ou une phrase de passe tirée de %3$s, dans la langue affichée par l\'application.</string>
 
     <string name="about_feature_audit">Audit de sécurité</string>
     <string name="about_feature_audit_desc">Une note sur 100 pour le coffre, et ce qui la fait baisser : les mots de passe faibles, ceux qui servent deux fois, ceux sans deuxième facteur. L\'âge est affiché et ne compte jamais contre vous.</string>
@@ -609,8 +609,8 @@
         <item quantity="other">%1$d types d\'entrée</item>
     </plurals>
     <plurals name="about_words">
-        <item quantity="one">%1$d mot français</item>
-        <item quantity="other">%1$d mots français</item>
+        <item quantity="one">%1$d mot</item>
+        <item quantity="other">%1$d mots</item>
     </plurals>
 
     <string name="action_about">À propos</string>

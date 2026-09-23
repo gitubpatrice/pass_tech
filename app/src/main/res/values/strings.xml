@@ -602,7 +602,7 @@
     <string name="about_feature_search">Search and sort</string>
     <string name="about_feature_search_desc">By title, username, address or content; newest, oldest, A to Z or Z to A.</string>
     <string name="about_feature_generator">Generator</string>
-    <string name="about_feature_generator_desc">Passwords of %1$d to %2$d characters, or a passphrase drawn from %3$s. That list is French whatever language the app is set to.</string>
+    <string name="about_feature_generator_desc">Passwords of %1$d to %2$d characters, or a passphrase drawn from %3$s, in the language the app is showing.</string>
 
     <string name="about_feature_audit">Security audit</string>
     <string name="about_feature_audit_desc">A score out of 100 for the vault, and what pulls it down: passwords that are weak, reused, or have no second factor. Age is shown and never counted against you.</string>
@@ -660,8 +660,8 @@
         <item quantity="other">%1$d kinds of entry</item>
     </plurals>
     <plurals name="about_words">
-        <item quantity="one">%1$d French word</item>
-        <item quantity="other">%1$d French words</item>
+        <item quantity="one">%1$d word</item>
+        <item quantity="other">%1$d words</item>
     </plurals>
 
     <string name="action_about">About</string>

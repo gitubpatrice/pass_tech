@@ -33,10 +33,17 @@ object AppFacts {
     val firstLockMillis: Long = BruteForceGuard.VAULT_LOCKS.min()
     val lastLockMillis: Long = BruteForceGuard.VAULT_LOCKS.max()
 
-    /** The generator's bounds, and how many words the passphrases are drawn from. */
+    /** The generator's bounds. */
     val generatorMinLength: Int = PasswordGenerator.MIN_LENGTH
     val generatorMaxLength: Int = PasswordGenerator.MAX_LENGTH
-    val dicewareWords: Int = Diceware.WORDS.size
+
+    /**
+     * How many words a passphrase is drawn from. A function and not a value: the list depends on
+     * the language the app is showing, and that can change under a running process — Android
+     * applies a per-app language to the process default. A value read once would state the count
+     * of the list the app started with, and the screen would keep showing it afterwards.
+     */
+    fun dicewareWords(): Int = Diceware.Language.current().words.size
 
     /**
      * The shortest and longest clearing delays the clipboard offers. Kept apart from the choices

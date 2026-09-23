@@ -162,7 +162,7 @@ private fun contentFeatures(): List<Feature> = listOf(
             R.string.about_feature_generator_desc,
             AppFacts.generatorMinLength,
             AppFacts.generatorMaxLength,
-            pluralStringResource(R.plurals.about_words, AppFacts.dicewareWords, AppFacts.dicewareWords),
+            pluralStringResource(R.plurals.about_words, AppFacts.dicewareWords(), AppFacts.dicewareWords()),
         ),
     ),
 )

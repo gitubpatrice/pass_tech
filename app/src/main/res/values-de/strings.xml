@@ -539,7 +539,7 @@
     <string name="about_feature_search">Suchen und sortieren</string>
     <string name="about_feature_search_desc">Nach Titel, Benutzername, Adresse oder Inhalt; neueste, älteste, A bis Z oder Z bis A.</string>
     <string name="about_feature_generator">Generator</string>
-    <string name="about_feature_generator_desc">Passwörter von %1$d bis %2$d Zeichen oder eine Passphrase aus %3$s. Diese Liste ist französisch, gleich welche Sprache in der App eingestellt ist.</string>
+    <string name="about_feature_generator_desc">Passwörter von %1$d bis %2$d Zeichen oder eine Passphrase aus %3$s, in der Sprache, die die App gerade zeigt.</string>
 
     <string name="about_feature_audit">Sicherheitsprüfung</string>
     <string name="about_feature_audit_desc">Eine Note von 100 für den Tresor und das, was sie drückt: schwache Passwörter, mehrfach verwendete, solche ohne zweiten Faktor. Das Alter wird angezeigt und nie gegen Sie gerechnet.</string>
@@ -595,8 +595,8 @@
         <item quantity="other">%1$d Arten von Einträgen</item>
     </plurals>
     <plurals name="about_words">
-        <item quantity="one">%1$d französisches Wort</item>
-        <item quantity="other">%1$d französische Wörter</item>
+        <item quantity="one">%1$d Wort</item>
+        <item quantity="other">%1$d Wörter</item>
     </plurals>
 
     <string name="action_about">Über</string>

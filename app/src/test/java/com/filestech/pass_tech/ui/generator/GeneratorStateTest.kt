@@ -50,14 +50,17 @@ class GeneratorStateTest {
 
     @Test
     fun `the passphrase mode follows its separator, word count and number`() {
-        val state = GeneratorState()
+        // The language is given here rather than read from the machine running the test: the list
+        // drawn from is the app's, and a test must not change answer with the locale of a runner.
+        val language = Diceware.Language.FRENCH
+        val state = GeneratorState(language)
         state.changeMode(Mode.PASSPHRASE)
         state.changeWords(3)
         state.changeSeparator("_")
         state.changeAppendNumber(false)
         val parts = state.password.split("_")
         assertThat(parts).hasSize(3)
-        assertThat(parts.all { it in Diceware.WORDS }).isTrue()
-        assertThat(state.entropyBits).isEqualTo(Diceware.entropyBits(3, appendNumber = false))
+        assertThat(parts.all { it in language.words }).isTrue()
+        assertThat(state.entropyBits).isEqualTo(Diceware.entropyBits(language, 3, appendNumber = false))
     }
 }

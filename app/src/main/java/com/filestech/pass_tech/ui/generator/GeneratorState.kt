@@ -13,7 +13,11 @@ import java.security.SecureRandom
  * The generator's options and its current password (2.7.1, `generator_screen.dart`). Every change of
  * option draws a new password. The options are not kept once the screen closes, as in 2.7.1.
  */
-class GeneratorState(private val random: SecureRandom = SecureRandom()) {
+class GeneratorState(
+    /** The word list a passphrase is drawn from: the language the app is showing, read once here. */
+    private val language: Diceware.Language = Diceware.Language.current(),
+    private val random: SecureRandom = SecureRandom(),
+) {
 
     enum class Mode { CHARACTERS, PASSPHRASE }
 
@@ -35,7 +39,7 @@ class GeneratorState(private val random: SecureRandom = SecureRandom()) {
     val entropyBits: Double
         get() = when (mode) {
             Mode.CHARACTERS -> PasswordGenerator.entropyBits(length, classes)
-            Mode.PASSPHRASE -> Diceware.entropyBits(words, appendNumber)
+            Mode.PASSPHRASE -> Diceware.entropyBits(language, words, appendNumber)
         }
 
     init {
@@ -45,7 +49,7 @@ class GeneratorState(private val random: SecureRandom = SecureRandom()) {
     fun generate() {
         password = when (mode) {
             Mode.CHARACTERS -> PasswordGenerator.generate(length, classes, random)
-            Mode.PASSPHRASE -> Diceware.generate(words, separator, appendNumber, random)
+            Mode.PASSPHRASE -> Diceware.generate(language, words, separator, appendNumber, random)
         }
     }
 

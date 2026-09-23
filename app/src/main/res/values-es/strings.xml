@@ -539,7 +539,7 @@
     <string name="about_feature_search">Búsqueda y orden</string>
     <string name="about_feature_search_desc">Por título, usuario, dirección o contenido; más recientes, más antiguas, de la A a la Z o de la Z a la A.</string>
     <string name="about_feature_generator">Generador</string>
-    <string name="about_feature_generator_desc">Contraseñas de %1$d a %2$d caracteres, o una frase de contraseña sacada de %3$s. Esa lista es francesa sea cual sea el idioma de la app.</string>
+    <string name="about_feature_generator_desc">Contraseñas de %1$d a %2$d caracteres, o una frase de contraseña sacada de %3$s, en el idioma en que se muestra la app.</string>
 
     <string name="about_feature_audit">Auditoría de seguridad</string>
     <string name="about_feature_audit_desc">Una nota sobre 100 para la caja fuerte, y lo que la baja: las contraseñas débiles, las que se repiten, las que no tienen segundo factor. La antigüedad se muestra y nunca cuenta en tu contra.</string>
@@ -595,8 +595,8 @@
         <item quantity="other">%1$d tipos de entrada</item>
     </plurals>
     <plurals name="about_words">
-        <item quantity="one">%1$d palabra francesa</item>
-        <item quantity="other">%1$d palabras francesas</item>
+        <item quantity="one">%1$d palabra</item>
+        <item quantity="other">%1$d palabras</item>
     </plurals>
 
     <string name="action_about">Acerca de</string>
