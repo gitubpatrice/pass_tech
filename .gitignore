@@ -53,6 +53,9 @@ hs_err_pid*.mdmp
 # the CI said so, the debug build here did not (2026-09-23).
 /audit/
 
+# Backups left by the negative-control scripts while a sabotage is in place.
+*.one-sabotage.bak
+
 # Claude / agent local files
 .claude/
 CLAUDE.md
