@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
+import com.filestech.pass_tech.core.legal.LegalDocument
 import com.filestech.pass_tech.core.model.DartDateTime
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.model.EntryType
@@ -68,6 +69,9 @@ class EntriesViewModel @Inject constructor(
         data object Audit : Screen
 
         data object About : Screen
+
+        /** The privacy policy or the terms, read from the app's own assets and never from the web. */
+        data class Legal(val document: LegalDocument) : Screen
     }
 
     sealed interface Message {
@@ -124,6 +128,8 @@ class EntriesViewModel @Inject constructor(
     fun openAudit() = push(Screen.Audit)
 
     fun openAbout() = push(Screen.About)
+
+    fun openLegal(document: LegalDocument) = push(Screen.Legal(document))
 
     fun openGenerator(target: EntryForm? = null) = push(Screen.Generator(GeneratorState(), target))
 

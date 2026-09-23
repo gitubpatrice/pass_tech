@@ -49,6 +49,7 @@ import com.filestech.pass_tech.ui.generator.GeneratorScreen
 import com.filestech.pass_tech.ui.heir.HeirScreen
 import com.filestech.pass_tech.ui.home.HomeScreen
 import com.filestech.pass_tech.ui.home.HomeViewModel
+import com.filestech.pass_tech.ui.legal.LegalScreen
 import com.filestech.pass_tech.ui.settings.SettingsScreen
 import com.filestech.pass_tech.ui.settings.SettingsViewModel
 import com.filestech.pass_tech.ui.splash.SplashScreen
@@ -192,7 +193,9 @@ private fun OpenVault(state: VaultManager.State.Open, screens: Screens, snackbar
             about = screens.about,
             snackbar = snackbar,
             onBack = { entries.close(Screen.About) },
+            onLegal = entries::openLegal,
         )
+        is Screen.Legal -> LegalScreen(document = top.document, onBack = { entries.close(top) })
     }
 }
 

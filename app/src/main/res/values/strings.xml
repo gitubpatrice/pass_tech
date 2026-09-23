@@ -651,6 +651,13 @@
     <string name="about_report_body">Describe what happened:\n\n\n---\nVersion: %1$s\nPhone: %2$s (Android %3$s)\n</string>
     <string name="about_link_failed">No app on this phone can open that.</string>
 
+    <string name="legal_privacy_title">Privacy policy</string>
+    <string name="legal_privacy_subtitle">What stays on your phone, and the two times the app goes online</string>
+    <string name="legal_terms_title">Terms of use</string>
+    <string name="legal_terms_subtitle">What we promise, and what we do not</string>
+    <string name="legal_not_translated">This document has not been written in your language yet, so here is the English one. A document that describes the app wrongly would be worse than one you have to work at.</string>
+    <string name="legal_unreadable">This document could not be read. It is also published with the source code.</string>
+
     <plurals name="about_attempts">
         <item quantity="one">%1$d attempt</item>
         <item quantity="other">%1$d attempts</item>

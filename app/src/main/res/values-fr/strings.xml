@@ -600,6 +600,13 @@
     <string name="about_report_body">Décrivez ce qui s\'est passé :\n\n\n---\nVersion : %1$s\nTéléphone : %2$s (Android %3$s)\n</string>
     <string name="about_link_failed">Aucune application de ce téléphone ne sait ouvrir cela.</string>
 
+    <string name="legal_privacy_title">Politique de confidentialité</string>
+    <string name="legal_privacy_subtitle">Ce qui reste sur votre téléphone, et les deux moments où l\'application se connecte</string>
+    <string name="legal_terms_title">Conditions d\'utilisation</string>
+    <string name="legal_terms_subtitle">Ce que nous promettons, et ce que nous ne promettons pas</string>
+    <string name="legal_not_translated">Ce document n\'a pas encore été écrit dans votre langue : voici celui en anglais. Un document qui décrirait mal l\'application serait pire qu\'un document à déchiffrer.</string>
+    <string name="legal_unreadable">Ce document n\'a pas pu être lu. Il est aussi publié avec le code source.</string>
+
     <plurals name="about_attempts">
         <item quantity="one">%1$d essai</item>
         <item quantity="other">%1$d essais</item>

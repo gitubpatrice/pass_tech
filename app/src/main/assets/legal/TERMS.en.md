@@ -1,10 +1,10 @@
 # Terms of Use — Pass Tech
 
-**Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-**Last changed**: 23 September 2026
-**Publisher**: Files Tech — Patrice Haltaya
-**Contact**: contact@files-tech.com
-**Source code**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
+- **Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+- **Last changed**: 23 September 2026
+- **Publisher**: Files Tech — Patrice Haltaya
+- **Contact**: contact@files-tech.com
+- **Source code**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
 
 > This document covers the **Kotlin** version of Pass Tech, 3.0.0. It is not the one for the earlier
 > Flutter versions (2.x, `com.passtech.pass_tech`).

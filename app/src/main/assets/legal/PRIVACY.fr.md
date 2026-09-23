@@ -1,10 +1,10 @@
 # Politique de confidentialité — Pass Tech
 
-**S'applique à** : Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-**Dernière modification** : 23 septembre 2026
-**Éditeur** : Files Tech — Patrice Haltaya
-**Contact** : contact@files-tech.com
-**Code source** : https://github.com/gitubpatrice/pass_tech — Apache License 2.0
+- **S'applique à** : Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+- **Dernière modification** : 23 septembre 2026
+- **Éditeur** : Files Tech — Patrice Haltaya
+- **Contact** : contact@files-tech.com
+- **Code source** : https://github.com/gitubpatrice/pass_tech — Apache License 2.0
 
 > Ce document décrit la version **Kotlin** de Pass Tech, la 3.0.0. Ce n'est pas la politique des
 > versions Flutter précédentes (2.x, `com.passtech.pass_tech`), qui fonctionnaient autrement.

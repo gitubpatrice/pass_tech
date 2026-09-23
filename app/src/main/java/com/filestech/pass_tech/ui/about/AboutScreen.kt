@@ -21,10 +21,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Policy
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Storefront
@@ -61,6 +63,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.about.AppFacts
+import com.filestech.pass_tech.core.legal.LegalDocument
 import com.filestech.pass_tech.core.update.UpdateCheck
 import com.filestech.pass_tech.ui.components.PtCard
 import com.filestech.pass_tech.ui.components.PtSnackbarHost
@@ -89,7 +92,12 @@ import kotlinx.coroutines.launch
  * it reads the same from the decoy as from the real one.
  */
 @Composable
-fun AboutScreen(about: AboutViewModel, snackbar: SnackbarHostState, onBack: () -> Unit) {
+fun AboutScreen(
+    about: AboutViewModel,
+    snackbar: SnackbarHostState,
+    onBack: () -> Unit,
+    onLegal: (LegalDocument) -> Unit,
+) {
     BackHandler(onBack = onBack)
     val check by about.check.collectAsStateWithLifecycle()
     val groups = aboutGroups()
@@ -127,7 +135,7 @@ fun AboutScreen(about: AboutViewModel, snackbar: SnackbarHostState, onBack: () -
             verifySection()
             helpSection(help)
             authorSection()
-            linksSection(about.installedVersion, open)
+            linksSection(about.installedVersion, open, onLegal)
         }
     }
 
@@ -332,13 +340,26 @@ private fun LazyListScope.authorSection() {
  * The report carries the version and the phone, because those are the two answers every report needs
  * and the two an owner should not have to go looking for. It carries nothing else, and the mail app
  * shows the whole of it before anything is sent.
+ *
+ * The last two rows open nothing outside the app: the policy and the terms are read from its own
+ * assets, so they answer a question about what the app sends without sending anything.
  */
-private fun LazyListScope.linksSection(version: String, open: (Intent) -> Unit) {
+private fun LazyListScope.linksSection(version: String, open: (Intent) -> Unit, onLegal: (LegalDocument) -> Unit) {
     item { SectionTitle(R.string.about_section_links) }
     item { Link(Icons.Outlined.Public, R.string.about_link_website) { open(view(WEBSITE)) } }
     item { Link(Icons.Outlined.Link, R.string.about_link_source) { open(view(SOURCE)) } }
     item { ReportLink(version, open) }
     item { LicenceRow() }
+    item {
+        Link(Icons.Outlined.PrivacyTip, R.string.legal_privacy_title, R.string.legal_privacy_subtitle) {
+            onLegal(LegalDocument.PRIVACY)
+        }
+    }
+    item {
+        Link(Icons.Outlined.Gavel, R.string.legal_terms_title, R.string.legal_terms_subtitle) {
+            onLegal(LegalDocument.TERMS)
+        }
+    }
 }
 
 @Composable
