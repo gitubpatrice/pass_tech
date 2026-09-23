@@ -1,6 +1,7 @@
 package com.filestech.pass_tech
 
 import android.app.ActivityManager
+import android.content.Context
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +20,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.core.panic.LauncherDisguise
+import com.filestech.pass_tech.core.settings.AppLanguage
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.ui.AppViewModel
@@ -51,6 +53,15 @@ class MainActivity : FragmentActivity() {
     private val about: AboutViewModel by viewModels()
     private val update: UpdateViewModel by viewModels()
     private val splash: SplashViewModel by viewModels()
+
+    /**
+     * The chosen language, applied to this window's own resources before anything is drawn. Below
+     * Android 13 only, and a no-op above, where the system applies its per-app language itself
+     * ([AppLanguage]).
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The system splash stays up until the first screen is known: whether the first-launch splash

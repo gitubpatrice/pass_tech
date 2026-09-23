@@ -209,6 +209,8 @@
     <string name="settings_section_danger">Zona pericolosa</string>
     <string name="settings_theme_title">Tema</string>
     <string name="settings_theme_choose_title">Scegli il tema</string>
+    <string name="settings_language_title">Lingua</string>
+    <string name="settings_language_system">Sistema (automatico)</string>
     <string name="settings_theme_system">Sistema</string>
     <string name="settings_theme_light">Chiaro</string>
     <string name="settings_theme_dark">Scuro</string>

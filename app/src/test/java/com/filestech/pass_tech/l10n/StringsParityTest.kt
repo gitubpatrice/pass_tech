@@ -1,6 +1,8 @@
 package com.filestech.pass_tech.l10n
 
+import com.filestech.pass_tech.core.settings.AppLanguage
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
@@ -94,12 +96,13 @@ class StringsParityTest {
         }
 
     /**
-     * The three places a language lives, which know nothing about one another: the `values-*`
-     * directory, the build's locale filter — which REMOVES a directory from the APK without a word
-     * — and the list Android 13 reads to offer the language for this app alone.
+     * The four places a language lives, none of which can see the other three: the `values-*`
+     * directory, the build's locale filter — which REMOVES a directory from the APK without a word —
+     * the list Android 13 reads to offer the language for this app alone, and the list the app's own
+     * picker offers below Android 13.
      */
     @Test
-    fun `a language is declared in all three places, or nobody can reach it`() {
+    fun `a language is declared in all four places, or nobody can reach it`() {
         val all = (languages + "en").toSet()
         val gradle = File("build.gradle.kts").readText()
         val filter = requireNotNull(LOCALE_FILTERS.find(gradle)) { "localeFilters not found in build.gradle.kts" }
@@ -108,8 +111,22 @@ class StringsParityTest {
         val config = File("src/main/res/xml/locales_config.xml").readText()
         assertThat(LOCALE_NAME.findAll(config).map { it.groupValues[1] }.toSet()).isEqualTo(all)
 
+        assertThat(AppLanguage.CODES.toSet()).isEqualTo(all)
+
         val manifest = File("src/main/AndroidManifest.xml").readText()
         assertThat(manifest).contains("""android:localeConfig="@xml/locales_config"""")
+    }
+
+    /**
+     * A language offered by the picker without a name of its own would be shown as "System (auto)",
+     * with a tick beside it — a picker that looks broken rather than one that is short of a string.
+     * The names are untranslatable by design: each is the word that language uses for itself.
+     */
+    @Test
+    fun `every language the picker offers has a name of its own`() {
+        AppLanguage.CODES.forEach { code ->
+            assertWithMessage(code).that(english.untranslatable).contains("settings_language_$code")
+        }
     }
 
     private companion object {

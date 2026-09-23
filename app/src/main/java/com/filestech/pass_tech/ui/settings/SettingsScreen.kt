@@ -1,5 +1,7 @@
 package com.filestech.pass_tech.ui.settings
 
+import android.app.Activity
+import android.content.Context
 import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Policy
@@ -76,6 +79,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -91,6 +96,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.backup.ImportParser
 import com.filestech.pass_tech.core.heir.HeirState
+import com.filestech.pass_tech.core.settings.AppLanguage
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
 import com.filestech.pass_tech.ui.components.PasswordField
@@ -105,6 +111,7 @@ import com.filestech.pass_tech.ui.theme.DestructiveRed
 /** Which dialog is up: one at a time. */
 private enum class SettingsDialog {
     THEME,
+    LANGUAGE,
     CLIPBOARD,
     AUTO_LOCK,
     SCREENSHOTS_OFF,
@@ -147,6 +154,13 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
     val resources = LocalResources.current
     val pending by settings.pending.collectAsStateWithLifecycle()
     val openImport = remember { mutableStateOf(false) }
+    // Read back from where it lives rather than held in the view model: on Android 13 that is the
+    // system's own per-app language, which Android's settings can change while this screen exists.
+    // Keyed on the configuration, which is what moves when either picker is used.
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+    val language = remember(LocalConfiguration.current) { AppLanguage.chosen(context) }
+    val onLanguage: (String) -> Unit = { chooseLanguage(context, activity, it) }
     Messages(settings, snackbar)
     ArmingPrompts(settings)
     FilePickers(settings, openImport)
@@ -174,6 +188,13 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
                 Tile(Icons.Outlined.BrightnessMedium, stringResource(R.string.settings_theme_title), stringResource(themeLabel(ui.theme))) {
                     dialog = SettingsDialog.THEME
                 }
+            }
+            item {
+                Tile(
+                    Icons.Outlined.Language,
+                    stringResource(R.string.settings_language_title),
+                    stringResource(languageLabel(language)),
+                ) { dialog = SettingsDialog.LANGUAGE }
             }
             item { SectionTitle(R.string.settings_section_clipboard) }
             item {
@@ -332,6 +353,8 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
         settings = settings,
         haptics = haptics,
         armedHere = biometrics.status == BiometricStatus.THIS_VAULT,
+        language = language,
+        onLanguage = onLanguage,
         onDialog = { dialog = it },
     )
     if (ui.busy) BusyDialog()
@@ -346,10 +369,23 @@ private fun SettingsDialogs(
     settings: SettingsViewModel,
     haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
     armedHere: Boolean,
+    language: String,
+    onLanguage: (String) -> Unit,
     onDialog: (SettingsDialog?) -> Unit,
 ) {
     val close = { onDialog(null) }
     when (dialog) {
+        SettingsDialog.LANGUAGE -> ChoiceDialog(
+            title = R.string.settings_language_title,
+            choices = LANGUAGE_CHOICES,
+            selected = language,
+            label = ::languageLabel,
+            onChoose = {
+                onLanguage(it)
+                close()
+            },
+            onDismiss = close,
+        )
         SettingsDialog.THEME -> ChoiceDialog(
             title = R.string.settings_theme_choose_title,
             choices = AppPreferences.Theme.entries,
@@ -1181,6 +1217,33 @@ private fun themeLabel(theme: AppPreferences.Theme): Int = when (theme) {
     AppPreferences.Theme.SYSTEM -> R.string.settings_theme_system
     AppPreferences.Theme.LIGHT -> R.string.settings_theme_light
     AppPreferences.Theme.DARK -> R.string.settings_theme_dark
+}
+
+/** "System (auto)" first, then the languages this build carries, as 2.7.1 offered them. */
+private val LANGUAGE_CHOICES = listOf(AppLanguage.SYSTEM) + AppLanguage.CODES
+
+/**
+ * Android 13 and above rebuild the activity themselves once the system's per-app language changes;
+ * below, nothing would happen without the [Activity.recreate], and the screen would sit in the old
+ * language with the new one ticked beside it.
+ */
+private fun chooseLanguage(context: Context, activity: Activity?, code: String) {
+    AppLanguage.choose(context, code)
+    if (AppLanguage.needsRecreate) activity?.recreate()
+}
+
+/**
+ * Each language in its own words. The fallback is deliberately not silent-looking: a code offered
+ * without a name of its own would show "System (auto)" with a tick beside it, which reads as broken
+ * — and `StringsParityTest` holds [AppLanguage.CODES] to one name each so it cannot ship.
+ */
+private fun languageLabel(code: String): Int = when (code) {
+    "en" -> R.string.settings_language_en
+    "fr" -> R.string.settings_language_fr
+    "de" -> R.string.settings_language_de
+    "it" -> R.string.settings_language_it
+    "es" -> R.string.settings_language_es
+    else -> R.string.settings_language_system
 }
 
 private fun themeIcon(theme: AppPreferences.Theme): ImageVector = when (theme) {

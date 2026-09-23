@@ -225,6 +225,19 @@
     <string name="settings_section_danger">Danger zone</string>
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_choose_title">Choose theme</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_system">System (auto)</string>
+    <!--
+      Each language named in its own words, as 2.7.1 named them: someone looking for their language
+      is looking for the word they use for it. Not translated, and not computed from the locale
+      either — what an Android build's ICU data answers for "es" is not something this list should
+      depend on.
+    -->
+    <string name="settings_language_en" translatable="false">English</string>
+    <string name="settings_language_fr" translatable="false">Français</string>
+    <string name="settings_language_de" translatable="false">Deutsch</string>
+    <string name="settings_language_it" translatable="false">Italiano</string>
+    <string name="settings_language_es" translatable="false">Español</string>
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
