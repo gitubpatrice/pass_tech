@@ -1,7 +1,6 @@
 package com.filestech.pass_tech.core.breach
 
-import java.net.HttpURLConnection
-import java.net.URL
+import com.filestech.pass_tech.core.net.HttpFetch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,40 +19,27 @@ interface BreachApi {
 }
 
 @Singleton
-class HibpApi @Inject constructor() : BreachApi {
+class HibpApi @Inject constructor(private val http: HttpFetch) : BreachApi {
 
-    override suspend fun range(prefix: String): String? =
-        try {
-            val connection = open(RANGE + prefix)
-            try {
-                read(connection)
-            } finally {
-                connection.disconnect()
-            }
-        } catch (_: Exception) {
-            null
-        }
-
-    private fun open(url: String): HttpURLConnection =
-        (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = TIMEOUT_MILLIS
-            readTimeout = TIMEOUT_MILLIS
-            requestMethod = "GET"
-            setRequestProperty("User-Agent", USER_AGENT)
+    /**
+     * No redirect is followed. The service does not redirect, and a `302` to another host would
+     * otherwise be followed by `HttpURLConnection` on its own, with nothing revalidated.
+     */
+    override suspend fun range(prefix: String): String? = http.get(
+        url = RANGE + prefix,
+        allowedHosts = setOf(HOST),
+        headers = mapOf(
+            "User-Agent" to USER_AGENT,
             // The answer is padded with decoy suffixes, so its LENGTH says nothing either.
-            setRequestProperty("Add-Padding", "true")
-        }
-
-    private fun read(connection: HttpURLConnection): String? =
-        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } else {
-            null
-        }
+            "Add-Padding" to "true",
+        ),
+        budgetMillis = BUDGET_MILLIS,
+    )
 
     private companion object {
-        const val RANGE = "https://api.pwnedpasswords.com/range/"
-        const val TIMEOUT_MILLIS = 8_000
+        const val HOST = "api.pwnedpasswords.com"
+        const val RANGE = "https://$HOST/range/"
+        const val BUDGET_MILLIS = 8_000L
 
         /**
          * The same plain string for every install, every request, every session.

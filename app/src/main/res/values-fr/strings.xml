@@ -338,6 +338,14 @@
     <string name="panic_warn_biometric_body">Le mode panique supprime l\'enrôlement biométrique — sinon quelqu\'un pourrait ouvrir votre coffre en vous faisant poser le doigt.\n\nAprès activation, SEUL votre mot de passe maître ouvrira le coffre. Il n\'est récupérable par aucun moyen.\n\nAssurez-vous de le connaître avant de continuer.</string>
 
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <!-- Vérification de mise à jour -->
+    <string name="update_title">La version %1$s est sortie</string>
+    <string name="update_body">Pass Tech ne se met pas à jour toute seule et ne télécharge jamais rien d\'elle-même. Le bouton ci-dessous ouvre la page de la version, là où se trouvent les notes et les empreintes.</string>
+    <string name="update_notes_label">Ce qui change</string>
+    <string name="update_sha_label">SHA-256 annoncé pour l\'APK</string>
+    <string name="update_open">Ouvrir la page de la version</string>
+    <string name="update_later">Plus tard</string>
+
     <!-- Audit de sécurité -->
     <string name="settings_audit_title">Audit de sécurité</string>
     <string name="settings_audit_subtitle">Mots de passe faibles, doublons, fuites…</string>

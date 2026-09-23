@@ -375,6 +375,14 @@
     <string name="panic_warn_biometric_title">Biometric unlock will be disabled</string>
     <string name="panic_warn_biometric_body">Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.</string>
 
+    <!-- Update check (2.7.1 app_update.dart + files_tech_core UpdateService) -->
+    <string name="update_title">Version %1$s is out</string>
+    <string name="update_body">Pass Tech does not update itself and never downloads anything on its own. The button below opens the release page, where the notes and the checksums are.</string>
+    <string name="update_notes_label">What changed</string>
+    <string name="update_sha_label">SHA-256 announced for the APK</string>
+    <string name="update_open">Open the release page</string>
+    <string name="update_later">Later</string>
+
     <!-- Security audit (2.7.1 audit_screen.dart, vault_audit_score.dart) -->
     <string name="settings_audit_title">Security audit</string>
     <string name="settings_audit_subtitle">Weak passwords, duplicates, breaches…</string>

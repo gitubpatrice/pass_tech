@@ -30,6 +30,7 @@ import com.filestech.pass_tech.ui.home.HomeViewModel
 import com.filestech.pass_tech.ui.settings.SettingsViewModel
 import com.filestech.pass_tech.ui.splash.SplashViewModel
 import com.filestech.pass_tech.ui.theme.PassTechTheme
+import com.filestech.pass_tech.ui.update.UpdateViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -46,6 +47,7 @@ class MainActivity : FragmentActivity() {
     private val home: HomeViewModel by viewModels()
     private val settings: SettingsViewModel by viewModels()
     private val audit: AuditViewModel by viewModels()
+    private val update: UpdateViewModel by viewModels()
     private val splash: SplashViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,6 +93,7 @@ class MainActivity : FragmentActivity() {
                     home = home,
                     settings = settings,
                     audit = audit,
+                    update = update,
                     splash = splash,
                 )
             }

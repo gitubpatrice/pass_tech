@@ -50,6 +50,8 @@ import com.filestech.pass_tech.ui.settings.SettingsScreen
 import com.filestech.pass_tech.ui.settings.SettingsViewModel
 import com.filestech.pass_tech.ui.splash.SplashScreen
 import com.filestech.pass_tech.ui.splash.SplashViewModel
+import com.filestech.pass_tech.ui.update.UpdateDialog
+import com.filestech.pass_tech.ui.update.UpdateViewModel
 import kotlinx.coroutines.launch
 
 /**
@@ -64,6 +66,7 @@ fun PassTechApp(
     home: HomeViewModel,
     settings: SettingsViewModel,
     audit: AuditViewModel,
+    update: UpdateViewModel,
     splash: SplashViewModel,
 ) {
     val vaultState by app.vaultState.collectAsStateWithLifecycle()
@@ -96,6 +99,9 @@ fun PassTechApp(
         }
     }
     if (entryState.backupReminder) BackupReminderDialog(onDismiss = entry::backupReminderSeen)
+
+    val newRelease by update.available.collectAsStateWithLifecycle()
+    newRelease?.let { UpdateDialog(it, onDismiss = update::dismiss) }
 
     // Over whichever screen raised it, and gone with the lock: the copy it holds back is a password.
     val domainAlert by entries.domainAlert.collectAsStateWithLifecycle()

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.filestech.pass_tech.core.model.EntryQuery
 import kotlinx.coroutines.flow.Flow
@@ -84,6 +85,15 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         store.edit { it[ANTI_PHISHING] = enabled }
     }
 
+    /**
+     * When the update check last UNDERSTOOD an answer, on the wall clock. Zero until the first one.
+     */
+    val updateLastCheckMillis: Flow<Long> = data.map { it[UPDATE_LAST_CHECK] ?: 0L }
+
+    suspend fun setUpdateLastCheckMillis(millis: Long) {
+        store.edit { it[UPDATE_LAST_CHECK] = millis }
+    }
+
     /** The order of the home list, kept from one opening to the next (2.7.1: `sort_mode`). */
     val sortMode: Flow<EntryQuery.Sort> = data.map { EntryQuery.Sort.fromKey(it[SORT_MODE]) }
 
@@ -116,5 +126,6 @@ class AppPreferences @Inject constructor(private val store: DataStore<Preference
         private val THEME = stringPreferencesKey("theme_mode")
         private val SCREENSHOT_PROTECTION = booleanPreferencesKey("screenshot_protection_enabled")
         private val ANTI_PHISHING = booleanPreferencesKey("anti_phishing_enabled")
+        private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check_ms")
     }
 }
