@@ -390,6 +390,7 @@
     <string name="update_body">Pass Tech does not update itself and never downloads anything on its own. The button below opens the release page, where the notes and the checksums are.</string>
     <string name="update_notes_label">What changed</string>
     <string name="update_sha_label">SHA-256 announced for the APK</string>
+    <string name="update_sha_label_named">SHA-256 announced for %1$s</string>
     <string name="update_open">Open the release page</string>
     <string name="update_later">Later</string>
 
@@ -528,4 +529,133 @@
     <string name="backup_saved">Backup saved</string>
     <string name="export_saved">Export saved</string>
     <string name="file_write_error">Could not save the file</string>
+
+    <!--
+      About. Every figure in these lines comes from core/about/AppFacts, which reads it from the code
+      that enforces it: no number is typed here, in any language.
+    -->
+    <string name="about_title">About</string>
+    <string name="about_tagline">A password manager that stays on your phone</string>
+    <string name="about_version">v%1$s</string>
+
+    <string name="about_check_updates">Check for updates</string>
+    <string name="about_checking">Checking…</string>
+    <string name="about_check_up_to_date">GitHub was asked: this is the latest published version.</string>
+    <string name="about_check_unreachable">GitHub could not be asked. Nothing was learnt — this may or may not be the latest version.</string>
+    <string name="about_check_disguised">Not asked. The app is disguised as a calculator, and this check would put traffic on the network that a calculator has no reason to make.</string>
+    <string name="about_check_unreadable_version">This build\'s version number cannot be compared with a published release, so nothing was asked.</string>
+
+    <string name="about_section_privacy">What Pass Tech never does</string>
+    <string name="about_privacy_no_ads">No ads</string>
+    <string name="about_privacy_no_tracker">No tracker</string>
+    <string name="about_privacy_offline">Works offline</string>
+    <string name="about_privacy_no_collect">Collects nothing</string>
+    <string name="about_privacy_no_share">Shares nothing</string>
+    <string name="about_privacy_no_store">No Play Store</string>
+    <string name="about_privacy_network_title">The only two times it uses the network</string>
+    <string name="about_privacy_network_body">Asking GitHub whether a newer version has been published, once your vault is open, %1$d times a day at most. And the breach check on the audit screen, which you start yourself: the password itself is never sent, only the first five characters of its fingerprint, which tens of thousands of other passwords share.\n\nNothing else ever leaves this phone, and your vault least of all. What these two calls do show is that someone on your connection uses this app — GitHub sees a request for this project\'s latest release, and Have I Been Pwned sees five characters of a fingerprint.\n\nBoth stop entirely while the app is disguised as a calculator.</string>
+
+    <string name="about_group_vault">The vault</string>
+    <string name="about_group_forced">If someone makes you open it</string>
+    <string name="about_group_content">What it holds</string>
+    <string name="about_group_watch">What it watches for you</string>
+    <string name="about_group_data">Your data, in and out</string>
+
+    <string name="about_feature_vault">Encrypted vault</string>
+    <string name="about_feature_vault_desc">AES-256-GCM. The key is derived from your master password by Argon2id (%1$d MiB of memory, %2$d passes) and by a key held in the phone\'s secure chip, which takes part in every single attempt.</string>
+    <string name="about_feature_biometric">Fingerprint, tied to this phone</string>
+    <string name="about_feature_biometric_desc">The key lives in the Android Keystore and cannot be read without your fingerprint. It never leaves the phone, and a copy of the vault taken elsewhere cannot use it.</string>
+    <string name="about_feature_bruteforce">Guessing gets slower</string>
+    <string name="about_feature_bruteforce_desc">%1$s, then a wait that grows from %2$s to %3$s. Unlocking cancels its own attempt and no earlier one, so alternating between two vaults never clears the delay.</string>
+    <string name="about_feature_autolock">Locks itself</string>
+    <string name="about_feature_autolock_desc">Immediately, after a delay of up to %1$s, or never — your choice. Leaving the app counts as leaving.</string>
+    <string name="about_feature_screenshot">No screenshots</string>
+    <string name="about_feature_screenshot_desc">No screen capture, and no preview in the list of recent apps, for as long as the setting is on.</string>
+    <string name="about_feature_backup_off">Never backed up by Android</string>
+    <string name="about_feature_backup_off_desc">The vault is excluded from the Android cloud backup and from phone-to-phone transfer. The only copy that exists is the one you make yourself.</string>
+    <string name="about_feature_integrity">Tells you what it sees</string>
+    <string name="about_feature_integrity_desc">Before you type your master password: whether this phone can be made root, whether a debugger is attached, whether this is a development build, whether it is an emulator. It warns, and never blocks.</string>
+
+    <string name="about_feature_decoy">Decoy vault</string>
+    <string name="about_feature_decoy_desc">A second password opens a second vault with its own entries. Nothing on this phone says whether you have one.</string>
+    <string name="about_feature_panic">Panic mode</string>
+    <string name="about_feature_panic_desc">Locks, clears the clipboard, disarms the fingerprint, turns the address check off, and makes the app look like a calculator — which really works.</string>
+    <string name="about_feature_heir">Someone after you</string>
+    <string name="about_feature_heir_desc">A relative opens a read-only copy of your vault after a long enough silence on your side. On the phone, with no cloud and no account.</string>
+
+    <string name="about_feature_types_desc">Passwords, bank cards and secure notes.</string>
+    <string name="about_feature_totp">Two-factor codes</string>
+    <string name="about_feature_totp_desc">The six-digit codes, generated here, like an authenticator app.</string>
+    <string name="about_feature_otpauth">Two-factor secrets from a link</string>
+    <string name="about_feature_otpauth_desc">Paste the otpauth:// link a site shows under its QR code and the secret is taken out of it.</string>
+    <string name="about_feature_cards">Bank cards</string>
+    <string name="about_feature_cards_desc">Number, holder, expiry, security code and PIN, shown as a card. The number, the security code and the PIN stay hidden until you ask for them.</string>
+    <string name="about_feature_notes">Secure notes</string>
+    <string name="about_feature_notes_desc">Any confidential text: bank details, recovery codes, licence keys.</string>
+    <string name="about_feature_search">Search and sort</string>
+    <string name="about_feature_search_desc">By title, username, address or content; newest, oldest, A to Z or Z to A.</string>
+    <string name="about_feature_generator">Generator</string>
+    <string name="about_feature_generator_desc">Passwords of %1$d to %2$d characters, or a passphrase drawn from %3$s. That list is French whatever language the app is set to.</string>
+
+    <string name="about_feature_audit">Security audit</string>
+    <string name="about_feature_audit_desc">A score out of 100 for the vault, and what pulls it down: passwords that are weak, reused, or have no second factor. Age is shown and never counted against you.</string>
+    <string name="about_feature_breach">Breach check</string>
+    <string name="about_feature_breach_desc">Asks Have I Been Pwned whether a password appears in a public leak, without ever sending the password.</string>
+    <string name="about_feature_phishing">Address check</string>
+    <string name="about_feature_phishing_desc">Before a password is copied, compares the address open in your browser with the one on the entry, and holds the copy back on a look-alike.</string>
+    <string name="about_feature_clipboard">Clipboard cleared</string>
+    <string name="about_feature_clipboard_desc">After %1$s to %2$s, or never — your choice.</string>
+    <string name="about_feature_update">Update check</string>
+    <string name="about_feature_update_desc">Tells you when a newer version is published, once your vault is open. It downloads nothing and installs nothing.</string>
+
+    <string name="about_feature_backup">Encrypted backup (.ptbak)</string>
+    <string name="about_feature_backup_desc">A file that only your passphrase opens, saved wherever you choose. It reads and writes the same format as version 2.7.1.</string>
+    <string name="about_feature_import">Import</string>
+    <string name="about_feature_import_desc">Chrome, Edge, a Bitwarden JSON export, or any CSV with a password column.</string>
+    <string name="about_feature_theme">Light or dark</string>
+    <string name="about_feature_theme_desc">Your choice, or whatever the phone is set to.</string>
+
+    <string name="about_section_verify">Check what you download</string>
+    <string name="about_verify_body">Every release publishes the SHA-256 of each file it carries. Once you have downloaded one, run:\n\nsha256sum &lt;the file you downloaded&gt;\n\nand compare the result with the line for that same file on the release page. If the two differ, do not install it.</string>
+
+    <string name="about_section_help">Quick help</string>
+    <string name="about_help_first_title">First launch</string>
+    <string name="about_help_first_1">Choose a master password of at least 12 characters.</string>
+    <string name="about_help_first_2">It encrypts everything, and there is no recovery: if you forget it, the vault is lost.</string>
+    <string name="about_help_add_title">Adding a password</string>
+    <string name="about_help_add_1">The Add button at the bottom of the main screen.</string>
+    <string name="about_help_add_2">Or open the generator and let it choose one for you.</string>
+    <string name="about_help_update_title">Updates</string>
+    <string name="about_help_update_1">Once your vault is open, the app asks GitHub whether a newer version exists, %1$d times a day at most.</string>
+    <string name="about_help_update_2">Or press Check for updates above, at any time.</string>
+
+    <string name="about_section_author">Author</string>
+    <string name="about_author_name" translatable="false">Patrice Haltaya</string>
+    <string name="about_author_role">Developer</string>
+
+    <string name="about_section_links">Help and links</string>
+    <string name="about_link_website">Official website</string>
+    <string name="about_link_source">Source code</string>
+    <string name="about_link_report">Report a problem</string>
+    <string name="about_link_report_subtitle">Opens your mail app, with the version and the phone already written in</string>
+    <string name="about_link_licence">Licence</string>
+    <string name="about_link_licence_value" translatable="false">Apache License 2.0</string>
+    <string name="about_report_subject">Pass Tech %1$s — problem report</string>
+    <string name="about_report_body">Describe what happened:\n\n\n---\nVersion: %1$s\nPhone: %2$s (Android %3$s)\n</string>
+    <string name="about_link_failed">No app on this phone can open that.</string>
+
+    <plurals name="about_attempts">
+        <item quantity="one">%1$d attempt</item>
+        <item quantity="other">%1$d attempts</item>
+    </plurals>
+    <plurals name="about_entry_types">
+        <item quantity="one">%1$d kind of entry</item>
+        <item quantity="other">%1$d kinds of entry</item>
+    </plurals>
+    <plurals name="about_words">
+        <item quantity="one">%1$d French word</item>
+        <item quantity="other">%1$d French words</item>
+    </plurals>
+
+    <string name="action_about">About</string>
 </resources>

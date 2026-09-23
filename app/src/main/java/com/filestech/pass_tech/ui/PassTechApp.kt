@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.vault.VaultManager
+import com.filestech.pass_tech.ui.about.AboutScreen
+import com.filestech.pass_tech.ui.about.AboutViewModel
 import com.filestech.pass_tech.ui.audit.AuditScreen
 import com.filestech.pass_tech.ui.audit.AuditViewModel
 import com.filestech.pass_tech.ui.components.PrivateKeyboard
@@ -67,6 +69,7 @@ fun PassTechApp(
     home: HomeViewModel,
     settings: SettingsViewModel,
     audit: AuditViewModel,
+    about: AboutViewModel,
     update: UpdateViewModel,
     splash: SplashViewModel,
 ) {
@@ -84,7 +87,8 @@ fun PassTechApp(
             when {
                 // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
                 locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                state is VaultManager.State.Open -> OpenVault(state, Screens(entries, home, settings, audit), snackbar, onLock = app::lock)
+                state is VaultManager.State.Open ->
+                    OpenVault(state, Screens(entries, home, settings, audit, about), snackbar, onLock = app::lock)
                 // Read only, and nothing of this app around it: no vault is open behind this screen.
                 state is VaultManager.State.Heir -> HeirScreen(state.entries, snackbar, onCopy = entries::copy)
                 else -> EntryScreen(entry)
@@ -129,6 +133,7 @@ private fun OpenVault(state: VaultManager.State.Open, screens: Screens, snackbar
             onGenerator = { entries.openGenerator() },
             onLock = onLock,
             onSettings = entries::openSettings,
+            onAbout = entries::openAbout,
             onOpen = { entries.openDetail(it.id) },
             onAdd = entries::openNew,
             onToggleFavorite = { entries.toggleFavorite(it.id) },
@@ -178,6 +183,11 @@ private fun OpenVault(state: VaultManager.State.Open, screens: Screens, snackbar
             onBack = { entries.close(Screen.Audit) },
             onOpen = { entries.openDetail(it.id) },
         )
+        Screen.About -> AboutScreen(
+            about = screens.about,
+            snackbar = snackbar,
+            onBack = { entries.close(Screen.About) },
+        )
     }
 }
 
@@ -187,6 +197,7 @@ private data class Screens(
     val home: HomeViewModel,
     val settings: SettingsViewModel,
     val audit: AuditViewModel,
+    val about: AboutViewModel,
 )
 
 /** One message at a time: a new one replaces the one showing, as 2.7.1's snack bars do. */

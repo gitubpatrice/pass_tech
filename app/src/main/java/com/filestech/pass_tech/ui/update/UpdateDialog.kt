@@ -55,7 +55,15 @@ fun UpdateDialog(release: Release, onDismiss: () -> Unit) {
                 }
                 release.sha256?.let {
                     Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.update_sha_label), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Named, not described: the checksum was matched on that file's name, and a hint
+                    // naming a file the release does not carry sends the owner to check nothing.
+                    Text(
+                        text = release.apkName
+                            ?.let { name -> stringResource(R.string.update_sha_label_named, name) }
+                            ?: stringResource(R.string.update_sha_label),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(it, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 }
             }

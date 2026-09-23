@@ -85,6 +85,28 @@ class ReleaseJsonTest {
         assertThat(real?.sha256).isEqualTo("52c8f4a53e75dc2918466d3ea67f0459ed7828472b9dfed08e8a41c34b8a02d3")
     }
 
+    /**
+     * 2.7.1 printed `sha256sum app-arm64-v8a-release.apk` under its checksum. No release of this
+     * project has ever carried a file by that name: every one of them publishes
+     * `pass-tech-<abi>-<version>.apk`, which is what the real answer says here. The name is read from
+     * the release rather than written down, and it is the name the checksum was matched on.
+     */
+    @Test
+    fun `the file the checksum belongs to is named, and named as the release names it`() {
+        val real = ReleaseJson.parse(Resources.text("github/releases-latest.json"))
+        assertThat(real?.apkName).isEqualTo("pass-tech-arm64-v8a-2.7.1.apk")
+        assertThat(real?.apkName).isNotEqualTo("app-arm64-v8a-release.apk")
+
+        // A release carrying no APK names none, rather than naming an empty file.
+        assertThat(ReleaseJson.parse("""{"tag_name":"v3.1.0","body":"","assets":[]}""")?.apkName).isNull()
+
+        // An asset called `x.apk` whose address is a bare host passes every rule above and leaves
+        // nothing after the last slash. Naming that as a file would print `sha256sum` and nothing.
+        val bare = """{"tag_name":"v3.1.0","body":"","assets":[{"name":"x.apk","browser_download_url":"https://github.com/"}]}"""
+        assertThat(ReleaseJson.parse(bare)?.apkUrl).isEqualTo("https://github.com/")
+        assertThat(ReleaseJson.parse(bare)?.apkName).isNull()
+    }
+
     @Test
     fun `a version nobody can read is never newer than anything`() {
         assertThat(Semver.isNewer("3.1.0", "3.0.0")).isTrue()

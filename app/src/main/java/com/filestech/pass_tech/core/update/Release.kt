@@ -15,7 +15,17 @@ data class Release(
     val apkUrl: String?,
     /** What the notes say the APK hashes to, for the owner to check by hand. Nothing downloads itself. */
     val sha256: String?,
-)
+) {
+    /**
+     * The file [sha256] belongs to, named as the release names it.
+     *
+     * 2.7.1 showed a checksum under a hint reading `sha256sum app-arm64-v8a-release.apk` — a name no
+     * release of this project has ever published (they are `pass-tech-<abi>-<version>.apk`). Anyone
+     * following that line would have run it against a file that is not there. The name is taken from
+     * the release rather than written down, which is also the name the checksum was matched on.
+     */
+    val apkName: String? get() = apkUrl?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+}
 
 /**
  * Reading what GitHub answered, and refusing everything that does not look exactly right. The
@@ -98,6 +108,13 @@ object Semver {
         }
         return false
     }
+
+    /**
+     * Whether this version can take part in a comparison at all. Asked of the app's OWN version
+     * before anything is asked of the network: a version nobody can read is never newer than
+     * anything, and that `false` reads exactly like "you are up to date".
+     */
+    fun readable(version: String): Boolean = parts(version) != null
 
     /** Bounded: a part of several thousand digits, out of a hostile tag, costs to convert for nothing. */
     private fun parts(version: String): List<Int>? {

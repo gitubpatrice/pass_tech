@@ -58,6 +58,8 @@ class EntriesViewModel @Inject constructor(
         data object Settings : Screen
 
         data object Audit : Screen
+
+        data object About : Screen
     }
 
     sealed interface Message {
@@ -112,6 +114,8 @@ class EntriesViewModel @Inject constructor(
     fun openSettings() = push(Screen.Settings)
 
     fun openAudit() = push(Screen.Audit)
+
+    fun openAbout() = push(Screen.About)
 
     fun openGenerator(target: EntryForm? = null) = push(Screen.Generator(GeneratorState(), target))
 

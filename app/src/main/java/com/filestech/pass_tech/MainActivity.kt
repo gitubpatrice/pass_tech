@@ -23,6 +23,7 @@ import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.ui.AppViewModel
 import com.filestech.pass_tech.ui.PassTechApp
+import com.filestech.pass_tech.ui.about.AboutViewModel
 import com.filestech.pass_tech.ui.audit.AuditViewModel
 import com.filestech.pass_tech.ui.entries.EntriesViewModel
 import com.filestech.pass_tech.ui.entry.EntryViewModel
@@ -47,6 +48,7 @@ class MainActivity : FragmentActivity() {
     private val home: HomeViewModel by viewModels()
     private val settings: SettingsViewModel by viewModels()
     private val audit: AuditViewModel by viewModels()
+    private val about: AboutViewModel by viewModels()
     private val update: UpdateViewModel by viewModels()
     private val splash: SplashViewModel by viewModels()
 
@@ -93,6 +95,7 @@ class MainActivity : FragmentActivity() {
                     home = home,
                     settings = settings,
                     audit = audit,
+                    about = about,
                     update = update,
                     splash = splash,
                 )

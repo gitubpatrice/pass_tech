@@ -76,6 +76,7 @@ internal fun HomeTopBar(
     onGenerator: () -> Unit,
     onLock: () -> Unit,
     onSettings: () -> Unit,
+    onAbout: () -> Unit,
 ) {
     TopAppBar(
         title = { if (ui.searchOpen) SearchField(ui.query.search, home::setSearch) else Brand() },
@@ -93,7 +94,7 @@ internal fun HomeTopBar(
             IconButton(onClick = onLock) {
                 Icon(Icons.Outlined.Lock, contentDescription = stringResource(R.string.home_tooltip_lock))
             }
-            MoreMenu(onSettings)
+            MoreMenu(onSettings, onAbout)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
     )
@@ -152,7 +153,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit) {
 
 /** 2.7.1's ⋮: Settings, then About (which comes with its screen). */
 @Composable
-private fun MoreMenu(onSettings: () -> Unit) {
+private fun MoreMenu(onSettings: () -> Unit, onAbout: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
@@ -164,6 +165,13 @@ private fun MoreMenu(onSettings: () -> Unit) {
                 onClick = {
                     open = false
                     onSettings()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_about)) },
+                onClick = {
+                    open = false
+                    onAbout()
                 },
             )
         }

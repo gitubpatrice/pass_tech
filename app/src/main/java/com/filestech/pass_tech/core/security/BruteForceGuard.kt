@@ -123,9 +123,14 @@ class BruteForceGuard(
         private const val MINUTE = 60 * SECOND
         private const val HOUR = 60 * MINUTE
 
-        /** Master password: 5 free attempts, then 30 s, 1 min, 5 min, 15 min, 30 min (as 2.7.1). */
-        private const val VAULT_FREE_ATTEMPTS = 5
-        private val VAULT_LOCKS = listOf(30 * SECOND, MINUTE, 5 * MINUTE, 15 * MINUTE, 30 * MINUTE)
+        /**
+         * Master password: 5 free attempts, then 30 s, 1 min, 5 min, 15 min, 30 min (as 2.7.1).
+         *
+         * Visible because the About screen states these two out loud, and reads them from here rather
+         * than from a sentence someone typed: see `core/about/AppFacts`.
+         */
+        const val VAULT_FREE_ATTEMPTS = 5
+        val VAULT_LOCKS = listOf(30 * SECOND, MINUTE, 5 * MINUTE, 15 * MINUTE, 30 * MINUTE)
 
         /** Heir passphrase: a delay from the first failure, 1 s doubling up to 16 s (as 2.7.1). */
         private val HEIR_LOCKS = listOf(SECOND, 2 * SECOND, 4 * SECOND, 8 * SECOND, 16 * SECOND)

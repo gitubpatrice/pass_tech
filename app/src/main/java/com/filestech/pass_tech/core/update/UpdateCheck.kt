@@ -51,30 +51,65 @@ class UpdateCheck @Inject constructor(
 ) {
 
     /**
-     * The newer release, or `null`: nothing newer, nothing asked (too soon, or disguised), or nothing
-     * understood. [force] skips the delay, for a check the owner asked for by hand.
+     * What came of a check. The owner who presses a button is owed the difference between "I asked
+     * and you are up to date" and "I never asked": 2.7.1's About screen answered "you already have
+     * the latest version" to both, so a phone with no connection was told its version was current.
      */
-    suspend fun newerRelease(force: Boolean = false): Release? {
-        if (!mayAsk(force)) return null
+    sealed interface Outcome {
+        /** A version this app is willing to describe, and newer than the one running. */
+        data class Newer(val release: Release) : Outcome
+
+        /** Asked, answered, understood: nothing newer. */
+        data object UpToDate : Outcome
+
+        /** Nothing was asked: the launcher is disguised, so no traffic may exist (fail-closed). */
+        data object Disguised : Outcome
+
+        /** Nothing was asked: the last check is too recent. Never returned to a check asked for by hand. */
+        data object TooSoon : Outcome
+
+        /**
+         * Nothing was asked: **this build's own version is not one that can be compared.** A debug
+         * build carries `-debug`, and a `3.1.0-rc1` would be no better. Saying "up to date" here
+         * would be the same lie as saying it to a phone with no connection, and it is the lie the
+         * code fell into on its own: an unreadable version is never newer, so the comparison simply
+         * answered no, and the screen turned that no into a tick.
+         */
+        data object UnreadableVersion : Outcome
+
+        /** Asked, and no answer this app could read: no network, a captive portal, a shape it refuses. */
+        data object Unreachable : Outcome
+    }
+
+    /**
+     * Asks, or says why it did not. [force] skips the delay, for a check the owner asked for by hand.
+     */
+    suspend fun check(force: Boolean = false): Outcome {
+        if (disguise.disguised() != false) return Outcome.Disguised
+        // Before the network: whatever GitHub answers cannot be compared with a version nobody can read.
+        if (!Semver.readable(installedVersion)) return Outcome.UnreadableVersion
+        if (!force && !dueAgain()) return Outcome.TooSoon
         val now = clock.wallMillis()
-        val release = api.latest()?.let(ReleaseJson::parse) ?: return null
+        val release = api.latest()?.let(ReleaseJson::parse) ?: return Outcome.Unreachable
         // Marked only once the answer has been UNDERSTOOD. Marking it on the status code alone means
         // a captive portal's "200 OK" page counts as a check, and nothing is asked for twelve hours
         // after the connection comes back (2.7.1 fixed exactly this).
         preferences.setUpdateLastCheckMillis(now)
-        return release.takeIf { Semver.isNewer(it.version, installedVersion) }
+        return if (Semver.isNewer(release.version, installedVersion)) Outcome.Newer(release) else Outcome.UpToDate
     }
 
     /**
-     * Disguised, or asked too recently. A clock moved backwards would otherwise hold the check off
-     * for as long as the owner's date is wrong, so the DISTANCE is what counts, in either direction.
+     * The newer release, or `null`: nothing newer, nothing asked (too soon, or disguised), or nothing
+     * understood. For the check nobody asked for, which has only one thing to say.
      */
-    private suspend fun mayAsk(force: Boolean): Boolean {
-        if (disguise.disguised() != false) return false
-        if (force) return true
-        val since = abs(clock.wallMillis() - preferences.updateLastCheckMillis.first())
-        return since >= BETWEEN_CHECKS_MILLIS
-    }
+    suspend fun newerRelease(force: Boolean = false): Release? = (check(force) as? Outcome.Newer)?.release
+
+    /**
+     * Whether enough time has passed. A clock moved backwards would otherwise hold the check off for
+     * as long as the owner's date is wrong, so the DISTANCE is what counts, in either direction.
+     */
+    private suspend fun dueAgain(): Boolean =
+        abs(clock.wallMillis() - preferences.updateLastCheckMillis.first()) >= BETWEEN_CHECKS_MILLIS
 
     companion object {
         /** The qualifier of the version this build carries, so that no second copy of it exists. */

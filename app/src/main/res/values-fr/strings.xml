@@ -353,6 +353,7 @@
     <string name="update_body">Pass Tech ne se met pas à jour toute seule et ne télécharge jamais rien d\'elle-même. Le bouton ci-dessous ouvre la page de la version, là où se trouvent les notes et les empreintes.</string>
     <string name="update_notes_label">Ce qui change</string>
     <string name="update_sha_label">SHA-256 annoncé pour l\'APK</string>
+    <string name="update_sha_label_named">SHA-256 annoncé pour %1$s</string>
     <string name="update_open">Ouvrir la page de la version</string>
     <string name="update_later">Plus tard</string>
 
@@ -483,5 +484,128 @@
     <string name="backup_saved">Sauvegarde enregistrée</string>
     <string name="export_saved">Export enregistré</string>
     <string name="file_write_error">Enregistrement du fichier impossible</string>
+
+    <string name="about_title">À propos</string>
+    <string name="about_tagline">Un gestionnaire de mots de passe qui reste sur votre téléphone</string>
+    <string name="about_version">v%1$s</string>
+
+    <string name="about_check_updates">Vérifier les mises à jour</string>
+    <string name="about_checking">Vérification…</string>
+    <string name="about_check_up_to_date">GitHub a été interrogé : c\'est la dernière version publiée.</string>
+    <string name="about_check_unreachable">GitHub n\'a pas pu être interrogé. On n\'a rien appris — c\'est peut-être la dernière version, peut-être pas.</string>
+    <string name="about_check_disguised">Rien n\'a été demandé. L\'application est camouflée en calculatrice, et cette vérification mettrait sur le réseau un trafic qu\'une calculatrice n\'a aucune raison de faire.</string>
+    <string name="about_check_unreadable_version">Le numéro de cette version ne peut pas être comparé à une version publiée : rien n\'a été demandé.</string>
+
+    <string name="about_section_privacy">Ce que Pass Tech ne fait jamais</string>
+    <string name="about_privacy_no_ads">Aucune publicité</string>
+    <string name="about_privacy_no_tracker">Aucun traceur</string>
+    <string name="about_privacy_offline">Fonctionne hors ligne</string>
+    <string name="about_privacy_no_collect">Ne collecte rien</string>
+    <string name="about_privacy_no_share">Ne partage rien</string>
+    <string name="about_privacy_no_store">Pas de Play Store</string>
+    <string name="about_privacy_network_title">Les deux seuls moments où elle se sert du réseau</string>
+    <string name="about_privacy_network_body">Demander à GitHub si une version plus récente est parue, une fois votre coffre ouvert, %1$d fois par jour au maximum. Et le contrôle des fuites de l\'écran d\'audit, que vous lancez vous-même : le mot de passe n\'est jamais envoyé, seulement les cinq premiers caractères de son empreinte, que des dizaines de milliers d\'autres mots de passe partagent.\n\nRien d\'autre ne quitte jamais ce téléphone, et votre coffre encore moins. Ce que ces deux appels montrent, en revanche, c\'est que quelqu\'un, depuis votre connexion, utilise cette application — GitHub voit une demande sur la dernière version de ce projet, et Have I Been Pwned voit cinq caractères d\'une empreinte.\n\nLes deux s\'arrêtent complètement tant que l\'application est camouflée en calculatrice.</string>
+
+    <string name="about_group_vault">Le coffre</string>
+    <string name="about_group_forced">Si on vous force à l\'ouvrir</string>
+    <string name="about_group_content">Ce qu\'il contient</string>
+    <string name="about_group_watch">Ce qu\'il surveille pour vous</string>
+    <string name="about_group_data">Vos données, entrée et sortie</string>
+
+    <string name="about_feature_vault">Coffre chiffré</string>
+    <string name="about_feature_vault_desc">AES-256-GCM. La clé est dérivée de votre mot de passe maître par Argon2id (%1$d Mio de mémoire, %2$d passes) et par une clé gardée dans la puce sécurisée du téléphone, qui participe à chaque essai, sans exception.</string>
+    <string name="about_feature_biometric">Empreinte, liée à ce téléphone</string>
+    <string name="about_feature_biometric_desc">La clé vit dans le Keystore d\'Android et ne se lit pas sans votre empreinte. Elle ne quitte jamais le téléphone, et une copie du coffre emportée ailleurs ne peut pas s\'en servir.</string>
+    <string name="about_feature_bruteforce">Deviner devient de plus en plus lent</string>
+    <string name="about_feature_bruteforce_desc">%1$s, puis une attente qui grandit de %2$s à %3$s. Une ouverture réussie annule son propre essai et aucun essai plus ancien : alterner entre deux coffres n\'efface donc jamais l\'attente.</string>
+    <string name="about_feature_autolock">Il se verrouille tout seul</string>
+    <string name="about_feature_autolock_desc">Immédiatement, après un délai qui va jusqu\'à %1$s, ou jamais — à votre choix. Quitter l\'application compte comme partir.</string>
+    <string name="about_feature_screenshot">Aucune capture d\'écran</string>
+    <string name="about_feature_screenshot_desc">Aucune capture, et aucun aperçu dans la liste des applications récentes, tant que le réglage est actif.</string>
+    <string name="about_feature_backup_off">Jamais sauvegardé par Android</string>
+    <string name="about_feature_backup_off_desc">Le coffre est exclu de la sauvegarde dans le cloud d\'Android et du transfert d\'un téléphone à l\'autre. La seule copie qui existe est celle que vous faites vous-même.</string>
+    <string name="about_feature_integrity">Il vous dit ce qu\'il voit</string>
+    <string name="about_feature_integrity_desc">Avant que vous tapiez votre mot de passe maître : si ce téléphone peut passer en root, si un débogueur est attaché, si c\'est une version de développement, si c\'est un émulateur. Il prévient, et ne bloque jamais.</string>
+
+    <string name="about_feature_decoy">Coffre leurre</string>
+    <string name="about_feature_decoy_desc">Un deuxième mot de passe ouvre un deuxième coffre, avec ses propres entrées. Rien sur ce téléphone ne dit si vous en avez un.</string>
+    <string name="about_feature_panic">Mode panique</string>
+    <string name="about_feature_panic_desc">Verrouille, vide le presse-papiers, désarme l\'empreinte, coupe le contrôle d\'adresse, et donne à l\'application l\'apparence d\'une calculatrice — qui fonctionne vraiment.</string>
+    <string name="about_feature_heir">Quelqu\'un après vous</string>
+    <string name="about_feature_heir_desc">Un proche ouvre une copie en lecture seule de votre coffre après un silence assez long de votre côté. Sur le téléphone, sans cloud et sans compte.</string>
+
+    <string name="about_feature_types_desc">Mots de passe, cartes bancaires et notes sécurisées.</string>
+    <string name="about_feature_totp">Codes à deux facteurs</string>
+    <string name="about_feature_totp_desc">Les codes à six chiffres, calculés ici, comme une application d\'authentification.</string>
+    <string name="about_feature_otpauth">Secrets à deux facteurs depuis un lien</string>
+    <string name="about_feature_otpauth_desc">Collez le lien otpauth:// que le site affiche sous son QR code : le secret en est extrait.</string>
+    <string name="about_feature_cards">Cartes bancaires</string>
+    <string name="about_feature_cards_desc">Numéro, titulaire, expiration, code de sécurité et code PIN, présentés comme une carte. Le numéro, le code de sécurité et le code PIN restent masqués tant que vous ne les demandez pas.</string>
+    <string name="about_feature_notes">Notes sécurisées</string>
+    <string name="about_feature_notes_desc">N\'importe quel texte confidentiel : RIB, codes de secours, clés de licence.</string>
+    <string name="about_feature_search">Recherche et tri</string>
+    <string name="about_feature_search_desc">Par titre, identifiant, adresse ou contenu ; du plus récent, du plus ancien, de A à Z ou de Z à A.</string>
+    <string name="about_feature_generator">Générateur</string>
+    <string name="about_feature_generator_desc">Des mots de passe de %1$d à %2$d caractères, ou une phrase de passe tirée de %3$s. Cette liste est française quelle que soit la langue de l\'application.</string>
+
+    <string name="about_feature_audit">Audit de sécurité</string>
+    <string name="about_feature_audit_desc">Une note sur 100 pour le coffre, et ce qui la fait baisser : les mots de passe faibles, ceux qui servent deux fois, ceux sans deuxième facteur. L\'âge est affiché et ne compte jamais contre vous.</string>
+    <string name="about_feature_breach">Contrôle des fuites</string>
+    <string name="about_feature_breach_desc">Demande à Have I Been Pwned si un mot de passe figure dans une fuite publique, sans jamais envoyer ce mot de passe.</string>
+    <string name="about_feature_phishing">Contrôle de l\'adresse</string>
+    <string name="about_feature_phishing_desc">Avant de copier un mot de passe, compare l\'adresse ouverte dans votre navigateur avec celle de l\'entrée, et retient la copie devant un sosie.</string>
+    <string name="about_feature_clipboard">Presse-papiers vidé</string>
+    <string name="about_feature_clipboard_desc">Au bout de %1$s à %2$s, ou jamais — à votre choix.</string>
+    <string name="about_feature_update">Vérification des mises à jour</string>
+    <string name="about_feature_update_desc">Vous prévient quand une version plus récente paraît, une fois votre coffre ouvert. Elle ne télécharge rien et n\'installe rien.</string>
+
+    <string name="about_feature_backup">Sauvegarde chiffrée (.ptbak)</string>
+    <string name="about_feature_backup_desc">Un fichier que seule votre phrase de passe ouvre, enregistré là où vous voulez. Il lit et écrit le même format que la version 2.7.1.</string>
+    <string name="about_feature_import">Import</string>
+    <string name="about_feature_import_desc">Chrome, Edge, un export JSON de Bitwarden, ou n\'importe quel CSV avec une colonne de mots de passe.</string>
+    <string name="about_feature_theme">Clair ou sombre</string>
+    <string name="about_feature_theme_desc">À votre choix, ou selon le réglage du téléphone.</string>
+
+    <string name="about_section_verify">Vérifier ce que vous téléchargez</string>
+    <string name="about_verify_body">Chaque version publie le SHA-256 de chacun de ses fichiers. Une fois l\'un d\'eux téléchargé, lancez :\n\nsha256sum &lt;le fichier que vous avez téléchargé&gt;\n\net comparez le résultat avec la ligne de ce même fichier sur la page de la version. Si les deux diffèrent, ne l\'installez pas.</string>
+
+    <string name="about_section_help">Aide rapide</string>
+    <string name="about_help_first_title">Premier lancement</string>
+    <string name="about_help_first_1">Choisissez un mot de passe maître d\'au moins 12 caractères.</string>
+    <string name="about_help_first_2">Il chiffre tout, et rien ne permet de le retrouver : si vous l\'oubliez, le coffre est perdu.</string>
+    <string name="about_help_add_title">Ajouter un mot de passe</string>
+    <string name="about_help_add_1">Le bouton Ajouter, en bas de l\'écran principal.</string>
+    <string name="about_help_add_2">Ou ouvrez le générateur et laissez-le en choisir un.</string>
+    <string name="about_help_update_title">Mises à jour</string>
+    <string name="about_help_update_1">Une fois votre coffre ouvert, l\'application demande à GitHub s\'il existe une version plus récente, %1$d fois par jour au maximum.</string>
+    <string name="about_help_update_2">Ou appuyez sur « Vérifier les mises à jour » ci-dessus, quand vous voulez.</string>
+
+    <string name="about_section_author">Auteur</string>
+    <string name="about_author_role">Développeur</string>
+
+    <string name="about_section_links">Aide et liens</string>
+    <string name="about_link_website">Site officiel</string>
+    <string name="about_link_source">Code source</string>
+    <string name="about_link_report">Signaler un problème</string>
+    <string name="about_link_report_subtitle">Ouvre votre application de courrier, la version et le téléphone déjà écrits</string>
+    <string name="about_link_licence">Licence</string>
+    <string name="about_report_subject">Pass Tech %1$s — signalement</string>
+    <string name="about_report_body">Décrivez ce qui s\'est passé :\n\n\n---\nVersion : %1$s\nTéléphone : %2$s (Android %3$s)\n</string>
+    <string name="about_link_failed">Aucune application de ce téléphone ne sait ouvrir cela.</string>
+
+    <plurals name="about_attempts">
+        <item quantity="one">%1$d essai</item>
+        <item quantity="other">%1$d essais</item>
+    </plurals>
+    <plurals name="about_entry_types">
+        <item quantity="one">%1$d type d\'entrée</item>
+        <item quantity="other">%1$d types d\'entrée</item>
+    </plurals>
+    <plurals name="about_words">
+        <item quantity="one">%1$d mot français</item>
+        <item quantity="other">%1$d mots français</item>
+    </plurals>
+
+    <string name="action_about">À propos</string>
 </resources>
 
