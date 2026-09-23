@@ -39,15 +39,29 @@ object DomainMatch {
     /** 2.7.1's threshold, kept: `paypal.com` against `paypa1.com` is one edit, `exarnple` two. */
     const val TYPO_DISTANCE = 2
 
-    /** 2.7.1's cut, kept: the cost of the distance is the product of the two lengths. */
-    private const val MAX_COMPARED = 50
+    /**
+     * The longest a DNS name can be. 2.7.1 cut both sides at 50 characters, and the cost of that cut
+     * is paid in the wrong direction: two hosts differing only past the fiftieth character came out
+     * **identical**, so the dialog offered "copy anyway" under the words "Distance: 0" — which reads
+     * as "the same site" — between a real one and an impostor. Whole names cost 253 × 253 cells of
+     * one row at a time, once per copy.
+     */
+    private const val MAX_COMPARED = 253
 
     /**
      * A plausible top-level label. Only what an address bar hands over is held to this: an entry
      * whose URL is an IP address or a bare name keeps its value, so the comparison ends in
      * [Verdict.UNKNOWN] — the browser side could not be read — rather than in a silent [Verdict.OK].
+     *
+     * **`xn--` belongs to this alphabet.** [normalize] has already punycoded the host, so an
+     * internationalised top level arrives as `xn--p1ai` (`.рф`), `xn--fiqs8s` (`.中国`) or
+     * `xn--3e0b707e` (`.한국`) — digits and a hyphen, which a letters-only pattern refuses. And
+     * refusing it does not end in "could not check": the service keeps the LAST readable host for
+     * fifteen seconds, so the page read just before answers in its place, and a bank on a `.рф`
+     * address is compared against whatever came before it. No address bar can show a page title
+     * ending in `.xn--…`, so nothing is lost by accepting it.
      */
-    private val TOP_LEVEL = Regex("\\.[a-z]{2,24}$")
+    private val TOP_LEVEL = Regex("\\.(xn--[a-z0-9-]{2,59}|[a-z]{2,24})$")
 
     /**
      * The host of [url], in the one form both sides can be compared in: lower case, no `www.`, no

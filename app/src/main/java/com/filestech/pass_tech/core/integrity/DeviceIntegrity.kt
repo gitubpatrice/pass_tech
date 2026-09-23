@@ -4,12 +4,14 @@ import android.content.Context
 import android.os.Build
 import android.os.Debug
 import com.filestech.pass_tech.core.state.StateStore
+import com.filestech.pass_tech.di.PhishingModule
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /** What this phone looks like, right now. */
@@ -20,7 +22,7 @@ fun interface DeviceIntegrity {
 @Singleton
 class AndroidDeviceIntegrity @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val debuggable: Boolean,
+    @Named(PhishingModule.DEBUGGABLE) private val debuggable: Boolean,
 ) : DeviceIntegrity {
 
     override fun issues(): Set<IntegrityIssue> = buildSet {

@@ -10,6 +10,25 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
+      The five root managers core/integrity/IntegritySignals.ROOT_APPS looks for, named one by one.
+      From Android 11 (targetSdk 30) an app sees no package it has not declared, so getPackageInfo
+      answered NameNotFoundException for all five on every modern phone: half the root check was
+      blind, and said so to nobody. Never QUERY_ALL_PACKAGES — five names are what is needed, and a
+      store or an F-Droid review has no reason to object to them.
+
+      The cost is that the list is readable in the published manifest, so a rooted owner can rename
+      their manager to escape it. Magisk already hides its package by default, so that cost was
+      mostly paid before this was written; the paths in SU_PATHS are the other half of the check.
+    -->
+    <queries>
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="eu.chainfire.supersu" />
+        <package android:name="com.koushikdutta.superuser" />
+        <package android:name="com.thirdparty.superuser" />
+        <package android:name="com.noshufou.android.su" />
+    </queries>
+
+    <!--
       allowBackup="false" plus both exclusion rule sets: no cloud backup and no device-to-device
       transfer of anything. The vault keys live in the AndroidKeyStore, bound to this install; a
       restored copy of the vault files would be unreadable anyway, and a backed-up copy is one more

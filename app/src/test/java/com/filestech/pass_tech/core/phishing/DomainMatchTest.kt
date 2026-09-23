@@ -123,13 +123,40 @@ class DomainMatchTest {
         assertThat(DomainMatch.check("victim.github.io", "attacker.github.io").verdict).isEqualTo(Verdict.MISMATCH)
     }
 
+    /**
+     * 2.7.1 cut both sides at fifty characters, and this test used to assert that cut as intended:
+     * `distance(long + "x.com", long + "y.com") == 0`. Two different hosts reading as identical is
+     * not a saving, it is the wrong answer — and the owner was shown "Distance: 0" under a "copy
+     * anyway" button, which reads as "the same site". The cut is now the longest a DNS name can be.
+     */
     @Test
-    fun `the distance is measured on at most fifty characters of each side`() {
+    fun `two hosts that differ only past the fiftieth character are not the same host`() {
         val long = "a".repeat(60)
-        assertThat(DomainMatch.distance(long + "x.com", long + "y.com")).isEqualTo(0)
+        assertThat(DomainMatch.distance(long + "x.com", long + "y.com")).isEqualTo(1)
+        assertThat(DomainMatch.check(long + "x.com", long + "y.com").verdict).isEqualTo(Verdict.TYPOSQUATTING)
+        assertThat(DomainMatch.check(long + "x.com", long + "y.com").distance).isEqualTo(1)
         assertThat(DomainMatch.distance("paypal.com", "paypa1.com")).isEqualTo(1)
         assertThat(DomainMatch.distance("", "abc")).isEqualTo(3)
         assertThat(DomainMatch.distance("abc", "")).isEqualTo(3)
+    }
+
+    /**
+     * An internationalised top level arrives punycoded — digits and a hyphen — and a letters-only
+     * pattern refused it. What followed was not "could not check": the service keeps the last
+     * readable host for fifteen seconds, so the page read just before answered in its place.
+     */
+    @Test
+    fun `an internationalised top level is a top level`() {
+        assertThat(DomainMatch.fromAddressBar("сбербанк.рф")).isEqualTo("xn--80abap1arsf.xn--p1ai")
+        assertThat(DomainMatch.fromAddressBar("https://shop.中国/panier")).isEqualTo("shop.xn--fiqs8s")
+        // Measured, not written by hand: guessing a punycode value is how a vector was wrong once.
+        assertThat(DomainMatch.fromAddressBar("청와대.한국")).isEqualTo("xn--vk1b187a8ue.xn--3e0b707e")
+        // And an entry noting the same address still matches it, in either form.
+        assertThat(DomainMatch.check("сбербанк.рф", "xn--80abap1arsf.xn--p1ai").verdict).isEqualTo(Verdict.OK)
+        assertThat(DomainMatch.check("сбербанк.рф", "сбербанк.рф").verdict).isEqualTo(Verdict.OK)
+        // What is still not a host stays not a host: a page title, a search, an IP address.
+        assertThat(DomainMatch.fromAddressBar("192.168.1.1")).isNull()
+        assertThat(DomainMatch.fromAddressBar("Ma Banque — connexion")).isNull()
     }
 
     /** `contentOrNull` is null for a JSON null, which is how "no browser was read" is written. */
