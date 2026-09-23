@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.SettingsAccessibility
 import androidx.compose.material.icons.outlined.SettingsBrightness
@@ -131,7 +132,7 @@ private enum class SettingsDialog {
  * The rest of 2.7.1's settings (decoy, panic, heir, data) come with their features.
  */
 @Composable
-fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onBack: () -> Unit) {
+fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onBack: () -> Unit, onAudit: () -> Unit) {
     BackHandler(onBack = onBack)
     val ui by settings.state.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
@@ -219,6 +220,15 @@ fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onB
             }
             // Always shown, on every phone and from every vault: a tile that appeared only where a decoy
             // is possible would answer the one question the whole design exists to leave open.
+            item {
+                Tile(
+                    icon = Icons.Outlined.Policy,
+                    title = stringResource(R.string.settings_audit_title),
+                    subtitle = stringResource(R.string.settings_audit_subtitle),
+                    onClick = onAudit,
+                )
+            }
+
             item { SectionTitle(R.string.settings_section_decoy) }
             item {
                 Tile(

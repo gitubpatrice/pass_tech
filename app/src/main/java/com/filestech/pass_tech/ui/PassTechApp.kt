@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.R
 import com.filestech.pass_tech.core.vault.VaultManager
+import com.filestech.pass_tech.ui.audit.AuditScreen
+import com.filestech.pass_tech.ui.audit.AuditViewModel
 import com.filestech.pass_tech.ui.components.PrivateKeyboard
 import com.filestech.pass_tech.ui.entries.EntriesViewModel
 import com.filestech.pass_tech.ui.entries.EntriesViewModel.Message
@@ -61,6 +63,7 @@ fun PassTechApp(
     entries: EntriesViewModel,
     home: HomeViewModel,
     settings: SettingsViewModel,
+    audit: AuditViewModel,
     splash: SplashViewModel,
 ) {
     val vaultState by app.vaultState.collectAsStateWithLifecycle()
@@ -77,7 +80,7 @@ fun PassTechApp(
             when {
                 // The auto-lock found the delay over on the way back: nothing of the vault, not even for a frame.
                 locking -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                state is VaultManager.State.Open -> OpenVault(state, Screens(entries, home, settings), snackbar, onLock = app::lock)
+                state is VaultManager.State.Open -> OpenVault(state, Screens(entries, home, settings, audit), snackbar, onLock = app::lock)
                 // Read only, and nothing of this app around it: no vault is open behind this screen.
                 state is VaultManager.State.Heir -> HeirScreen(state.entries, snackbar, onCopy = entries::copy)
                 else -> EntryScreen(entry)
@@ -104,7 +107,10 @@ fun PassTechApp(
 /** The home, or the screen on top of it: an entry's detail or the editor. */
 @Composable
 private fun OpenVault(state: VaultManager.State.Open, screens: Screens, snackbar: SnackbarHostState, onLock: () -> Unit) {
-    val (entries, home, settings) = screens
+    val entries = screens.entries
+    val home = screens.home
+    val settings = screens.settings
+    val audit = screens.audit
     val stack by entries.stack.collectAsStateWithLifecycle()
     when (val top = stack.lastOrNull()) {
         null -> HomeScreen(
@@ -151,12 +157,28 @@ private fun OpenVault(state: VaultManager.State.Open, screens: Screens, snackbar
             onUse = if (top.target != null) ({ entries.useGenerated(top) }) else null,
             onCopy = entries::copyGenerated,
         )
-        Screen.Settings -> SettingsScreen(settings, snackbar, onBack = { entries.close(Screen.Settings) })
+        Screen.Settings -> SettingsScreen(
+            settings = settings,
+            snackbar = snackbar,
+            onBack = { entries.close(Screen.Settings) },
+            onAudit = entries::openAudit,
+        )
+        Screen.Audit -> AuditScreen(
+            audit = audit,
+            snackbar = snackbar,
+            onBack = { entries.close(Screen.Audit) },
+            onOpen = { entries.openDetail(it.id) },
+        )
     }
 }
 
 /** The view models of the screens of an open vault. */
-private data class Screens(val entries: EntriesViewModel, val home: HomeViewModel, val settings: SettingsViewModel)
+private data class Screens(
+    val entries: EntriesViewModel,
+    val home: HomeViewModel,
+    val settings: SettingsViewModel,
+    val audit: AuditViewModel,
+)
 
 /** One message at a time: a new one replaces the one showing, as 2.7.1's snack bars do. */
 @Composable

@@ -375,6 +375,43 @@
     <string name="panic_warn_biometric_title">Biometric unlock will be disabled</string>
     <string name="panic_warn_biometric_body">Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.</string>
 
+    <!-- Security audit (2.7.1 audit_screen.dart, vault_audit_score.dart) -->
+    <string name="settings_audit_title">Security audit</string>
+    <string name="settings_audit_subtitle">Weak passwords, duplicates, breaches…</string>
+    <string name="audit_title">Security audit</string>
+    <string name="audit_refresh">Refresh</string>
+    <string name="audit_score_none">Not applicable</string>
+    <string name="audit_score_excellent">Excellent</string>
+    <string name="audit_score_good">Good</string>
+    <string name="audit_score_fair">Medium</string>
+    <string name="audit_score_poor">Weak</string>
+    <string name="audit_score_partial">Partial score: some passwords have not been put against the breach list.</string>
+    <string name="audit_stat_entries">Entries</string>
+    <string name="audit_stat_passwords">Passwords</string>
+    <string name="audit_stat_second_factor">With 2FA</string>
+    <string name="audit_stat_notes">Notes</string>
+    <string name="audit_stat_cards">Cards</string>
+    <string name="audit_breach_title">Data breach check</string>
+    <string name="audit_breach_body">Compares your passwords with public breaches. Only five characters of a hash leave the phone, never a password.</string>
+    <string name="audit_breach_run">Run check</string>
+    <string name="audit_breach_again">Check again</string>
+    <string name="audit_breach_none">No compromised password found</string>
+    <plurals name="audit_breach_found">
+        <item quantity="one">%1$d compromised password</item>
+        <item quantity="other">%1$d compromised passwords</item>
+    </plurals>
+    <plurals name="audit_breach_unanswered">
+        <item quantity="one">%1$d password could not be checked: it stays outside the score.</item>
+        <item quantity="other">%1$d passwords could not be checked: they stay outside the score.</item>
+    </plurals>
+    <string name="audit_breach_network_error">No answer at all — check your connection</string>
+    <!-- The launcher is showing a calculator: any traffic at all would contradict it. -->
+    <string name="audit_breach_disguised">Not sent: the app is disguised, and this check would show on the network</string>
+    <string name="audit_weak">Weak passwords</string>
+    <string name="audit_duplicates">Duplicates</string>
+    <string name="audit_no_second_factor">No 2FA on a sensitive account</string>
+    <string name="audit_stale">Not reviewed for over a year</string>
+
     <!-- Anti-phishing (2.7.1 anti_phishing_service.dart, PhishingDetectorService.kt) -->
     <!--
       These two are drawn by ANDROID, in its accessibility settings, so they follow the language of

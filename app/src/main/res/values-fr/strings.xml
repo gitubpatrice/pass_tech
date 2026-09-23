@@ -338,6 +338,42 @@
     <string name="panic_warn_biometric_body">Le mode panique supprime l\'enrôlement biométrique — sinon quelqu\'un pourrait ouvrir votre coffre en vous faisant poser le doigt.\n\nAprès activation, SEUL votre mot de passe maître ouvrira le coffre. Il n\'est récupérable par aucun moyen.\n\nAssurez-vous de le connaître avant de continuer.</string>
 
     <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <!-- Audit de sécurité -->
+    <string name="settings_audit_title">Audit de sécurité</string>
+    <string name="settings_audit_subtitle">Mots de passe faibles, doublons, fuites…</string>
+    <string name="audit_title">Audit sécurité</string>
+    <string name="audit_refresh">Actualiser</string>
+    <string name="audit_score_none">Non applicable</string>
+    <string name="audit_score_excellent">Excellent</string>
+    <string name="audit_score_good">Bon</string>
+    <string name="audit_score_fair">Moyen</string>
+    <string name="audit_score_poor">Faible</string>
+    <string name="audit_score_partial">Score partiel : certains mots de passe n\'ont pas été confrontés aux fuites.</string>
+    <string name="audit_stat_entries">Entrées</string>
+    <string name="audit_stat_passwords">Mots de passe</string>
+    <string name="audit_stat_second_factor">Avec 2FA</string>
+    <string name="audit_stat_notes">Notes</string>
+    <string name="audit_stat_cards">Cartes</string>
+    <string name="audit_breach_title">Vérification de fuites de données</string>
+    <string name="audit_breach_body">Compare vos mots de passe aux fuites publiques. Seuls cinq caractères d\'une empreinte quittent le téléphone, jamais un mot de passe.</string>
+    <string name="audit_breach_run">Lancer la vérification</string>
+    <string name="audit_breach_again">Vérifier à nouveau</string>
+    <string name="audit_breach_none">Aucun mot de passe compromis</string>
+    <plurals name="audit_breach_found">
+        <item quantity="one">%1$d mot de passe compromis</item>
+        <item quantity="other">%1$d mots de passe compromis</item>
+    </plurals>
+    <plurals name="audit_breach_unanswered">
+        <item quantity="one">%1$d mot de passe n\'a pas pu être vérifié : il reste hors du score.</item>
+        <item quantity="other">%1$d mots de passe n\'ont pas pu être vérifiés : ils restent hors du score.</item>
+    </plurals>
+    <string name="audit_breach_network_error">Aucune réponse — vérifiez votre connexion</string>
+    <string name="audit_breach_disguised">Rien n\'a été envoyé : l\'app est camouflée, et cette vérification se verrait sur le réseau</string>
+    <string name="audit_weak">Mots de passe faibles</string>
+    <string name="audit_duplicates">Doublons</string>
+    <string name="audit_no_second_factor">Sans 2FA sur compte sensible</string>
+    <string name="audit_stale">Non revus depuis plus d\'un an</string>
+
     <!-- Anti-phishing -->
     <string name="phishing_service_label">Pass Tech — anti-phishing</string>
     <string name="phishing_detector_description">Lit le domaine affiché par le navigateur au premier plan, pour vérifier qu\'il correspond à l\'entrée Pass Tech avant de copier un mot de passe. Seul le domaine est lu, uniquement en mémoire : rien n\'est enregistré, rien n\'est envoyé. Seuls les navigateurs reconnus sont lus. Cette lecture est activée à votre demande, et disparaît de cette liste dès que vous la désactivez dans Pass Tech.</string>

@@ -56,6 +56,8 @@ class EntriesViewModel @Inject constructor(
         class Generator(val state: GeneratorState, val target: EntryForm?) : Screen
 
         data object Settings : Screen
+
+        data object Audit : Screen
     }
 
     sealed interface Message {
@@ -108,6 +110,8 @@ class EntriesViewModel @Inject constructor(
     fun openEditor(entry: Entry) = push(Screen.Edit(EntryForm.edit(entry)))
 
     fun openSettings() = push(Screen.Settings)
+
+    fun openAudit() = push(Screen.Audit)
 
     fun openGenerator(target: EntryForm? = null) = push(Screen.Generator(GeneratorState(), target))
 

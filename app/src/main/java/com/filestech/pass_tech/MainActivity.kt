@@ -23,6 +23,7 @@ import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.ui.AppViewModel
 import com.filestech.pass_tech.ui.PassTechApp
+import com.filestech.pass_tech.ui.audit.AuditViewModel
 import com.filestech.pass_tech.ui.entries.EntriesViewModel
 import com.filestech.pass_tech.ui.entry.EntryViewModel
 import com.filestech.pass_tech.ui.home.HomeViewModel
@@ -44,6 +45,7 @@ class MainActivity : FragmentActivity() {
     private val entries: EntriesViewModel by viewModels()
     private val home: HomeViewModel by viewModels()
     private val settings: SettingsViewModel by viewModels()
+    private val audit: AuditViewModel by viewModels()
     private val splash: SplashViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,7 +84,15 @@ class MainActivity : FragmentActivity() {
                 onDispose {}
             }
             PassTechTheme(darkTheme = dark) {
-                PassTechApp(app = app, entry = entry, entries = entries, home = home, settings = settings, splash = splash)
+                PassTechApp(
+                    app = app,
+                    entry = entry,
+                    entries = entries,
+                    home = home,
+                    settings = settings,
+                    audit = audit,
+                    splash = splash,
+                )
             }
         }
     }
