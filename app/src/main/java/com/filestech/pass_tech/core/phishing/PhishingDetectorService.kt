@@ -46,11 +46,11 @@ class PhishingDetectorService : AccessibilityService() {
         val root = rootInActiveWindow ?: return
         val found = mutableListOf<AccessibilityNodeInfo>()
         try {
-            for (id in addressBars) {
-                val nodes = root.findAccessibilityNodeInfosByViewId(id) ?: continue
+            for (bar in addressBars) {
+                val nodes = root.findAccessibilityNodeInfosByViewId(bar.viewId) ?: continue
                 found += nodes
                 for (node in nodes) {
-                    val host = DomainMatch.fromAddressBar(node.text?.toString().orEmpty()) ?: continue
+                    val host = bar.hostOrNull(node, found) ?: continue
                     snapshot.record(host)
                     return
                 }
@@ -83,6 +83,43 @@ class PhishingDetectorService : AccessibilityService() {
         snapshot.clear()
     }
 
+    /**
+     * One address bar of one browser, and **where in it the address is written**.
+     *
+     * Reading a node's DESCRIPTION is declared browser by browser and never used as a fallback when
+     * the text is empty. In several browsers the field beside the address bar holds the page TITLE,
+     * which the page itself chooses: 2.7.1 read one of those, and a fake page titled `mabanque.fr`
+     * was read as that domain and answered for it (removed on 2026-08-03). A fallback would bring
+     * that back for every browser at once.
+     */
+    private class AddressBar private constructor(
+        val viewId: String,
+        private val insideTag: String?,
+        private val inDescription: Boolean,
+    ) {
+
+        /** [opened] collects every node this walks, so the caller can give them all back. */
+        fun hostOrNull(node: AccessibilityNodeInfo, opened: MutableList<AccessibilityNodeInfo>): String? {
+            val target = if (insideTag == null) node else taggedOrNull(node, insideTag, opened) ?: return null
+            return if (inDescription) {
+                DomainMatch.fromAddressBarDescription(target.contentDescription?.toString().orEmpty())
+            } else {
+                DomainMatch.fromAddressBar(target.text?.toString().orEmpty())
+            }
+        }
+
+        companion object {
+            fun text(viewId: String) = AddressBar(viewId, insideTag = null, inDescription = false)
+
+            /**
+             * [viewId] is the real view around it — a Compose test tag is not a resource the
+             * framework can resolve, so it is found by walking that node's own small subtree.
+             */
+            fun describedTag(viewId: String, tag: String) =
+                AddressBar(viewId, insideTag = tag, inDescription = true)
+        }
+    }
+
     private companion object {
         /** `AccessibilityNodeInfo.recycle` does nothing from API 34 on, and is deprecated. */
         const val RECYCLING_ENDED = 34
@@ -93,21 +130,69 @@ class PhishingDetectorService : AccessibilityService() {
         )
 
         /**
-         * 2.7.1's list, unchanged. The identifier must be the one of the **address bar**: the field
-         * next to it in several of these browsers holds the page TITLE, which the page chooses — a
-         * fake page titled `mabanque.fr` was read as that domain and answered for, which turned the
-         * protection against its owner (2.7.1 removed it on 2026-08-03).
+         * Firefox's Compose toolbar names its address box by a **test tag**, which carries no
+         * package prefix and is not a resource the framework can resolve — so
+         * `findAccessibilityNodeInfosByViewId` cannot reach it. The toolbar around it is a real
+         * view, and the box is found by walking that.
          */
-        val ADDRESS_BARS: Map<String, List<String>> = mapOf(
-            "com.android.chrome" to listOf("com.android.chrome:id/url_bar"),
-            "com.brave.browser" to listOf("com.brave.browser:id/url_bar"),
-            "com.vivaldi.browser" to listOf("com.vivaldi.browser:id/url_bar"),
-            "com.microsoft.emmx" to listOf("com.microsoft.emmx:id/url_bar"),
-            "com.opera.browser" to listOf("com.opera.browser:id/url_field"),
-            "org.mozilla.firefox" to listOf("org.mozilla.firefox:id/mozac_browser_toolbar_url_view"),
-            "org.mozilla.fenix" to listOf("org.mozilla.fenix:id/mozac_browser_toolbar_url_view"),
-            "com.sec.android.app.sbrowser" to listOf("com.sec.android.app.sbrowser:id/location_bar_edit_text"),
-            "com.duckduckgo.mobile.android" to listOf("com.duckduckgo.mobile.android:id/omnibarTextInput"),
+        const val FIREFOX_URL_BOX = "ADDRESSBAR_URL_BOX"
+
+        /**
+         * 2.7.1's list, with Firefox corrected. **An identifier goes stale in silence**: Firefox
+         * moved to a Compose toolbar, `mozac_browser_toolbar_url_view` stopped existing, and the
+         * protection answered "could not check" on every copy — measured on a Galaxy S24 on
+         * 2026-09-23, where Firefox is the default browser. Chrome was measured the same day and
+         * still puts the address in the text of `url_bar`. **The seven others have never been
+         * checked on a device**: open the browser on a page, withdraw the accessibility grant so
+         * `uiautomator dump` can read the screen, and look at the `resource-id` of the address bar.
+         *
+         * Both Firefox identifiers are kept, the new one first: a phone still on an older build
+         * reads the old one.
+         */
+        val ADDRESS_BARS: Map<String, List<AddressBar>> = mapOf(
+            "com.android.chrome" to listOf(AddressBar.text("com.android.chrome:id/url_bar")),
+            "com.brave.browser" to listOf(AddressBar.text("com.brave.browser:id/url_bar")),
+            "com.vivaldi.browser" to listOf(AddressBar.text("com.vivaldi.browser:id/url_bar")),
+            "com.microsoft.emmx" to listOf(AddressBar.text("com.microsoft.emmx:id/url_bar")),
+            "com.opera.browser" to listOf(AddressBar.text("com.opera.browser:id/url_field")),
+            "org.mozilla.firefox" to listOf(
+                AddressBar.describedTag("org.mozilla.firefox:id/composable_toolbar", FIREFOX_URL_BOX),
+                AddressBar.text("org.mozilla.firefox:id/mozac_browser_toolbar_url_view"),
+            ),
+            "org.mozilla.fenix" to listOf(
+                AddressBar.describedTag("org.mozilla.fenix:id/composable_toolbar", FIREFOX_URL_BOX),
+                AddressBar.text("org.mozilla.fenix:id/mozac_browser_toolbar_url_view"),
+            ),
+            "com.sec.android.app.sbrowser" to listOf(
+                AddressBar.text("com.sec.android.app.sbrowser:id/location_bar_edit_text"),
+            ),
+            "com.duckduckgo.mobile.android" to listOf(
+                AddressBar.text("com.duckduckgo.mobile.android:id/omnibarTextInput"),
+            ),
         )
     }
+}
+
+/** How deep inside a browser's toolbar a Compose test tag is looked for. A toolbar is shallow. */
+private const val MAX_TAG_DEPTH = 6
+
+/**
+ * The node named [tag] inside [node], or `null`. Depth-first and bounded: this is handed a browser's
+ * toolbar, never a page, and it must not become a walk of one. [opened] collects every node it takes
+ * hold of, so the caller can give them all back on the versions where that still matters.
+ */
+private fun taggedOrNull(
+    node: AccessibilityNodeInfo,
+    tag: String,
+    opened: MutableList<AccessibilityNodeInfo>,
+    depth: Int = 0,
+): AccessibilityNodeInfo? {
+    if (node.viewIdResourceName == tag) return node
+    if (depth >= MAX_TAG_DEPTH) return null
+    for (index in 0 until node.childCount) {
+        val child = node.getChild(index) ?: continue
+        opened += child
+        taggedOrNull(child, tag, opened, depth + 1)?.let { return it }
+    }
+    return null
 }

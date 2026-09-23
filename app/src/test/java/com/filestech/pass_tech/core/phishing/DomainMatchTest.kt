@@ -118,6 +118,30 @@ class DomainMatchTest {
         assertThat(DomainMatch.check("example.com", "notexample.com").verdict).isEqualTo(Verdict.MISMATCH)
     }
 
+    /**
+     * Firefox's Compose toolbar keeps no text in its address box at all: the address is in the
+     * node's description, first, followed by the browser's own hint in the phone's language.
+     * Measured on a Galaxy S24 in French — the identifier this replaces had gone stale in silence,
+     * and every copy answered "could not check".
+     */
+    @Test
+    fun `an address written in a description is read, and only its first word`() {
+        assertThat(DomainMatch.fromAddressBarDescription(" example.com. Recherche ou adresse")).isEqualTo("example.com")
+        assertThat(DomainMatch.fromAddressBarDescription(" example.com. Search or enter address")).isEqualTo("example.com")
+        // A full address is normalised like any other, trailing dot included.
+        assertThat(DomainMatch.fromAddressBarDescription(" https://www.example.com/a?b=1. Recherche"))
+            .isEqualTo("example.com")
+        // Nothing but the hint, a search, or a name being typed: no reading at all.
+        assertThat(DomainMatch.fromAddressBarDescription("Recherche ou adresse")).isNull()
+        assertThat(DomainMatch.fromAddressBarDescription("")).isNull()
+        assertThat(DomainMatch.fromAddressBarDescription("   ")).isNull()
+        // Fails closed rather than guessing: a description that does not start with the address
+        // reads as nothing, and the owner is told the check could not be made.
+        assertThat(DomainMatch.fromAddressBarDescription("Barre d'adresse : example.com")).isNull()
+        // A page title is not a host, whatever the browser calls the field it sits in.
+        assertThat(DomainMatch.fromAddressBarDescription("Ma Banque — connexion")).isNull()
+    }
+
     @Test
     fun `a public suffix is not a domain someone owns`() {
         assertThat(DomainMatch.check("victim.github.io", "attacker.github.io").verdict).isEqualTo(Verdict.MISMATCH)

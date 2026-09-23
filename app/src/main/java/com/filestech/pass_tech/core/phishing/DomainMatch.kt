@@ -107,6 +107,18 @@ object DomainMatch {
     fun fromAddressBar(raw: String): String? = normalize(raw)?.takeIf { TOP_LEVEL.containsMatchIn(it) }
 
     /**
+     * The same, for a browser that keeps its address in a node's **description** rather than its
+     * text. Firefox's address box does: since it became a Compose toolbar its text is empty and it
+     * describes itself as `" example.com. Search or enter address"` — the address first, then the
+     * browser's own hint in the phone's language.
+     *
+     * Only the first run of non-space characters is read, because no host holds a space and
+     * everything after it is that translated hint. What is left still has to pass [fromAddressBar],
+     * so a bar showing a search or a half-typed name reads as nothing at all.
+     */
+    fun fromAddressBarDescription(raw: String): String? = fromAddressBar(raw.trim().substringBefore(' '))
+
+    /**
      * [url] is what the entry stores, [otherDomains] the other addresses it declares, [active] what
      * the browser is showing. Every side is normalised here, so a caller cannot hand in one form and
      * be compared against another.
