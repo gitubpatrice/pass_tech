@@ -229,10 +229,78 @@ class HeirTest {
     @Test
     fun `every slot carries a snapshot, and they all weigh the same`() {
         configure(vaultWith(owner))
-        val sizes = Slot.entries.map { File(dir, "pt_heir_${it.label}.enc").length() }
-        assertThat(sizes.toSet()).hasSize(1)
-        assertThat(sizes.first()).isGreaterThan(0L)
+        assertThat(snapshotSizes().toSet()).hasSize(1)
+        assertThat(snapshotSizes().first()).isGreaterThan(0L)
     }
+
+    /**
+     * The first setup makes all three the same size. The second one, once the vault has outgrown that
+     * size, has to bring the other two with it — or the files say which slot has an heir, and with it
+     * which slot holds a vault at all.
+     *
+     * This is the path nothing covered. The dummies were written once and never rewritten, because
+     * nothing could tell a dummy from a real snapshot of a vault this one knows nothing about; so on
+     * the ordinary phone — one vault, one heir, two dummies — they stayed at 64 KiB for ever while
+     * the real one moved to 256 KiB. `HeirMark` is what makes the difference sayable.
+     */
+    @Test
+    fun `the snapshots still weigh the same once the vault has outgrown a bucket`() {
+        val small = vaultWith(owner)
+        configure(small)
+        assertThat(snapshotSizes().toSet()).hasSize(1)
+
+        // Past 64 KiB of entries, so the next snapshot lands in the bucket above.
+        val grown = repo.save(open(owner), List(GROWN_ENTRIES) { bulky("entry-$it") })
+        configure(grown)
+
+        assertThat(snapshotSizes().toSet()).hasSize(1)
+        // And it really did grow: a test that passed because nothing moved would prove nothing.
+        assertThat(snapshotSizes().first()).isGreaterThan(FIRST_BUCKET_BYTES)
+    }
+
+    /** A real snapshot of another vault is never overwritten, whatever its size: only its own vault may. */
+    @Test
+    fun `growing one vault never destroys the heir of another`() {
+        configure(vaultWith(owner))
+        val decoySession = repo.configureDecoy(open(owner), decoy.encodeToByteArray()).let { open(decoy) }
+        configure(repo.save(decoySession, listOf(entry("decoy bank"))), passphrase = "laphraseduleurre2026")
+
+        val grown = repo.save(open(owner), List(GROWN_ENTRIES) { bulky("entry-$it") })
+        configure(grown)
+
+        // The decoy's heir still opens with its own passphrase: the growth did not write over it.
+        silentFor(30 + HeirState.GRACE_DAYS)
+        val opened = readAsHeir("laphraseduleurre2026")
+        assertThat((opened as HeirRepository.UnlockResult.Opened).entries.map { it.title }).containsExactly("decoy bank")
+    }
+
+    /**
+     * A file whose mark cannot be read — one written before the mark existed, a corrupted one, a
+     * Keystore that stayed silent — is never written over. Refusing to touch it can only leave sizes
+     * uneven; touching it wrongly destroys the heir of a vault this one must not know about, and
+     * there would be no way back.
+     */
+    @Test
+    fun `a snapshot whose mark cannot be read is left exactly as it is`() {
+        val session = vaultWith(owner)
+        configure(session)
+        val other = (Slot.entries - session.slot).first()
+        val file = File(dir, "pt_heir_${other.label}.enc")
+        // The mark goes, the rest of the file stays: exactly a file written before the mark existed.
+        val unmarked = file.readText().replace(Regex(""""occ":\{[^}]*\},"""), "")
+        file.writeText(unmarked)
+        val before = file.readText()
+
+        val grown = repo.save(open(owner), List(GROWN_ENTRIES) { bulky("entry-$it") })
+        configure(grown)
+
+        assertThat(file.readText()).isEqualTo(before)
+    }
+
+    private fun snapshotSizes(): List<Long> = Slot.entries.map { File(dir, "pt_heir_${it.label}.enc").length() }
+
+    /** An entry heavy enough that a few dozen of them pass the first padding bucket. */
+    private fun bulky(title: String) = entry(title).copy(notes = "n".repeat(BULKY_NOTES))
 
     @Test
     fun `a wrong passphrase costs a growing delay`() {
@@ -285,5 +353,10 @@ class HeirTest {
     private companion object {
         const val DAY_MILLIS = 24L * 60 * 60 * 1000
         const val MINUTE_MILLIS = 60L * 1000
+
+        /** Enough entries, heavy enough, to pass the first padding bucket of 64 KiB. */
+        const val GROWN_ENTRIES = 80
+        const val BULKY_NOTES = 1200
+        const val FIRST_BUCKET_BYTES = 64L * 1024
     }
 }

@@ -26,9 +26,11 @@ import com.filestech.pass_tech.core.vault.valueOrNull
  * - **A passphrase that opens a snapshot whose vault is not yet due is refused in the same words as a
  *   wrong passphrase.** The unlock screen offers heir access on every phone, configured or not
  *   (design v2 §8): there is nothing to read from the offer, and nothing to read from the refusal.
- * - **No file of another slot is ever rewritten.** Without the passphrase, a real snapshot cannot be
- *   told from a dummy, so rewriting "the others" as dummies would destroy an heir belonging to a
- *   vault this one must not even know about. Missing files are created, never replaced.
+ * - **No REAL snapshot of another slot is ever rewritten.** Its passphrase is the only thing that
+ *   could seal it again, so rewriting "the others" would destroy an heir belonging to a vault this
+ *   one must not even know about. What can be rewritten is this app's own dummies, and only because
+ *   [HeirMark] lets it say which those are: without that they never caught up in size, and their
+ *   size then said which slot had an heir (design §21).
  *
  * Not thread-safe: the caller serialises the calls.
  */
@@ -80,7 +82,9 @@ class HeirRepository(
         val plain = HeirContainer.payloadOf(HeirSnapshot(generation, entries))
         val bucket = maxOf(Padding.bucketFor(plain.size), largestBucketOnDisk())
         val content = key.useThenWipe { sealing ->
-            plain.useThenWipe { Padding.pad(it, bucket) }.useThenWipe { padded -> HeirContainer.seal(header, sealing, padded) }
+            plain.useThenWipe { Padding.pad(it, bucket) }.useThenWipe { padded ->
+                HeirContainer.seal(header, sealing, padded, HeirMark.real.seal(slot, keystore))
+            }
         }
         writeSnapshot(slot, content, bucket)
         state.enable(generation, thresholdDays)
@@ -185,23 +189,54 @@ class HeirRepository(
     }
 
     /**
-     * Writes [slot]'s snapshot, and creates a dummy for any slot that has none yet, in ONE write. An
-     * existing file of another slot is never replaced: it may be a real heir of a vault this one
-     * knows nothing about, and nothing but its passphrase could tell.
+     * Writes [slot]'s snapshot, and brings every other slot to [bucket] in the SAME write: a missing
+     * file becomes a dummy, and a dummy smaller than [bucket] is made again at that size.
+     *
+     * A file that says it is a **real** snapshot is never replaced — it may be the heir of a vault
+     * this one is not supposed to know exists, and rewriting it would destroy that heir. Neither is
+     * one whose mark cannot be read. Both then stay at their own size until their own vault next
+     * writes, which is the residual the design states for the vaults themselves (§11 point 2).
+     *
+     * **What this closes.** Before the mark, nothing could tell a dummy from a real snapshot, so no
+     * existing file was ever touched and the dummies never caught up at all — on the ordinary phone,
+     * one vault with an heir and two dummies, the two stayed at 64 KiB while the real one grew to
+     * 256 KiB, and the sizes said which slot had the heir. The design called that the same residual
+     * as the vaults', and it was not: there, a FREE slot is realigned at every single save.
      */
     private fun writeSnapshot(slot: Slot, content: String, bucket: Int) {
         val updates = mutableMapOf(slot to content)
         for (other in Slot.entries - slot) {
-            if (files.read(other) == null) updates[other] = dummy(other, bucket)
+            if (needsDummy(other, bucket)) updates[other] = dummy(other, bucket)
         }
         files.writeAll(updates)
     }
 
-    /** A snapshot nobody can open: a random key, never kept, over padding only. */
+    /**
+     * Whether [slot]'s file is one this vault may write a dummy over, and one that is not already big
+     * enough. Reading the mark costs a Keystore call; a silent Keystore reads as UNKNOWN, like every
+     * other answer that is not a plain "this is a dummy".
+     */
+    private fun needsDummy(slot: Slot, bucket: Int): Boolean {
+        val content = files.read(slot) ?: return true
+        // Unreadable, unmarked, or a mark the Keystore would not open: UNKNOWN, and left alone.
+        val parsed = HeirContainer.parseOrNull(content, slot) ?: return false
+        val mark = parsed.mark?.let { HeirMark.openOrNull(it, slot, keystore) } ?: return false
+        // The size test is a FAST PATH and not a guard: making a dummy again at the size it already
+        // has produces a file of the same size, so removing it changes no verdict, only the work.
+        // Said here because a negative control that took it out caught nothing, and a control that
+        // catches nothing has to be explained rather than left looking like a weak test.
+        return !mark.real && parsed.cipherAndTag.size - AesGcm.TAG_LENGTH < bucket
+    }
+
+    /**
+     * A snapshot nobody can open: a random key, never kept, over padding only. Its mark says so, and
+     * that is the only thing about it anyone without the Keystore key can learn — the mark has a
+     * fixed length and a random nonce, so it reads the same as a real one.
+     */
     private fun dummy(slot: Slot, bucket: Int): String {
         val header = HeirContainer.newHeader(slot, params)
         return SecretBytes.random(AesGcm.KEY_LENGTH).useThenWipe { key ->
-            HeirContainer.seal(header, key, Padding.pad(ByteArray(0), bucket))
+            HeirContainer.seal(header, key, Padding.pad(ByteArray(0), bucket), HeirMark.dummy.seal(slot, keystore))
         }
     }
 

@@ -67,13 +67,22 @@ object HeirContainer {
             info = HKDF_INFO,
         )
 
-    fun seal(header: Header, key: ByteArray, paddedPayload: ByteArray): String {
+    /**
+     * [mark] says whether this file is a real snapshot or a dummy, sealed by the hardware and
+     * readable without the passphrase: see [HeirMark] for why that is needed and what it must never
+     * be used for.
+     */
+    fun seal(header: Header, key: ByteArray, paddedPayload: ByteArray, mark: SlotKeystore.Wrapped): String {
         val sealed = AesGcm.encrypt(key, paddedPayload, aad(header))
         val encoder = Base64.getEncoder()
         val file = buildJsonObject {
             put("magic", MAGIC)
             put("version", VERSION)
             put("slot", header.slot.label)
+            putJsonObject("occ") {
+                put("nonce", encoder.encodeToString(mark.nonce))
+                put("data", encoder.encodeToString(mark.ciphertext))
+            }
             putJsonObject("kdf") {
                 put("algo", "argon2id")
                 put("m", header.params.memoryKiB)
@@ -90,7 +99,8 @@ object HeirContainer {
         return json.encodeToString(JsonObject.serializer(), file)
     }
 
-    class Parsed(val header: Header, val nonce: ByteArray, val cipherAndTag: ByteArray)
+    /** [mark] is `null` for a file written before the mark existed: that reads as UNKNOWN, never touched. */
+    class Parsed(val header: Header, val nonce: ByteArray, val cipherAndTag: ByteArray, val mark: SlotKeystore.Wrapped?)
 
     /** `null` if this is not a heir snapshot of [expectedSlot]: a file moved between slots is refused. */
     fun parseOrNull(content: String, expectedSlot: Slot): Parsed? =
@@ -107,10 +117,17 @@ object HeirContainer {
                 parallelism = kdf.optInt("p").orReject(),
             ).orReject()
             val decoder = Base64.getDecoder()
+            val occ = root.objectOrNull("occ")?.let {
+                SlotKeystore.Wrapped(
+                    ciphertext = decoder.decode(it.requireString("data")),
+                    nonce = decoder.decode(it.requireString("nonce")),
+                )
+            }
             Parsed(
                 header = Header(expectedSlot, params, decoder.decode(kdf.requireString("salt"))),
                 nonce = decoder.decode(cipher.requireString("nonce")),
                 cipherAndTag = decoder.decode(cipher.requireString("data")),
+                mark = occ,
             )
         }
 

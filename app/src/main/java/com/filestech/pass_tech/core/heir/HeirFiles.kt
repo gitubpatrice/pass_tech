@@ -11,6 +11,13 @@ import java.io.File
  * slot with no heir carries a snapshot nobody can open, of the same size as the others. Otherwise
  * the mere presence, size or date of one file would say which slot has an heir — and, with it, which
  * slot holds a vault at all.
+ *
+ * **"Of the same size" holds for the dummies, and only for them.** A slot carrying the real snapshot
+ * of ANOTHER vault cannot be rewritten by this one — only its own passphrase can seal it — so after
+ * one vault outgrows a padding bucket, that slot stays at its own size until its own vault writes
+ * again. That is the residual the design states for the vault files themselves (§11 point 2), and it
+ * is the one this sentence used to promise away. The dummies are a different matter: they are this
+ * app's own files, `HeirMark` is what lets it say so, and they are realigned at every write.
  */
 interface HeirSnapshotFiles {
     fun read(slot: Slot): String?
