@@ -2,6 +2,7 @@ package com.filestech.pass_tech.core.legal
 
 import com.filestech.pass_tech.core.legal.Markdown.Block
 import com.filestech.pass_tech.core.legal.Markdown.Span
+import com.filestech.pass_tech.core.settings.AppLanguage
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.jupiter.api.DynamicTest
@@ -151,6 +152,19 @@ class MarkdownTest {
     fun `a language has both documents or neither`() {
         val languages = documents.mapNotNull(::parts).groupBy({ it.first }, { it.second })
         assertThat(languages["PRIVACY"].orEmpty().toSet()).isEqualTo(languages["TERMS"].orEmpty().toSet())
+    }
+
+    /**
+     * A document in a language the app cannot be shown in could never be opened: the screen resolves
+     * on the app's own language, so nothing would reach it. The other direction is deliberately not
+     * required — a language the app speaks may read the English document, and the screen says so —
+     * but as of 3.0.0 the two sets are equal, and this is where that stops being true quietly.
+     */
+    @Test
+    fun `every language with documents is a language the app can be shown in`() {
+        val documented = documents.mapNotNull(::parts).map { it.second }.toSet()
+        assertThat(documented).isNotEmpty()
+        assertThat(AppLanguage.CODES).containsAtLeastElementsIn(documented)
     }
 
     @TestFactory

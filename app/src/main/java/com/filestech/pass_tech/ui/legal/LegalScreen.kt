@@ -55,8 +55,8 @@ import kotlinx.coroutines.withContext
  * also means the text read is the one that came with the version installed, and not a page that has
  * moved on since.
  *
- * 3.0.0 carries English and French. A reader in one of the other three languages is shown the English
- * one **and told so**, rather than being left to wonder whether their language was forgotten or
+ * 3.0.0 carries all five languages the app speaks. A phone set to any other one is shown the English
+ * document **and told so**, rather than being left to wonder whether its language was forgotten or
  * whether this is simply how it reads.
  */
 @Composable

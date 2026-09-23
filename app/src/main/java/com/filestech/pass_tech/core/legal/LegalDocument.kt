@@ -23,9 +23,12 @@ enum class LegalDocument(private val base: String) {
         /**
          * English is not a courtesy fallback: it is the only language every release is guaranteed to
          * carry, and a translation is added to `assets/legal/` only once it has been written against
-         * the code. 3.0.0 ships English and French; the app shows the English one to the other three
-         * and says so, because a document that describes the app wrongly is worse than one in a
-         * language its reader has to work at.
+         * the code — never machine-turned from another one, because these documents name files,
+         * algorithms and permissions, and a plausible-looking mistranslation of any of those is a
+         * false statement about the app.
+         *
+         * 3.0.0 ships all five the app speaks. A phone in any other language reads these, and the
+         * screen says which language it is showing rather than leaving the reader to wonder.
          */
         const val FALLBACK = "en"
 
