@@ -109,6 +109,13 @@ les autres emplacements intacts.
 - **Qui sait que cette application existe sait qu'un deuxième coffre peut exister.** C'est public, et
   voulu : la fonction est dans ce fichier, sur la page du site et dans l'app. Le déni protège d'une
   fouille, pas d'une connaissance.
+- **Combien d'emplacements sont libres se lit depuis l'application**, par qui tient le téléphone avec
+  un coffre ouvert. Configurer un leurre prend un emplacement libre, et l'app le dit quand il n'y en
+  a plus : on peut enchaîner deux leurres sur un téléphone à un coffre, un seul sur un téléphone qui
+  en cache deux. Le compte n'est pas gratuit — chaque tentative est décomptée sur le même barème
+  qu'un mot de passe faux, cinq puis une attente qui grandit — mais il n'est pas fermé, et avec trois
+  emplacements il ne peut pas l'être : toutes les façons de masquer le refus disent la même chose
+  plus tôt. Assumé, sous le numéro R6.
 - **Une sonde de capacité.** L'espace libre du téléphone change à mesure qu'un coffre grossit. Qui le
   mesurerait dans le temps, le téléphone en main entre deux mesures, pourrait en déduire que quelque
   chose a grossi. C'est un résiduel connu (R5 plus bas), assumé plutôt que résolu.
@@ -155,6 +162,8 @@ le moyen qu'il choisit — l'application n'y est pour rien, et ne peut rien si e
 | R3 | Le camouflage est partiel (§4) | Moyen | Documenté ; aller plus loin demanderait un second APK |
 | R4 | L'écrasement d'un fichier n'est pas garanti sur mémoire flash | Faible | Au mieux — copie sur écriture et nivellement d'usure nous échappent |
 | R5 | Une sonde de capacité peut suggérer qu'un coffre a grossi (§4) | Faible | Assumé ; l'alternative serait de rembourrer chaque emplacement à une taille que personne n'accepterait |
+| R6 | Le nombre d'emplacements libres se compte depuis l'application (§4) | Moyen | Assumé, et freiné : chaque tentative est décomptée sur le barème anti-force-brute |
+| R7 | Le compte à rebours de l'héritage peut être avancé en redémarrant le téléphone la date changée | Faible | Demande le code de déverrouillage du téléphone. Dans une même session, le compte n'avance pas plus vite que l'horloge de fonctionnement, que rien dans les Réglages ne déplace |
 
 ## 7. Signaler une vulnérabilité
 
@@ -167,5 +176,6 @@ coordonnée. La procédure est dans [SECURITY.md](SECURITY.md).
 
 | Date | Révision |
 |---|---|
+| 2026-09-24 | Après l'audit de sécurité du jour. Deux résiduels réels et non dits le sont désormais (R6, R7), et trois choses que ce document affirmait sont maintenant vraies du code et non de l'intention : les fichiers d'emplacement sont égalisés même quand la session n'en a pas la clé, l'alarme du presse-papiers réveille le téléphone, et un mot de passe qui n'ouvre rien est compté sur chaque écran qui en vérifie un. |
 | 2026-09-23 | Réécrit pour l'app Kotlin. L'étape matérielle participe désormais à chaque essai, là où l'app Flutter enveloppait un secret indépendant du mot de passe ; trois emplacements remplacent deux ; le risque ML Kit est parti avec la bibliothèque ; et ce document existe maintenant en anglais, le français à côté. |
 | 2026-08-03 | Créé pour l'app Flutter, à l'issue de l'audit de cette date. |

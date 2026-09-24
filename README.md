@@ -60,7 +60,7 @@ there is no backend.
 ### If someone makes you open it
 
 - **Decoy vault** — a second master password opens a second vault with its own entries. Three slots
-  exist from the first launch, all the same size, so nothing on the phone says how many you use.
+  exist from the first launch, all kept the same size, so nothing in the files says how many you use.
 - **Panic mode** — locks, clears the clipboard, disarms the fingerprint, withdraws the address check
   and replaces the name and icon on the home screen with a calculator that really works. Nothing is
   deleted.

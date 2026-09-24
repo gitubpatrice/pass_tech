@@ -104,6 +104,12 @@ leaves the other slots untouched.
 - **Someone who knows this app exists knows a second vault may exist.** That is public, by design:
   the feature is in this file, on the store page and in the app. Deniability is against a search,
   not against knowledge.
+- **How many slots are free can be read from inside the app**, by someone holding the phone with a
+  vault open. Setting up a decoy takes a free slot, and the app says so when there is none left: two
+  decoys can be set up in a row on a phone with one vault, one on a phone with two. The count is not
+  free — each attempt is charged against the same schedule as a wrong password, five and then a
+  growing wait — but it is not closed either, and with three slots it cannot be: every way of hiding
+  the refusal tells the same thing sooner rather than later. Accepted, as R6.
 - **A capacity probe.** The amount of free space on the phone changes as a vault grows. Someone
   measuring it over time, with the phone in hand between measurements, could infer that something
   grew. This is a known residual (R5 below), accepted rather than solved.
@@ -149,6 +155,8 @@ has no part in that, and no way to help if it is lost.
 | R3 | The disguise is partial (§4) | Medium | Documented; a second APK would be needed to go further |
 | R4 | Overwriting a file is not guaranteed on flash storage | Low | Best effort — copy-on-write and wear levelling are outside our reach |
 | R5 | A capacity probe can suggest that a vault grew (§4) | Low | Accepted; the alternative would be to pad every slot to a size nobody would accept |
+| R6 | The number of free slots is countable from inside the app (§4) | Medium | Accepted, and rate-limited: every attempt is charged to the brute-force schedule |
+| R7 | The heir countdown can be brought forward by restarting the phone with the date moved | Low | Needs the phone's own screen lock. Inside one session the countdown advances no faster than the boot clock, which nothing in Settings can move |
 
 ## 7. Reporting a vulnerability
 
@@ -161,5 +169,6 @@ has no part in that, and no way to help if it is lost.
 
 | Date | Revision |
 |---|---|
+| 2026-09-24 | After the security audit of that date. Two residuals that were real and unstated are now stated (R6, R7), and three things this document claimed are now true of the code rather than of the intention: the slot files are evened out even when the session holds no key for them, the clipboard alarm wakes the phone, and a password that opens nothing is counted on every screen that checks one. |
 | 2026-09-23 | Rewritten for the Kotlin app. The hardware step now takes part in every attempt, where the Flutter app wrapped a password-independent secret; three slots replace two; the ML Kit risk is gone with the library; and this document is now in English, with a French version beside it. |
 | 2026-08-03 | Created for the Flutter app, after the audit of that date. |

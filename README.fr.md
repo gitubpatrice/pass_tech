@@ -61,8 +61,8 @@ aucune fuite de backend possible, puisqu'il n'y a pas de backend.
 ### Si on vous force à l'ouvrir
 
 - **Coffre leurre** — un deuxième mot de passe maître ouvre un deuxième coffre avec ses propres
-  entrées. Trois emplacements existent dès le premier lancement, tous de la même taille : rien sur le
-  téléphone ne dit combien vous en utilisez.
+  entrées. Trois emplacements existent dès le premier lancement, tenus à la même taille : rien dans
+  les fichiers ne dit combien vous en utilisez.
 - **Mode panique** — verrouille, vide le presse-papiers, désarme l'empreinte, retire le contrôle
   d'adresse et remplace le nom et l'icône sur l'écran d'accueil par une calculatrice qui fonctionne
   vraiment. Rien n'est supprimé.
