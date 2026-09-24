@@ -103,15 +103,20 @@ class SecureClipboard @Inject constructor(
     }
 
     /**
-     * The vault closed, so what it put in the clipboard goes with it — a net for the case the delay
+     * The vault closed, so what IT put in the clipboard goes with it — a net for the case the delay
      * cannot cover, a process killed before its alarm.
      *
-     * "Never clear" is honoured: an owner who turned the delay off asked for the value to stay, and
-     * a lock is not the place to overrule them. Every other choice is a minute at most, so for them
-     * this changes nothing they would notice.
+     * What it put there, and nothing else. Written without that check first, and it was wrong in a
+     * way a test would never have shown: copy a password out of a mail to paste it into Pass Tech,
+     * let the app auto-lock as it comes to the front, and the clipboard is emptied under the owner's
+     * hand. Patrice hit it on the S24 within a minute of trying (2026-09-24). Twelve lines below
+     * [clearIfLeftBehind], which was careful about exactly this.
+     *
+     * "Never clear" is honoured too: an owner who turned the delay off asked for the value to stay,
+     * and a lock is not the place to overrule them.
      */
     override fun clearOnLock() {
-        if (clearAfterSeconds.value > 0) clear()
+        if (clearAfterSeconds.value > 0 && clipIsOurs()) clear()
     }
 
     /**
@@ -130,12 +135,22 @@ class SecureClipboard @Inject constructor(
         if (leftBehindChecked) return
         leftBehindChecked = true
         if (clearAfterSeconds.value <= 0) return
-        val ours = runCatching {
+        if (clipIsOurs()) clear()
+    }
+
+    /**
+     * Whether what is in the clipboard now is what [copy] put there, read from the clip's
+     * DESCRIPTION and never its content.
+     *
+     * `false` when it cannot be told — Android 10 and later hand the description to a foreground app
+     * only, so a lock that happens in the background answers no. That is the safe way to be wrong:
+     * nothing of somebody else's is erased, and the delay and its alarm still cover the value.
+     */
+    private fun clipIsOurs(): Boolean =
+        runCatching {
             context.getSystemService(ClipboardManager::class.java)
                 ?.primaryClipDescription?.extras?.getBoolean(OWNED_EXTRA) == true
         }.getOrDefault(false)
-        if (ours) clear()
-    }
 
     private fun clearing(): PendingIntent = PendingIntent.getBroadcast(
         context,
