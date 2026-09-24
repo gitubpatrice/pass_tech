@@ -73,6 +73,14 @@ class HttpFetch @Inject constructor(@IoDispatcher private val io: CoroutineDispa
             val left = ((deadline - System.nanoTime()) / NANOS_PER_MILLI).coerceIn(1, Int.MAX_VALUE.toLong()).toInt()
             connectTimeout = minOf(left, STEP_TIMEOUT_MILLIS)
             readTimeout = minOf(left, STEP_TIMEOUT_MILLIS)
+            // Before the caller's headers, so a caller may still override it — and so that no caller
+            // has to remember. Left unset, Android fills in its own:
+            // `Dalvik/… (Linux; U; Android <release>; <model> Build/<id>)`, which hands the phone's
+            // model and build to a request that already names this project. The breach check set a
+            // constant agent for that reason and said so; the update check simply never got the same
+            // treatment, and the privacy policy promises "nothing of yours is sent" for both (audit
+            // of 2026-09-24). It belongs here, on the one path out, where a third call cannot miss it.
+            setRequestProperty("User-Agent", USER_AGENT)
             headers.forEach { (name, value) -> setRequestProperty(name, value) }
         }
 
@@ -94,6 +102,16 @@ class HttpFetch @Inject constructor(@IoDispatcher private val io: CoroutineDispa
     }
 
     private companion object {
+        /**
+         * The same plain string for every install, every request, every session.
+         *
+         * 2.7.1 drew one at random out of four at start-up and kept it for the session, which is
+         * worse than none: an observer seeing the same agent on several requests could tie one
+         * install together, and `IP × agent` was close to unique. A constant, unremarkable agent
+         * looks like any other crawler.
+         */
+        const val USER_AGENT = "Mozilla/5.0 (compatible)"
+
         /** A release, or a range of hashes, is a few kilobytes. */
         const val MAX_BYTES = 512 * 1024
         const val BUDGET_MILLIS = 20_000L

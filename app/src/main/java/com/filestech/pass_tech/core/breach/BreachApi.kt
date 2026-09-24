@@ -28,11 +28,9 @@ class HibpApi @Inject constructor(private val http: HttpFetch) : BreachApi {
     override suspend fun range(prefix: String): String? = http.get(
         url = RANGE + prefix,
         allowedHosts = setOf(HOST),
-        headers = mapOf(
-            "User-Agent" to USER_AGENT,
-            // The answer is padded with decoy suffixes, so its LENGTH says nothing either.
-            "Add-Padding" to "true",
-        ),
+        // The answer is padded with decoy suffixes, so its LENGTH says nothing either. The
+        // `User-Agent` is [HttpFetch]'s, set once for every call this app makes.
+        headers = mapOf("Add-Padding" to "true"),
         budgetMillis = BUDGET_MILLIS,
     )
 
@@ -40,15 +38,5 @@ class HibpApi @Inject constructor(private val http: HttpFetch) : BreachApi {
         const val HOST = "api.pwnedpasswords.com"
         const val RANGE = "https://$HOST/range/"
         const val BUDGET_MILLIS = 8_000L
-
-        /**
-         * The same plain string for every install, every request, every session.
-         *
-         * 2.7.1 first drew one at random out of four at start-up and kept it for the session, which
-         * is worse than none: an observer seeing the same agent on several requests could tie one
-         * install together, and `IP × agent` was close to unique. A constant, unremarkable agent
-         * looks like any other crawler.
-         */
-        const val USER_AGENT = "Mozilla/5.0 (compatible)"
     }
 }

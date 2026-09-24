@@ -50,8 +50,15 @@ object DomainMatch {
 
     /**
      * A plausible top-level label. Only what an address bar hands over is held to this: an entry
-     * whose URL is an IP address or a bare name keeps its value, so the comparison ends in
-     * [Verdict.UNKNOWN] — the browser side could not be read — rather than in a silent [Verdict.OK].
+     * whose URL is an IP address keeps its value, so the comparison ends in [Verdict.UNKNOWN] — the
+     * browser side could not be read — rather than in a silent [Verdict.OK].
+     *
+     * **A bare name does not, and this claimed it did** until the audit of 2026-09-24. [normalize]
+     * refuses anything without a dot long before this pattern is reached, so an entry whose URL is
+     * `mybank` or `intranet` leaves [check] nothing to compare and it answers [Verdict.OK]. The
+     * password is copied either way — the `UNKNOWN` path copies it too, and the only difference is a
+     * banner afterwards — so nothing is handed to an attacker by it. What is wrong is the comment:
+     * "nothing to compare" and "compared, all is well" are not the same answer.
      *
      * **`xn--` belongs to this alphabet.** [normalize] has already punycoded the host, so an
      * internationalised top level arrives as `xn--p1ai` (`.рф`), `xn--fiqs8s` (`.中国`) or

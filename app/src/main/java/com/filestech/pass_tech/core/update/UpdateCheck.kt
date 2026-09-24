@@ -18,6 +18,7 @@ interface ReleaseApi {
 @Singleton
 class GithubReleaseApi @Inject constructor(private val http: HttpFetch) : ReleaseApi {
 
+    /** The `User-Agent` is [HttpFetch]'s, constant for every install: see why it is set there. */
     override suspend fun latest(): String? = http.get(
         url = UpdateCheck.LATEST,
         allowedHosts = setOf(UpdateCheck.HOST),

@@ -65,7 +65,4 @@ class AntiPhishing @Inject constructor(
         } else {
             DomainMatch.check(url, domain.current(), otherDomains)
         }
-
-    /** The vault closing, or the panic mode: the last site read has no reason to outlive either. */
-    fun forget() = domain.clear()
 }
