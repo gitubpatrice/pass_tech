@@ -127,9 +127,17 @@ object VaultContainer {
             )
         }
 
-    /** The padded payload, or `null` if [key] is not the key of this file (or the file was altered). */
+    /**
+     * The padded payload, or `null` if [key] is not the key of this file (or the file was altered).
+     *
+     * The ciphertext may be followed by random bytes that another session wrote to bring this file to
+     * the size of the others ([grownTo]), so where it ends is not known in advance. Each bucket it
+     * could have been padded to is tried, smallest first, and the authentication tag decides: a wrong
+     * boundary fails exactly as a wrong key does. A file with no filler matches on its first and only
+     * candidate, which is why files written before this existed still open.
+     */
     fun openOrNull(parsed: Parsed, key: ByteArray): ByteArray? =
-        AesGcm.decryptOrNull(key, parsed.nonce, parsed.cipherAndTag, aad(parsed.header))
+        SlotFiller.openTrying(parsed.cipherAndTag) { AesGcm.decryptOrNull(key, parsed.nonce, it, aad(parsed.header)) }
 
     private fun aad(header: Header): ByteArray =
         with(header.params) { "pt:v=$VERSION|slot=${header.slot.label}|kdf=argon2id|m=$memoryKiB|t=$iterations|p=$parallelism" }

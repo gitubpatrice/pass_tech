@@ -14,10 +14,14 @@ import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.util.Base64
 
 /**
  * The dead man's switch (design v2 §8), on a real vault: the snapshot, the silence it waits for, and
@@ -275,13 +279,40 @@ class HeirTest {
     }
 
     /**
-     * A file whose mark cannot be read — one written before the mark existed, a corrupted one, a
-     * Keystore that stayed silent — is never written over. Refusing to touch it can only leave sizes
-     * uneven; touching it wrongly destroys the heir of a vault this one must not know about, and
-     * there would be no way back.
+     * The same setup as the test above, measured on the sizes rather than on the content — and that
+     * is where it used to fail.
+     *
+     * `needsDummy` refuses to rewrite a REAL snapshot, rightly: it would destroy the heir of a vault
+     * this session must not know exists. Until 3.0.0 it did nothing else either, so once one vault
+     * grew, the shorter of the three files was the other vault's real snapshot — and a phone with
+     * two heirs said so to anyone holding a copy of the directory (audit of 2026-09-24).
      */
     @Test
-    fun `a snapshot whose mark cannot be read is left exactly as it is`() {
+    fun `with two heirs, the vault that grows leaves no snapshot short`() {
+        configure(vaultWith(owner))
+        val decoySession = repo.configureDecoy(open(owner), decoy.encodeToByteArray()).let { open(decoy) }
+        configure(repo.save(decoySession, listOf(entry("decoy bank"))), passphrase = "laphraseduleurre2026")
+
+        val grown = repo.save(open(owner), List(GROWN_ENTRIES) { bulky("entry-$it") })
+        configure(grown)
+
+        assertThat(snapshotSizes().toSet()).hasSize(1)
+        // And it really did grow, or the test would be measuring nothing.
+        assertThat(snapshotSizes().first()).isGreaterThan(FIRST_BUCKET_BYTES)
+    }
+
+    /**
+     * A file whose mark cannot be read — one written before the mark existed, a corrupted one, a
+     * Keystore that stayed silent — is never written OVER: it may be the heir of a vault this one
+     * must not know exists, and there would be no way back.
+     *
+     * It is brought up to the common size all the same, and that is a different thing. The bytes go
+     * AFTER the ciphertext, so every byte that was there is still there, in the same order
+     * (`SlotFiller`). Until 3.0.0 not even that happened, and the sizes stayed uneven — which is
+     * what told an observer of the directory which slots were in use.
+     */
+    @Test
+    fun `a snapshot whose mark cannot be read keeps every byte it had, and is evened out`() {
         val session = vaultWith(owner)
         configure(session)
         val other = (Slot.entries - session.slot).first()
@@ -289,12 +320,25 @@ class HeirTest {
         // The mark goes, the rest of the file stays: exactly a file written before the mark existed.
         val unmarked = file.readText().replace(Regex(""""occ":\{[^}]*\},"""), "")
         file.writeText(unmarked)
-        val before = file.readText()
+        val before = cipherBlob(file)
 
         val grown = repo.save(open(owner), List(GROWN_ENTRIES) { bulky("entry-$it") })
         configure(grown)
 
-        assertThat(file.readText()).isEqualTo(before)
+        val after = cipherBlob(file)
+        // Nothing was rewritten: what was there is still there, byte for byte, at the front.
+        assertThat(after.copyOf(before.size)).isEqualTo(before)
+        assertThat(after.size).isGreaterThan(before.size)
+        // And it is no longer the short one of the three. Measured on the sealed blobs, not on the
+        // files: this test tore the `occ` field out by hand, and a real file always carries one.
+        val blobs = Slot.entries.map { cipherBlob(File(dir, "pt_heir_${it.label}.enc")).size }
+        assertThat(blobs.toSet()).hasSize(1)
+    }
+
+    /** The ciphertext-and-filler blob of a snapshot file, decoded. */
+    private fun cipherBlob(file: File): ByteArray {
+        val root = Json.parseToJsonElement(file.readText()).jsonObject
+        return Base64.getDecoder().decode(root.getValue("cipher").jsonObject.getValue("data").jsonPrimitive.content)
     }
 
     private fun snapshotSizes(): List<Long> = Slot.entries.map { File(dir, "pt_heir_${it.label}.enc").length() }

@@ -248,6 +248,42 @@ class VaultStructureTest {
         assertThat(repo.unlock(decoy)).isEqualTo(VaultRepository.UnlockResult.WrongPassword)
     }
 
+    /**
+     * The state no test ever measured, and the one the audit of 2026-09-24 found: a decoy in place,
+     * the parent grown past a bucket, and nothing deleted.
+     *
+     * Every test that claimed "all slot files are the same size" measured somewhere else. Some had a
+     * single vault, where the other two slots are dummies and get rewritten whole. Others measured
+     * AFTER a deletion, which puts every slot back at the same size anyway. In between — which is
+     * simply a decoy being used — the decoy's file stayed at its old bucket, and a file smaller than
+     * the largest could only be an occupied slot. That is the whole of plausible deniability, for
+     * anyone holding a copy of the directory.
+     */
+    @Test
+    fun `with a decoy in place, a parent that grows leaves no file behind`() {
+        val parent = ownerWithDecoy()
+        repo.save(parent, (1..400).map { entry("entry number $it with a long enough title") }).close()
+        assertThat(Slot.entries.map { File(dir, it.vaultFileName).length() }.toSet()).hasSize(1)
+        // And it is bigger than one bucket, or the test would be measuring nothing.
+        assertThat(File(dir, Slot.B.vaultFileName).length()).isGreaterThan(Padding.FIRST_BUCKET.toLong())
+    }
+
+    @Test
+    fun `a decoy whose file was evened out still opens, and still holds its entries`() {
+        val parent = ownerWithDecoy()
+        val withEntries = repo.save(open(decoy), listOf(entry("a credible looking account")))
+        withEntries.close()
+        // The parent now grows past the bucket, which rewrites the decoy's file around its ciphertext.
+        repo.save(open(owner), (1..400).map { entry("entry number $it with a long enough title") }).close()
+        val reopened = open(decoy)
+        assertThat(reopened.slot).isEqualTo(Slot.B)
+        assertThat(reopened.entries.map { it.title }).containsExactly("a credible looking account")
+        // And it can save again, which re-pads its own plaintext to the common bucket.
+        repo.save(reopened, reopened.entries + entry("one more")).close()
+        assertThat(Slot.entries.map { File(dir, it.vaultFileName).length() }.toSet()).hasSize(1)
+        assertThat(open(owner).entries).hasSize(400)
+    }
+
     @Test
     fun `deletion keeps the largest bucket, whichever vault it comes from`() {
         val parent = ownerWithDecoy()

@@ -11,6 +11,7 @@ import com.filestech.pass_tech.core.vault.KeyResult
 import com.filestech.pass_tech.core.vault.KeystoreUnavailableException
 import com.filestech.pass_tech.core.vault.Padding
 import com.filestech.pass_tech.core.vault.Slot
+import com.filestech.pass_tech.core.vault.SlotFiller
 import com.filestech.pass_tech.core.vault.SlotKeystore
 import com.filestech.pass_tech.core.vault.valueOrNull
 
@@ -206,7 +207,16 @@ class HeirRepository(
     private fun writeSnapshot(slot: Slot, content: String, bucket: Int) {
         val updates = mutableMapOf(slot to content)
         for (other in Slot.entries - slot) {
-            if (needsDummy(other, bucket)) updates[other] = dummy(other, bucket)
+            if (needsDummy(other, bucket)) {
+                updates[other] = dummy(other, bucket)
+            } else {
+                // A real snapshot, or a mark that would not read: its payload cannot be re-padded
+                // without its key, but its FILE is still brought up to the common size. Without this,
+                // two vaults each with an heir left the smaller snapshot short — and short meant
+                // real (audit of 2026-09-24). [SlotFiller] says how, and why it is safe.
+                SlotFiller.grownTo(files.read(other).orEmpty(), bucket + AesGcm.TAG_LENGTH)
+                    ?.let { grown -> updates[other] = grown }
+            }
         }
         files.writeAll(updates)
     }

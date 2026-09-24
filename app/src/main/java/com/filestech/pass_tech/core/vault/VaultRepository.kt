@@ -635,7 +635,13 @@ class VaultRepository(
     /**
      * Seals [session] and rewrites every slot file (design v2 §7). Dummies are regenerated when smaller
      * than the new bucket or when the creation mode ends; a missing slot file becomes a dummy. An
-     * occupied or unknown slot is copied as it is, never touched.
+     * occupied or unknown slot keeps its ciphertext byte for byte — this session has no key for it —
+     * and is brought up to the common size with random bytes written AFTER it, which needs no key.
+     *
+     * That last part is new in 3.0.0. Such a slot used to be left exactly as it was, so a vault that
+     * grew past a bucket left every other occupied slot smaller than the rest: a file smaller than
+     * the largest was therefore an occupied one, and the decoy stopped being deniable to anyone
+     * holding a copy of the directory (audit of 2026-09-24).
      */
     private fun write(session: VaultSession, clearCreationRequests: Boolean = false, erase: Slot? = null) {
         val statuses = statuses()
@@ -647,16 +653,26 @@ class VaultRepository(
         }
         val updates = mutableMapOf(session.slot to content)
         for (slot in Slot.entries - session.slot) {
-            dummyRequest(slot, statuses.getValue(slot), bucket, clearCreationRequests, erase)
-                ?.let { creationRequested -> updates[slot] = dummy(slot, bucket, creationRequested) }
+            val request = dummyRequest(slot, statuses.getValue(slot), bucket, clearCreationRequests, erase)
+            if (request != null) {
+                updates[slot] = dummy(slot, bucket, request)
+            } else {
+                // A slot this session has no key for: occupied, or a mark it cannot read. Its
+                // plaintext cannot be re-padded — but its FILE can still be brought to the common
+                // size, which is all an observer of the directory ever sees ([VaultContainer.grownTo]).
+                // `null` back means it is already that long, and then it is left exactly as it is.
+                SlotFiller.grownTo(files.read(slot).orEmpty(), bucket + AesGcm.TAG_LENGTH)
+                    ?.let { grown -> updates[slot] = grown }
+            }
         }
         files.writeAll(updates)
     }
 
     /**
-     * Whether [slot] is rewritten as a dummy by this save, and with which creation request. `null`
-     * leaves its file exactly as it is: an occupied slot, or one whose mark cannot be read, is never
-     * touched — except [erase], the decoy this vault is deleting on purpose.
+     * Whether [slot] is rewritten as a DUMMY by this save, and with which creation request. `null`
+     * means it is not: an occupied slot, or one whose mark cannot be read, keeps the ciphertext this
+     * session has no key for. [write] still brings its file up to the common size. The one exception
+     * is [erase], the decoy this vault is deleting on purpose.
      */
     private fun dummyRequest(slot: Slot, status: SlotStatus, bucket: Int, clearCreationRequests: Boolean, erase: Slot?): Boolean? =
         when {

@@ -1,5 +1,6 @@
 package com.filestech.pass_tech.core.vault
 
+import com.filestech.pass_tech.core.crypto.AesGcm
 import com.filestech.pass_tech.core.crypto.Argon2id
 import com.filestech.pass_tech.core.crypto.HkdfSha256
 import com.filestech.pass_tech.core.crypto.KdfParams
@@ -33,6 +34,47 @@ class VaultContainerTest {
     @Test
     fun `a sealed slot opens with its password and gives the padded payload back`() {
         assertThat(open(sealedFile())).isEqualTo(payload)
+    }
+
+    /**
+     * A file evened out by a session that has no key for it: random bytes written after the
+     * ciphertext, so that the slot files all come out the same size. The reader is not told where
+     * the ciphertext ends — the authentication tag is what tells it.
+     */
+    @Test
+    fun `a file grown by another session still opens, and gives the same payload back`() {
+        val sealed = sealedFile()
+        val grown = requireNotNull(SlotFiller.grownTo(sealed, Padding.FIRST_BUCKET * 4 + AesGcm.TAG_LENGTH))
+        assertThat(grown.length).isGreaterThan(sealed.length)
+        assertThat(open(grown)).isEqualTo(payload)
+    }
+
+    @Test
+    fun `a file grown twice still opens`() {
+        val once = requireNotNull(SlotFiller.grownTo(sealedFile(), Padding.FIRST_BUCKET * 4 + AesGcm.TAG_LENGTH))
+        val twice = requireNotNull(SlotFiller.grownTo(once, Padding.FIRST_BUCKET * 16 + AesGcm.TAG_LENGTH))
+        assertThat(open(twice)).isEqualTo(payload)
+    }
+
+    @Test
+    fun `a file already at the size asked for is left exactly as it is`() {
+        assertThat(SlotFiller.grownTo(sealedFile(), Padding.FIRST_BUCKET + AesGcm.TAG_LENGTH)).isNull()
+    }
+
+    @Test
+    fun `a wrong password is still wrong on a grown file`() {
+        val grown = requireNotNull(SlotFiller.grownTo(sealedFile(), Padding.FIRST_BUCKET * 4 + AesGcm.TAG_LENGTH))
+        assertThat(open(grown, pw = "not it at all".encodeToByteArray())).isNull()
+    }
+
+    @Test
+    fun `what is added is random, so two evened-out files never match`() {
+        val sealed = sealedFile()
+        val target = Padding.FIRST_BUCKET * 4 + AesGcm.TAG_LENGTH
+        val first = requireNotNull(SlotFiller.grownTo(sealed, target))
+        val second = requireNotNull(SlotFiller.grownTo(sealed, target))
+        assertThat(first).isNotEqualTo(second)
+        assertThat(first.length).isEqualTo(second.length)
     }
 
     @Test

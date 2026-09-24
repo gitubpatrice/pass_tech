@@ -16,6 +16,7 @@ import com.filestech.pass_tech.core.vault.KeyResult
 import com.filestech.pass_tech.core.vault.Padding
 import com.filestech.pass_tech.core.vault.Slot
 import com.filestech.pass_tech.core.vault.SlotCrypto
+import com.filestech.pass_tech.core.vault.SlotFiller
 import com.filestech.pass_tech.core.vault.SlotKeystore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -131,8 +132,13 @@ object HeirContainer {
             )
         }
 
+    /**
+     * The padded payload, or `null` if [key] does not open this file. The ciphertext may be followed
+     * by filler another session wrote to even the sizes out, so the end is found by trying — see
+     * [SlotFiller].
+     */
     fun openOrNull(parsed: Parsed, key: ByteArray): ByteArray? =
-        AesGcm.decryptOrNull(key, parsed.nonce, parsed.cipherAndTag, aad(parsed.header))
+        SlotFiller.openTrying(parsed.cipherAndTag) { AesGcm.decryptOrNull(key, parsed.nonce, it, aad(parsed.header)) }
 
     /** The snapshot, ready to be padded and sealed. */
     fun payloadOf(snapshot: HeirSnapshot): ByteArray {
