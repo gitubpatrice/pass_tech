@@ -69,6 +69,14 @@ sensitive on Android 13 and above, which keeps it out of the clipboard preview.
 **Not covered**: another app reading the clipboard during the delay. Android has no way to hand a
 secret to one app only.
 
+**Not covered either, and measured rather than reasoned**: some manufacturers' keyboards keep a
+clipboard history of their own, and it is not the system clipboard. On a Galaxy S24 running Android
+16, the value was still being offered in the Samsung keyboard's suggestion bar a minute after the
+system clipboard had been emptied — verified on 2026-09-24 by long-pressing in a text field, where
+nothing was left to paste. `EXTRA_IS_SENSITIVE` is set on every copy and is what should keep a value
+out of such a history; that keyboard does not honour it. Nothing in an app can reach another app's
+store. Clearing the keyboard's own clipboard history is the owner's to do.
+
 ### 3.4 The address check (optional, off by default)
 
 Before a password is copied, the app compares the site open in the browser with the ones the entry
@@ -157,6 +165,7 @@ has no part in that, and no way to help if it is lost.
 | R5 | A capacity probe can suggest that a vault grew (§4) | Low | Accepted; the alternative would be to pad every slot to a size nobody would accept |
 | R6 | The number of free slots is countable from inside the app (§4) | Medium | Accepted, and rate-limited: every attempt is charged to the brute-force schedule |
 | R7 | The heir countdown can be brought forward by restarting the phone with the date moved | Low | Needs the phone's own screen lock. Inside one session the countdown advances no faster than the boot clock, which nothing in Settings can move |
+| R8 | A manufacturer's keyboard may keep a copied value in a clipboard history of its own (§3.3) | Medium | Outside any app's reach. The system clipboard is cleared on time; that history is the owner's to clear |
 
 ## 7. Reporting a vulnerability
 

@@ -72,6 +72,15 @@ Android 13 et plus, ce qui le tient hors de l'aperçu du presse-papiers.
 **Non couvert** : une autre app qui lit le presse-papiers pendant le délai. Android n'offre aucun
 moyen de remettre un secret à une seule application.
 
+**Non couvert non plus, et mesuré plutôt que raisonné** : certains claviers de constructeurs gardent
+leur propre historique de copie, qui n'est pas le presse-papiers du système. Sur un Galaxy S24 sous
+Android 16, la valeur était encore proposée dans la barre de suggestions du clavier Samsung une
+minute après que le presse-papiers système ait été vidé — vérifié le 2026-09-24 par un appui long
+dans un champ de texte, où il n'y avait plus rien à coller. `EXTRA_IS_SENSITIVE` est posé à chaque
+copie et devrait tenir une valeur hors d'un tel historique ; ce clavier ne l'honore pas. Aucune
+application ne peut atteindre le magasin d'une autre. Vider l'historique du clavier revient au
+propriétaire.
+
 ### 3.4 Le contrôle d'adresse (optionnel, éteint par défaut)
 
 Avant qu'un mot de passe soit copié, l'app compare le site ouvert dans le navigateur avec ceux que
@@ -164,6 +173,7 @@ le moyen qu'il choisit — l'application n'y est pour rien, et ne peut rien si e
 | R5 | Une sonde de capacité peut suggérer qu'un coffre a grossi (§4) | Faible | Assumé ; l'alternative serait de rembourrer chaque emplacement à une taille que personne n'accepterait |
 | R6 | Le nombre d'emplacements libres se compte depuis l'application (§4) | Moyen | Assumé, et freiné : chaque tentative est décomptée sur le barème anti-force-brute |
 | R7 | Le compte à rebours de l'héritage peut être avancé en redémarrant le téléphone la date changée | Faible | Demande le code de déverrouillage du téléphone. Dans une même session, le compte n'avance pas plus vite que l'horloge de fonctionnement, que rien dans les Réglages ne déplace |
+| R8 | Le clavier d'un constructeur peut garder une valeur copiée dans son propre historique (§3.3) | Moyen | Hors de portée de toute application. Le presse-papiers système est vidé à l'heure ; cet historique-là revient au propriétaire |
 
 ## 7. Signaler une vulnérabilité
 
