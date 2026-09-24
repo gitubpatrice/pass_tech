@@ -1,7 +1,7 @@
 [versions]
 # Same toolchain as Agenda Tech and SMS Tech (AGP 9: Kotlin is built into AGP, no
 # `org.jetbrains.kotlin.android` plugin).
-agp = "9.4.0"
+agp = "9.4.1"
 # Capped below 2.4.20: CodeQL refuses to compile from there on ("Kotlin version 2.4.20 is too recent",
 # measured on Agenda Tech). CodeQL covering ALL of the code, crypto included, is one of the reasons for
 # this rewrite, so the cap is not negotiable. `>= 2.4.20` is ignored in .github/dependabot.yml.
