@@ -7,6 +7,7 @@ import com.filestech.pass_tech.core.model.DartDateTime
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.state.StateStore
+import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
@@ -77,7 +78,7 @@ class VaultImportExportTest {
 
     /** The vault on the test's own scheduler: nothing is left running on a real thread at the end. */
     private suspend fun TestScope.opened() {
-        manager = VaultManager(repository, FixedDomain(), StandardTestDispatcher(testScheduler))
+        manager = VaultManager(repository, FixedDomain(), FakeClipboard(), StandardTestDispatcher(testScheduler))
         assertThat(manager.openOrCreate(owner())).isEqualTo(VaultManager.CreateOutcome.Created)
     }
 

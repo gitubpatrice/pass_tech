@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.model.DartDateTime
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.phishing.DomainSnapshot
@@ -62,7 +63,7 @@ class VaultOnDeviceTest {
             VaultModule.heirRepository(context, keystore, state, clock),
             BiometricBinding.NONE,
         )
-        manager = VaultManager(repository, DomainSnapshot(clock), Dispatchers.IO)
+        manager = VaultManager(repository, DomainSnapshot(clock), NoClipboard, Dispatchers.IO)
     }
 
     @After
@@ -144,6 +145,17 @@ class VaultOnDeviceTest {
     }
 
     private fun median(values: List<Long>) = values.sorted()[values.size / 2]
+
+    /** This test measures derivations; the clipboard has no part in it. */
+    private object NoClipboard : SensitiveClipboard {
+        override fun copy(text: String): Int? = null
+
+        override fun clear() = Unit
+
+        override fun clearOnLock() = Unit
+
+        override fun clearIfLeftBehind() = Unit
+    }
 
     private companion object {
         const val TAG = "PassTechVault"

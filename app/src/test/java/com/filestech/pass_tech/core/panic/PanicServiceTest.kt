@@ -71,7 +71,8 @@ class PanicServiceTest {
         guard = BruteForceGuard.forVault(state, clock)
         val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
         val heir = heirRepository(dir, keystore, state, clock, fastParams)
-        vault = VaultManager(VaultRepository(files, keystore, guard, heir, biometrics, fastParams), domain, Dispatchers.Unconfined)
+        val repository = VaultRepository(files, keystore, guard, heir, biometrics, fastParams)
+        vault = VaultManager(repository, domain, clipboard, Dispatchers.Unconfined)
         panic = PanicService(vault, clipboard, AntiPhishing(preferences, phishing, domain), disguise)
     }
 

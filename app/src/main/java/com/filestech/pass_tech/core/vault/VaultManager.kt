@@ -2,6 +2,7 @@ package com.filestech.pass_tech.core.vault
 
 import com.filestech.pass_tech.core.backup.PlainExport
 import com.filestech.pass_tech.core.backup.PtbakCodec
+import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.crypto.wipe
 import com.filestech.pass_tech.core.di.IoDispatcher
 import com.filestech.pass_tech.core.heir.HeirRepository
@@ -45,6 +46,7 @@ import javax.inject.Singleton
 class VaultManager @Inject constructor(
     private val repository: VaultRepository,
     private val domain: ActiveDomain,
+    private val clipboard: SensitiveClipboard,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) {
 
@@ -522,6 +524,11 @@ class VaultManager @Inject constructor(
         // The site the browser was last seen on. It expires by itself fifteen seconds later, but a
         // closed vault should leave nothing of what its owner was doing sitting in this process.
         domain.clear()
+        // And nothing of it sitting OUTSIDE this process either. The clipboard clears itself on a
+        // delay, from a timer and an alarm that both die with the process; this is the net for when
+        // it does. It is here, on the one path every lock goes through — auto-lock, the button, the
+        // panic gesture, and a deletion — so that no new way of closing a vault can forget it.
+        clipboard.clearOnLock()
         publish()
     }
 

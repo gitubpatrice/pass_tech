@@ -106,7 +106,7 @@ class SettingsViewModelTest {
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
             val repository = VaultRepository(files, keystore, guard, heir, StoredBiometricBinding(state, bioKeys), fastParams)
-            val vault = VaultManager(repository, FixedDomain(), io)
+            val vault = VaultManager(repository, FixedDomain(), clipboard, io)
             assertThat(vault.openOrCreate(owner.encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "settings.preferences_pb") })
             val preferences = AppPreferences(store)
@@ -374,7 +374,8 @@ class SettingsViewModelTest {
             val files = VaultFiles(File(dir, "vault").apply { mkdirs() })
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
-            val vault = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), FixedDomain(), io)
+            val repository = VaultRepository(files, keystore, guard, heir, params = fastParams)
+            val vault = VaultManager(repository, FixedDomain(), FakeClipboard(), io)
             val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { File(dir, "now.preferences_pb") })
             val settings = ViewModelProvider.create(
                 viewModels,

@@ -12,6 +12,7 @@ import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.core.vault.VaultRepository
 import com.filestech.pass_tech.core.vault.VaultRepository.EntryMode
 import com.filestech.pass_tech.testing.FakeBiometricKeys
+import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
@@ -68,7 +69,8 @@ class EntryViewModelTest {
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
             val heir = heirRepository(dir, keystore, state, clock, fastParams)
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, biometrics, fastParams), FixedDomain(), io)
+            val repository = VaultRepository(VaultFiles(dir), keystore, guard, heir, biometrics, fastParams)
+            val vault = VaultManager(repository, FixedDomain(), FakeClipboard(), io)
             // Nothing to warn about: this screen's other behaviour is what is under test here.
             val integrity = IntegrityWarning(DeviceIntegrity { emptySet() }, state)
             val viewModel = EntryViewModel(vault, clock, { biometricHardware }, integrity)

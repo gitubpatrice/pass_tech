@@ -72,9 +72,18 @@ class AutoLock internal constructor(
      * The app leaves the foreground for a moment it asked for, so the vault does not lock at once, as it
      * would with the immediate delay (2.7.1 locks there, and the import is lost with it).
      *
-     * It buys a short delay, never an open vault: past [SYSTEM_SCREEN_GRACE_MILLIS] away, a lock that was
-     * due happens all the same. And it only covers the very next trip, within [ANNOUNCE_GRACE_MILLIS]:
-     * a picker that never opens protects nothing.
+     * It buys a bounded delay, never an open vault. Three things bound it, and the first two are new
+     * in 3.0.0 because the vault could otherwise stay open with no limit at all:
+     *
+     * - a timer runs behind the trip, so a picker left open or abandoned still locks;
+     * - the hold is [holdMillis], the SAME value the check on return uses, so the two cannot drift;
+     * - and it only covers the very next trip, within [ANNOUNCE_GRACE_MILLIS]: a picker that never
+     *   opens protects nothing.
+     *
+     * The hold is never shorter than [SYSTEM_SCREEN_GRACE_MILLIS], so an owner who chose to lock
+     * immediately does not lock immediately on this one trip. That is a real widening of their
+     * setting, it is the only one in the app, and the Settings screen says it out loud rather than
+     * leaving them to find out.
      */
     fun systemScreenExpected() {
         systemScreenAt = clock.elapsedMillis()
@@ -92,12 +101,14 @@ class AutoLock internal constructor(
         val announced = systemScreenAt
         systemScreenAt = null
         systemScreenTrip = announced != null && at - announced <= ANNOUNCE_GRACE_MILLIS
-        // No timer on an announced trip: the picker would otherwise lock the vault behind it.
-        if (systemScreenTrip) return
         val seconds = delaySeconds.value
         if (seconds == AppPreferences.NEVER) return
+        // An announced trip holds the lock back, because the owner asked for the picker — but it is
+        // held back for a bounded time, and a timer runs behind it. There used to be an early return
+        // here instead, arming nothing: a picker left open, or abandoned with the home button, kept
+        // the vault open in the background with no limit at all (audit of 2026-09-24).
         timer = scope.launch {
-            val due = at + seconds * MILLIS_PER_SECOND
+            val due = at + holdMillis(seconds, systemScreenTrip)
             var left = due - clock.elapsedMillis()
             while (left > 0) {
                 delay(left.coerceAtMost(CHECK_MILLIS))
@@ -121,9 +132,7 @@ class AutoLock internal constructor(
             scope.launch { vault.lock() }
             return
         }
-        // Back from a file picker: a lock that was due waits, but only for a moment.
-        if (announced && clock.elapsedMillis() - at <= SYSTEM_SCREEN_GRACE_MILLIS) return
-        if (isDue(at)) {
+        if (isDue(at, announced)) {
             mutableLocking.value = true
             scope.launch {
                 try {
@@ -135,12 +144,29 @@ class AutoLock internal constructor(
         }
     }
 
-    private fun isDue(leftAt: Long): Boolean {
+    private fun isDue(leftAt: Long, announced: Boolean): Boolean {
         val seconds = delaySeconds.value
         if (seconds == AppPreferences.NEVER) return false
         val away = clock.elapsedMillis() - leftAt
         // The boot clock cannot go back within one process. If it seems to, nothing is known: lock.
-        return away < 0 || away >= seconds * MILLIS_PER_SECOND
+        return away < 0 || away >= holdMillis(seconds, announced)
+    }
+
+    /**
+     * How long the vault may stay open on this trip: the owner's delay, and never less than
+     * [SYSTEM_SCREEN_GRACE_MILLIS] when the trip was announced.
+     *
+     * The grace is needed — a picker takes a moment to use, and "Immediately" would otherwise lose
+     * every import, which is what 2.7.1 does. It is a real widening of that setting, and the only
+     * place in the app where a choice of the owner's is overruled; the Settings screen says so.
+     *
+     * One function, read by BOTH the timer that locks in the background and the check on return, so
+     * that the two cannot say different things. They did: the return applied a flat two minutes while
+     * the background applied nothing.
+     */
+    private fun holdMillis(seconds: Int, announced: Boolean): Long {
+        val chosen = seconds * MILLIS_PER_SECOND
+        return if (announced) maxOf(chosen, SYSTEM_SCREEN_GRACE_MILLIS) else chosen
     }
 
     private companion object {

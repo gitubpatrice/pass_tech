@@ -40,4 +40,11 @@ class FakeClipboard(private val clearAfterSeconds: Int? = null) : SensitiveClipb
         clears++
         content = null
     }
+
+    /** As the real one: honours "never clear", which is what `clearAfterSeconds == null` means here. */
+    override fun clearOnLock() {
+        if (clearAfterSeconds != null && clearAfterSeconds > 0) clear()
+    }
+
+    override fun clearIfLeftBehind() = Unit
 }

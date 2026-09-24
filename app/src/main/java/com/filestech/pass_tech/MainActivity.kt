@@ -19,6 +19,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.panic.LauncherDisguise
 import com.filestech.pass_tech.core.settings.AppLanguage
 import com.filestech.pass_tech.core.settings.AppPreferences
@@ -43,6 +44,9 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var disguise: LauncherDisguise
+
+    @Inject
+    lateinit var clipboard: SensitiveClipboard
 
     private val app: AppViewModel by viewModels()
     private val entry: EntryViewModel by viewModels()
@@ -117,6 +121,9 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         nameRecentTask()
+        // Once for the life of the process, and only from here: Android 10 and later hand the clip's
+        // description to a foreground app only. It erases nothing but what this app itself left.
+        clipboard.clearIfLeftBehind()
     }
 
     /**

@@ -5,6 +5,7 @@ import com.filestech.pass_tech.core.security.BruteForceGuard
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.state.StateStore
+import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.InMemorySlotKeystore
 import com.filestech.pass_tech.testing.heirRepository
@@ -49,7 +50,7 @@ class AutoLockTest {
         val guard = BruteForceGuard.forVault(store, clock)
         val heir = heirRepository(dir, keystore, store, clock, fastParams)
         val repository = VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams)
-        val vault = VaultManager(repository, FixedDomain(), Dispatchers.IO)
+        val vault = VaultManager(repository, FixedDomain(), FakeClipboard(), Dispatchers.IO)
         assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
         val delay = MutableStateFlow(seconds)
         block(Setup(vault, AutoLock(vault, delay, clock, backgroundScope), clock, delay))
@@ -215,7 +216,40 @@ class AutoLockTest {
             autoLock.wentToBackground()
             clock.now += 20_000
             advanceTimeBy(20_000)
-            // No background timer either: the picker is still in front of the owner.
+            // A timer IS running behind the picker now; it is simply not due yet.
+            assertThat(settled(vault).isOpen()).isTrue()
+            autoLock.cameToForeground()
+            assertThat(settled(vault).isOpen()).isTrue()
+        }
+    }
+
+    /**
+     * The hole the audit of 2026-09-24 found: an announced trip armed no timer at all, so a picker
+     * the owner never came back from left the vault open with no limit. This test never returns to
+     * the foreground — that is the whole point of it.
+     */
+    @Test
+    fun `a picker the owner never comes back from still locks`() = runTest {
+        opened(seconds = 0) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            autoLock.wentToBackground()
+            clock.now += 121_000
+            advanceTimeBy(121_000)
+            assertThat(settled(vault)).isEqualTo(VaultManager.State.Locked)
+        }
+    }
+
+    /**
+     * A delay longer than the grace is the owner's, not the grace's: an announced trip must not make
+     * the vault lock SOONER than they asked.
+     */
+    @Test
+    fun `an announced trip never shortens a delay longer than the grace`() = runTest {
+        opened(seconds = 1800) { (vault, autoLock, clock) ->
+            autoLock.systemScreenExpected()
+            autoLock.wentToBackground()
+            clock.now += 200_000
+            advanceTimeBy(200_000)
             assertThat(settled(vault).isOpen()).isTrue()
             autoLock.cameToForeground()
             assertThat(settled(vault).isOpen()).isTrue()

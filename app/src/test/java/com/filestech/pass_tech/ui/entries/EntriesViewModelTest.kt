@@ -57,6 +57,10 @@ class EntriesViewModelTest {
         }
 
         override fun clear() = Unit
+
+        override fun clearOnLock() = Unit
+
+        override fun clearIfLeftBehind() = Unit
     }
 
     private data class Setup(
@@ -79,9 +83,10 @@ class EntriesViewModelTest {
             // The vault on the test scheduler too: no write left on a real thread to come back to Main after the test.
             val io = StandardTestDispatcher(testScheduler)
             val domain = FixedDomain()
-            val vault = VaultManager(VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams), domain, io)
-            assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
+            val repository = VaultRepository(VaultFiles(dir), keystore, guard, heir, params = fastParams)
             val clipboard = FakeClipboard(clearAfter = 30)
+            val vault = VaultManager(repository, domain, clipboard, io)
+            assertThat(vault.openOrCreate("renardclochesoleil2026".encodeToByteArray())).isEqualTo(VaultManager.CreateOutcome.Created)
             val preferences = AppPreferences(InMemoryPreferences())
             val phishing = FakePhishingComponent()
             val antiPhishing = AntiPhishing(preferences, phishing, domain)

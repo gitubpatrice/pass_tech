@@ -10,6 +10,7 @@ import com.filestech.pass_tech.core.vault.VaultManager.CreateOutcome
 import com.filestech.pass_tech.core.vault.VaultManager.DecoyOutcome
 import com.filestech.pass_tech.core.vault.VaultManager.State
 import com.filestech.pass_tech.core.vault.VaultManager.UnlockOutcome
+import com.filestech.pass_tech.testing.FakeClipboard
 import com.filestech.pass_tech.testing.FakeClock
 import com.filestech.pass_tech.testing.FixedDomain
 import com.filestech.pass_tech.testing.GatedFiles
@@ -51,7 +52,8 @@ class VaultManagerTest {
         val store = StateStore(File(dir, StateStore.FILE_NAME), keystore)
         val guard = BruteForceGuard.forVault(store, clock)
         val heir = heirRepository(dir, keystore, store, clock, fastParams)
-        manager = VaultManager(VaultRepository(files, keystore, guard, heir, params = fastParams), domain, Dispatchers.IO)
+        val repository = VaultRepository(files, keystore, guard, heir, params = fastParams)
+        manager = VaultManager(repository, domain, FakeClipboard(), Dispatchers.IO)
     }
 
     // A fresh array for every call: the manager wipes what it is given.
