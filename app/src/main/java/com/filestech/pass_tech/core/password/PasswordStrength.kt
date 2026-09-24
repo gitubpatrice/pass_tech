@@ -30,6 +30,23 @@ object PasswordStrength {
     // A common root counts when it has at least this many letters, and weighs at least half the password.
     private const val ROOT_MIN_LENGTH = 5
 
+    /**
+     * Past this length, [isCommon] answers false without looking. Two reasons, and the second is the
+     * one that matters.
+     *
+     * It is very nearly free: the longest root here is 14 letters, and [weighsHalf] wants the root to
+     * be at least half of what survives the dressing, so anything a root can match is under 30 letters
+     * once stripped. 256 is far above that; only a password padded with hundreds of non-letters around
+     * a common root falls outside, and calling such a thing "common" was never useful anyway.
+     *
+     * And it bounds the work. [isCommon] allocates about six copies of its argument and runs
+     * [weighsHalf] over every root, so its cost is quadratic in a length the OWNER does not choose:
+     * an imported file does. Without this line, one entry carrying a very large `password` froze the
+     * audit at every unlock — see the import caps in `ImportParser`, which close the same hole at the
+     * door. Both are needed: this one also covers a value that arrived some other way.
+     */
+    private const val MAX_COMMON_CANDIDATE = 256
+
     private val UPPER = Regex("[A-Z]")
     private val LOWER = Regex("[a-z]")
     private val DIGIT = Regex("[0-9]")
@@ -66,6 +83,7 @@ object PasswordStrength {
      * normalisation, which would otherwise turn `123` into letters and hide the root.
      */
     fun isCommon(password: String): Boolean {
+        if (password.length > MAX_COMMON_CANDIDATE) return false
         val lower = password.lowercase()
         val trimmed = lower.replace(DRESSING, "")
         return setOf(deleet(lower), deleet(trimmed)).any { candidate ->
@@ -74,9 +92,16 @@ object PasswordStrength {
         }
     }
 
-    /** A root of at least 5 letters that is at least half of [core]: `passwordxyz` counts, `chaisenuageturbine` does not. */
+    /**
+     * A root of at least 5 letters that is at least half of [core]: `passwordxyz` counts,
+     * `chaisenuageturbine` does not.
+     *
+     * The two length tests come FIRST, and that is not style: `core.contains(root)` scans, while they
+     * are comparisons. Written the other way round — as it was — every root was searched through the
+     * whole of [core] before the test that would have rejected it outright.
+     */
     private fun weighsHalf(root: String, core: String) =
-        root.length >= ROOT_MIN_LENGTH && core.contains(root) && root.length * 2 >= core.length
+        root.length >= ROOT_MIN_LENGTH && root.length * 2 >= core.length && core.contains(root)
 
     /**
      * Repetitions (`aaaa`) and sequences (`1234`, `dcba`) do not count for their raw length: a run of

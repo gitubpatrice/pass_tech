@@ -270,7 +270,7 @@
     <string name="decoy_tile_configured">Caja fuerte señuelo configurada</string>
     <string name="decoy_tile_subtitle">Una segunda contraseña abre una caja fuerte falsa. Si alguien te obliga a abrir la app, da la falsa.</string>
     <string name="decoy_dialog_title">Caja fuerte señuelo</string>
-    <string name="decoy_setup_body">Una caja fuerte señuelo es una segunda caja fuerte, totalmente separada, que se abre con una contraseña distinta.\n\nPara qué sirve: si alguien te obliga a abrir Pass Tech (frontera, agresión, control), das la contraseña del señuelo. La app muestra entonces una caja fuerte falsa — es criptográficamente imposible demostrar que existe la verdadera.\n\nTen en cuenta:\n• La contraseña del señuelo debe ser distinta de la verdadera\n• Llena el señuelo con algunas entradas creíbles\n• El desbloqueo biométrico se desactivará, y seguirá desactivado mientras exista un señuelo: la huella abre directamente la caja fuerte verdadera, lo que anularía el señuelo</string>
+    <string name="decoy_setup_body">Una caja fuerte señuelo es una segunda caja fuerte, totalmente separada, que se abre con una contraseña distinta.\n\nPara qué sirve: si alguien te obliga a abrir Pass Tech (frontera, agresión, control), das la contraseña del señuelo. La app muestra entonces una caja fuerte falsa, y nada en los archivos de este teléfono — ni sus nombres, ni sus tamaños, ni su contenido — dice que existe una segunda.\n\nTen en cuenta:\n• La contraseña del señuelo debe ser distinta de la verdadera\n• Llena el señuelo con algunas entradas creíbles\n• Esto protege frente a un registro del teléfono, no frente a la app en sí: quien la usa todavía puede averiguar que hay un espacio ocupado\n• El desbloqueo biométrico se desactivará, y seguirá desactivado mientras exista un señuelo: la huella abre directamente la caja fuerte verdadera, lo que anularía el señuelo</string>
     <string name="decoy_setup_biometric_warning">Configurar una caja fuerte señuelo desactivará el desbloqueo biométrico. La huella abre directamente la caja fuerte real y echaría por tierra el señuelo en la situación misma para la que existe. Puedes seguir desbloqueando con tu contraseña maestra.</string>
     <string name="decoy_configure">Configurar</string>
     <string name="decoy_password_dialog_title">Contraseña de la caja fuerte señuelo</string>
@@ -460,14 +460,14 @@
     <string name="import_format_csv">CSV (Chrome / Edge / otros)</string>
     <string name="import_format_bitwarden">Bitwarden JSON</string>
     <string name="import_format_pass_tech">Pass Tech JSON</string>
-    <string name="import_error_too_large">Archivo demasiado grande (máx. 50 MB)</string>
+    <string name="import_error_too_large">Archivo demasiado grande (máx. 50 MB, 50 000 entradas)</string>
     <string name="import_error_empty_file">Archivo vacío</string>
     <string name="import_error_json_unknown">Formato JSON no reconocido</string>
     <string name="import_error_json_invalid">JSON no válido</string>
     <string name="import_error_csv_invalid">CSV no válido</string>
     <string name="import_error_csv_empty">CSV vacío</string>
     <string name="import_error_csv_no_password_column">No se encuentra la columna «password» en el CSV</string>
-    <string name="import_error_cell_too_large">Celda CSV demasiado grande (máx. 64 KB)</string>
+    <string name="import_error_field_too_large">Un campo de este archivo es demasiado grande (máx. 64 KB)</string>
 
     <string name="export_plain_dialog_title">Exportación SIN CIFRAR</string>
     <string name="export_plain_warning_headline">El archivo exportado contendrá TODAS tus contraseñas EN CLARO (legibles por cualquiera).</string>
@@ -523,7 +523,7 @@
     <string name="about_feature_integrity_desc">Antes de que escribas tu contraseña maestra: si este teléfono puede pasar a root, si hay un depurador conectado, si es una versión de desarrollo, si es un emulador. Avisa, y nunca bloquea.</string>
 
     <string name="about_feature_decoy">Caja fuerte señuelo</string>
-    <string name="about_feature_decoy_desc">Una segunda contraseña abre una segunda caja fuerte, con sus propias entradas. Nada en este teléfono dice si tienes una.</string>
+    <string name="about_feature_decoy_desc">Una segunda contraseña abre una segunda caja fuerte, con sus propias entradas. Nada en los archivos de este teléfono dice si tienes una.</string>
     <string name="about_feature_panic">Modo pánico</string>
     <string name="about_feature_panic_desc">Bloquea, vacía el portapapeles, desarma la huella, apaga la comprobación de la dirección y da a la app el aspecto de una calculadora — que funciona de verdad.</string>
     <string name="about_feature_heir">Alguien después de ti</string>

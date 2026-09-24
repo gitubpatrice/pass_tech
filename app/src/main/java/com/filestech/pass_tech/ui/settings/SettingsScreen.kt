@@ -1454,7 +1454,7 @@ private fun importProblemLabel(problem: ImportParser.Problem): Int = when (probl
     ImportParser.Problem.CSV_INVALID -> R.string.import_error_csv_invalid
     ImportParser.Problem.CSV_EMPTY -> R.string.import_error_csv_empty
     ImportParser.Problem.CSV_NO_PASSWORD_COLUMN -> R.string.import_error_csv_no_password_column
-    ImportParser.Problem.CELL_TOO_LARGE -> R.string.import_error_cell_too_large
+    ImportParser.Problem.FIELD_TOO_LARGE -> R.string.import_error_field_too_large
 }
 
 private const val BACKUP_MIME = "application/octet-stream"

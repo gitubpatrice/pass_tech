@@ -277,7 +277,7 @@
     <string name="decoy_tile_configured">Coffre leurre configuré</string>
     <string name="decoy_tile_subtitle">Un 2e mot de passe ouvre un faux coffre. Si quelqu\'un vous force à ouvrir l\'app, donnez le faux.</string>
     <string name="decoy_dialog_title">Coffre leurre</string>
-    <string name="decoy_setup_body">Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec un mot de passe différent.\n\nUsage : si quelqu\'un vous force à ouvrir Pass Tech (frontière, agression, contrôle), vous donnez le mot de passe du leurre. L\'app affiche alors un faux coffre — il est cryptographiquement impossible de prouver l\'existence du vrai.\n\nÀ retenir :\n• Le mot de passe du leurre doit être différent du vrai\n• Remplissez le leurre avec quelques entrées crédibles\n• Le déverrouillage biométrique sera désactivé, et le restera tant qu\'un leurre existe : l\'empreinte ouvre directement le vrai coffre, elle annulerait le leurre</string>
+    <string name="decoy_setup_body">Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec un mot de passe différent.\n\nUsage : si quelqu\'un vous force à ouvrir Pass Tech (frontière, agression, contrôle), vous donnez le mot de passe du leurre. L\'app affiche alors un faux coffre, et rien dans les fichiers de ce téléphone — ni leurs noms, ni leurs tailles, ni leur contenu — ne dit qu\'il en existe un second.\n\nÀ retenir :\n• Le mot de passe du leurre doit être différent du vrai\n• Remplissez le leurre avec quelques entrées crédibles\n• Cela protège d\'une fouille du téléphone, pas de l\'app elle-même : qui s\'en sert peut encore découvrir qu\'un emplacement est pris\n• Le déverrouillage biométrique sera désactivé, et le restera tant qu\'un leurre existe : l\'empreinte ouvre directement le vrai coffre, elle annulerait le leurre</string>
     <string name="decoy_setup_biometric_warning">Configurer un coffre leurre désactivera le déverrouillage biométrique. L\'empreinte ouvre directement le vrai coffre : elle annulerait le leurre dans la situation même où il sert. Vous déverrouillerez avec votre mot de passe principal.</string>
     <string name="decoy_configure">Configurer</string>
     <string name="decoy_password_dialog_title">Mot de passe du coffre leurre</string>
@@ -474,14 +474,14 @@
     <string name="import_format_csv">CSV (Chrome / Edge / autre)</string>
     <string name="import_format_bitwarden">Bitwarden JSON</string>
     <string name="import_format_pass_tech">Pass Tech JSON</string>
-    <string name="import_error_too_large">Fichier trop volumineux (max 50 Mo)</string>
+    <string name="import_error_too_large">Fichier trop volumineux (max 50 Mo, 50 000 entrées)</string>
     <string name="import_error_empty_file">Fichier vide</string>
     <string name="import_error_json_unknown">Format JSON non reconnu</string>
     <string name="import_error_json_invalid">JSON invalide</string>
     <string name="import_error_csv_invalid">CSV invalide</string>
     <string name="import_error_csv_empty">CSV vide</string>
     <string name="import_error_csv_no_password_column">Colonne « password » introuvable dans le CSV</string>
-    <string name="import_error_cell_too_large">Cellule CSV trop volumineuse (max 64 Ko)</string>
+    <string name="import_error_field_too_large">Un champ de ce fichier est trop volumineux (max 64 Ko)</string>
 
     <string name="export_plain_dialog_title">Export NON CHIFFRÉ</string>
     <string name="export_plain_warning_headline">Le fichier exporté contiendra TOUS vos mots de passe EN CLAIR (lisibles par n\'importe qui).</string>
@@ -537,7 +537,7 @@
     <string name="about_feature_integrity_desc">Avant que vous tapiez votre mot de passe maître : si ce téléphone peut passer en root, si un débogueur est attaché, si c\'est une version de développement, si c\'est un émulateur. Il prévient, et ne bloque jamais.</string>
 
     <string name="about_feature_decoy">Coffre leurre</string>
-    <string name="about_feature_decoy_desc">Un deuxième mot de passe ouvre un deuxième coffre, avec ses propres entrées. Rien sur ce téléphone ne dit si vous en avez un.</string>
+    <string name="about_feature_decoy_desc">Un deuxième mot de passe ouvre un deuxième coffre, avec ses propres entrées. Rien dans les fichiers de ce téléphone ne dit si vous en avez un.</string>
     <string name="about_feature_panic">Mode panique</string>
     <string name="about_feature_panic_desc">Verrouille, vide le presse-papiers, désarme l\'empreinte, coupe le contrôle d\'adresse, et donne à l\'application l\'apparence d\'une calculatrice — qui fonctionne vraiment.</string>
     <string name="about_feature_heir">Quelqu\'un après vous</string>

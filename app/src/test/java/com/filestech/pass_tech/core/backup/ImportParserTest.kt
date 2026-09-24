@@ -86,12 +86,65 @@ class ImportParserTest {
 
     @Test
     fun `a cell built to grow without end stops the import, and says which cell`() {
-        val cell = "x".repeat(ImportParser.MAX_CELL_CHARS + 1)
+        val cell = "x".repeat(ImportParser.MAX_FIELD_CHARS + 1)
         val result = parse("name,password\n\"$cell\",pw\n")
-        assertThat(result.problem).isEqualTo(ImportParser.Problem.CELL_TOO_LARGE)
+        assertThat(result.problem).isEqualTo(ImportParser.Problem.FIELD_TOO_LARGE)
         assertThat(result.entries).isEmpty()
         // One character less is a cell like any other.
         assertThat(parse("name,password\n\"${cell.dropLast(1)}\",pw\n").entries).hasSize(1)
+    }
+
+    /**
+     * The bound used to live inside the CSV reader, so the three JSON routes walked past it. These
+     * are the negative controls for that: each one FAILED before the guard moved out.
+     */
+    @Test
+    fun `an oversized field stops a Pass Tech export too, not only a CSV`() {
+        val field = "x".repeat(ImportParser.MAX_FIELD_CHARS + 1)
+        val result = parse("""[{"id":"1","title":"Site","password":"$field"}]""")
+        assertThat(result.problem).isEqualTo(ImportParser.Problem.FIELD_TOO_LARGE)
+        assertThat(result.entries).isEmpty()
+    }
+
+    @Test
+    fun `an oversized field stops a Bitwarden export too`() {
+        val field = "x".repeat(ImportParser.MAX_FIELD_CHARS + 1)
+        val json = """{"items":[{"type":1,"name":"Site","login":{"password":"$field"}}]}"""
+        assertThat(parse(json).problem).isEqualTo(ImportParser.Problem.FIELD_TOO_LARGE)
+    }
+
+    @Test
+    fun `an oversized field is found however deep it is buried`() {
+        val field = "x".repeat(ImportParser.MAX_FIELD_CHARS + 1)
+        val json = """[{"id":"1","title":"Site","otherDomains":["ok.com","$field"]}]"""
+        assertThat(parse(json).problem).isEqualTo(ImportParser.Problem.FIELD_TOO_LARGE)
+    }
+
+    @Test
+    fun `a field of exactly the cap comes in`() {
+        val field = "x".repeat(ImportParser.MAX_FIELD_CHARS)
+        val result = parse("""[{"id":"1","title":"Site","password":"$field"}]""")
+        assertThat(result.problem).isNull()
+        assertThat(result.entries.single().password).hasLength(ImportParser.MAX_FIELD_CHARS)
+    }
+
+    /**
+     * A million one-character cells sit well under [ImportParser.MAX_FILE_CHARS] and still build a
+     * million objects, so the count is bounded on its own.
+     */
+    @Test
+    fun `too many rows stops the import, even in a small file`() {
+        val rows = buildString {
+            append("name,password\n")
+            repeat(ImportParser.MAX_ENTRIES + 1) { append("a,b\n") }
+        }
+        assertThat(parse(rows).problem).isEqualTo(ImportParser.Problem.TOO_LARGE)
+    }
+
+    @Test
+    fun `too many items stops a JSON import, even in a small file`() {
+        val items = (0..ImportParser.MAX_ENTRIES).joinToString(",") { """{"id":"$it","title":"T"}""" }
+        assertThat(parse("[$items]").problem).isEqualTo(ImportParser.Problem.TOO_LARGE)
     }
 
     @Test

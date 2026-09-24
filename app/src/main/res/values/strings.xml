@@ -303,7 +303,7 @@
     <string name="decoy_dialog_title">Decoy vault</string>
     <!-- Third bullet reworded for 3.0.0: biometrics stays off for as long as the decoy exists, it is not
          merely turned off once. -->
-    <string name="decoy_setup_body">A decoy vault is a second, fully separate vault unlocked with a different password.\n\nUse case: if someone forces you to open Pass Tech (border, assault, control), you give the decoy password. The app then shows a fake vault — it is cryptographically impossible to prove the real one exists.\n\nKeep in mind:\n• The decoy password must differ from the real one\n• Fill the decoy with a few credible entries\n• Biometric unlock will be turned off, and stays off for as long as a decoy exists: the fingerprint opens the real vault directly, which would defeat the decoy</string>
+    <string name="decoy_setup_body">A decoy vault is a second, fully separate vault unlocked with a different password.\n\nUse case: if someone forces you to open Pass Tech (border, assault, control), you give the decoy password. The app then shows a fake vault, and nothing in the files on this phone — their names, their sizes, their contents — says a second one exists.\n\nKeep in mind:\n• The decoy password must differ from the real one\n• Fill the decoy with a few credible entries\n• This covers a search of the phone, not the app itself: someone using it can still work out that a slot is taken\n• Biometric unlock will be turned off, and stays off for as long as a decoy exists: the fingerprint opens the real vault directly, which would defeat the decoy</string>
     <!-- Shown only when a fingerprint opens THIS vault: no vault ever says anything about another (design v2.3 §1). -->
     <string name="decoy_setup_biometric_warning">Setting up a decoy vault will turn off biometric unlock. The fingerprint opens the real vault directly, so it would defeat the decoy in the very situation the decoy is for. You can still unlock with your master password.</string>
     <string name="decoy_configure">Set up</string>
@@ -530,14 +530,14 @@
     <string name="import_format_csv">CSV (Chrome / Edge / other)</string>
     <string name="import_format_bitwarden">Bitwarden JSON</string>
     <string name="import_format_pass_tech">Pass Tech JSON</string>
-    <string name="import_error_too_large">File too large (max 50 MB)</string>
+    <string name="import_error_too_large">File too large (max 50 MB, 50,000 entries)</string>
     <string name="import_error_empty_file">Empty file</string>
     <string name="import_error_json_unknown">Unrecognised JSON format</string>
     <string name="import_error_json_invalid">Invalid JSON</string>
     <string name="import_error_csv_invalid">Invalid CSV</string>
     <string name="import_error_csv_empty">Empty CSV</string>
     <string name="import_error_csv_no_password_column">No \"password\" column found in the CSV</string>
-    <string name="import_error_cell_too_large">CSV cell too large (max 64 KB)</string>
+    <string name="import_error_field_too_large">A field in this file is too large (max 64 KB)</string>
 
     <string name="export_plain_dialog_title">UNENCRYPTED export</string>
     <string name="export_plain_warning_headline">The exported file will contain ALL your passwords IN CLEAR TEXT (readable by anyone).</string>
@@ -597,7 +597,7 @@
     <string name="about_feature_integrity_desc">Before you type your master password: whether this phone can be made root, whether a debugger is attached, whether this is a development build, whether it is an emulator. It warns, and never blocks.</string>
 
     <string name="about_feature_decoy">Decoy vault</string>
-    <string name="about_feature_decoy_desc">A second password opens a second vault with its own entries. Nothing on this phone says whether you have one.</string>
+    <string name="about_feature_decoy_desc">A second password opens a second vault with its own entries. Nothing in the files on this phone says whether you have one.</string>
     <string name="about_feature_panic">Panic mode</string>
     <string name="about_feature_panic_desc">Locks, clears the clipboard, disarms the fingerprint, turns the address check off, and makes the app look like a calculator — which really works.</string>
     <string name="about_feature_heir">Someone after you</string>

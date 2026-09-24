@@ -4,16 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filestech.pass_tech.core.audit.VaultAudit
 import com.filestech.pass_tech.core.breach.BreachCheck
+import com.filestech.pass_tech.core.di.IoDispatcher
 import com.filestech.pass_tech.core.model.Entry
 import com.filestech.pass_tech.core.model.EntryType
 import com.filestech.pass_tech.core.state.Clock
 import com.filestech.pass_tech.core.vault.VaultManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -28,6 +32,7 @@ class AuditViewModel @Inject constructor(
     private val vault: VaultManager,
     private val breach: BreachCheck,
     private val clock: Clock,
+    @IoDispatcher private val io: CoroutineDispatcher,
 ) : ViewModel() {
 
     data class UiState(
@@ -58,13 +63,20 @@ class AuditViewModel @Inject constructor(
     private var breachedHashes: Set<String>? = null
     private var checkedHashes: Set<String>? = null
 
+    /** The analysis in flight, if any. One at a time: see [analyse]. */
+    private var running: Job? = null
+
     init {
         viewModelScope.launch {
             vault.state.collect { state ->
                 if (state is VaultManager.State.Open) {
                     analyse(state.entries)
                 } else {
-                    // The vault closed: the audit goes with it, results included.
+                    // The vault closed: the audit goes with it, results included. The analysis in
+                    // flight is cancelled FIRST, or its result would land after this reset and put
+                    // the closed vault's figures back on a locked screen.
+                    running?.cancel()
+                    running = null
                     breachedHashes = null
                     checkedHashes = null
                     mutableState.value = UiState()
@@ -106,10 +118,29 @@ class AuditViewModel @Inject constructor(
         mutableState.update { it.copy(problem = null) }
     }
 
+    /**
+     * The analysis, on [io] and never on the thread that draws.
+     *
+     * [VaultAudit.of] reads every password of the vault, and its cost is decided by the CONTENT, not
+     * by the number of entries. Run on the main thread — which it was, both from the collector above
+     * and straight from the refresh button, with no coroutine at all — one entry carrying a very
+     * large password froze the app at EVERY unlock, since the entry stays in the vault. The work is
+     * bounded now (`PasswordStrength.MAX_COMMON_CANDIDATE`, and the field caps of `ImportParser`),
+     * and it still has no business here.
+     *
+     * One run at a time: a newer set of entries cancels an older analysis instead of racing it to
+     * the state. The hashes are read HERE, on the caller's thread, so a run always scores against
+     * the set that existed when it was asked for.
+     */
     private fun analyse(entries: List<Entry>) {
-        val now = LocalDateTime.ofInstant(Instant.ofEpochMilli(clock.wallMillis()), ZoneId.systemDefault())
-        val audit = VaultAudit.of(entries, now, breachedHashes, checkedHashes)
-        mutableState.update { it.copy(audit = audit) }
+        val breached = breachedHashes
+        val checked = checkedHashes
+        running?.cancel()
+        running = viewModelScope.launch {
+            val now = LocalDateTime.ofInstant(Instant.ofEpochMilli(clock.wallMillis()), ZoneId.systemDefault())
+            val audit = withContext(io) { VaultAudit.of(entries, now, breached, checked) }
+            mutableState.update { it.copy(audit = audit) }
+        }
     }
 
     private companion object {

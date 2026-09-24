@@ -179,9 +179,19 @@ object PtbakCodec {
         }
     }
 
-    /** A JSON array of entries. An entry Dart would reject is skipped, the rest is kept. */
-    private fun parseEntries(text: String): List<Entry> =
-        (json.parseToJsonElement(text) as? JsonArray).orReject().mapNotNull(EntryJson::fromJsonOrNull)
+    /**
+     * A JSON array of entries. An entry Dart would reject is skipped, the rest is kept.
+     *
+     * The two bounds a plain import gets apply here too. A `.ptbak` is encrypted, which says nothing
+     * about who wrote it: its passphrase travels with it, so "here is a shared backup, here is the
+     * password" is a file an attacker chooses every byte of.
+     */
+    private fun parseEntries(text: String): List<Entry> {
+        val array = (json.parseToJsonElement(text) as? JsonArray).orReject()
+        ensure(!ImportParser.hasOversizedField(array))
+        ensure(array.size <= ImportParser.MAX_ENTRIES)
+        return array.mapNotNull(EntryJson::fromJsonOrNull)
+    }
 
     /**
      * `KdfParams.fromFileOrNull` of the Flutter app: all three absent means the defaults (no file

@@ -270,7 +270,7 @@
     <string name="decoy_tile_configured">Schein-Tresor eingerichtet</string>
     <string name="decoy_tile_subtitle">Ein zweites Passwort öffnet einen falschen Tresor. Zwingt Sie jemand, die App zu öffnen, geben Sie das falsche an.</string>
     <string name="decoy_dialog_title">Schein-Tresor</string>
-    <string name="decoy_setup_body">Ein Schein-Tresor ist ein zweiter, vollständig getrennter Tresor, der mit einem anderen Passwort geöffnet wird.\n\nWofür: Wenn Sie jemand zwingt, Pass Tech zu öffnen (Grenze, Überfall, Kontrolle), geben Sie das Passwort des Schein-Tresors an. Die App zeigt dann einen falschen Tresor — es ist kryptografisch unmöglich zu beweisen, dass der echte existiert.\n\nZu beachten:\n• Das Passwort des Schein-Tresors muss sich vom echten unterscheiden\n• Füllen Sie den Schein-Tresor mit einigen glaubwürdigen Einträgen\n• Das biometrische Entsperren wird abgeschaltet und bleibt es, solange ein Schein-Tresor besteht: Der Fingerabdruck öffnet unmittelbar den echten Tresor und würde den Schein-Tresor damit aufheben</string>
+    <string name="decoy_setup_body">Ein Schein-Tresor ist ein zweiter, vollständig getrennter Tresor, der mit einem anderen Passwort geöffnet wird.\n\nWofür: Wenn Sie jemand zwingt, Pass Tech zu öffnen (Grenze, Überfall, Kontrolle), geben Sie das Passwort des Schein-Tresors an. Die App zeigt dann einen falschen Tresor, und nichts in den Dateien dieses Telefons — weder ihre Namen noch ihre Größe noch ihr Inhalt — verrät, dass ein zweiter existiert.\n\nZu beachten:\n• Das Passwort des Schein-Tresors muss sich vom echten unterscheiden\n• Füllen Sie den Schein-Tresor mit einigen glaubwürdigen Einträgen\n• Das schützt vor einer Durchsuchung des Telefons, nicht vor der App selbst: wer sie bedient, kann weiterhin herausfinden, dass ein Platz belegt ist\n• Das biometrische Entsperren wird abgeschaltet und bleibt es, solange ein Schein-Tresor besteht: Der Fingerabdruck öffnet unmittelbar den echten Tresor und würde den Schein-Tresor damit aufheben</string>
     <string name="decoy_setup_biometric_warning">Das Einrichten eines Schein-Tresors schaltet das biometrische Entsperren ab. Der Fingerabdruck öffnet direkt den echten Tresor und würde den Schein-Tresor genau in der Situation aushebeln, für die er gedacht ist. Sie können weiterhin mit Ihrem Master-Passwort entsperren.</string>
     <string name="decoy_configure">Einrichten</string>
     <string name="decoy_password_dialog_title">Passwort des Schein-Tresors</string>
@@ -460,14 +460,14 @@
     <string name="import_format_csv">CSV (Chrome / Edge / andere)</string>
     <string name="import_format_bitwarden">Bitwarden JSON</string>
     <string name="import_format_pass_tech">Pass Tech JSON</string>
-    <string name="import_error_too_large">Datei zu groß (max. 50 MB)</string>
+    <string name="import_error_too_large">Datei zu groß (max. 50 MB, 50 000 Einträge)</string>
     <string name="import_error_empty_file">Leere Datei</string>
     <string name="import_error_json_unknown">Unbekanntes JSON-Format</string>
     <string name="import_error_json_invalid">Ungültiges JSON</string>
     <string name="import_error_csv_invalid">Ungültiges CSV</string>
     <string name="import_error_csv_empty">Leeres CSV</string>
     <string name="import_error_csv_no_password_column">Keine Spalte „password“ im CSV gefunden</string>
-    <string name="import_error_cell_too_large">CSV-Zelle zu groß (max. 64 KB)</string>
+    <string name="import_error_field_too_large">Ein Feld in dieser Datei ist zu groß (max. 64 KB)</string>
 
     <string name="export_plain_dialog_title">UNVERSCHLÜSSELTER Export</string>
     <string name="export_plain_warning_headline">Die exportierte Datei enthält ALLE Ihre Passwörter IM KLARTEXT (für jeden lesbar).</string>
@@ -523,7 +523,7 @@
     <string name="about_feature_integrity_desc">Bevor Sie Ihr Master-Passwort eingeben: ob dieses Telefon Root erlangen kann, ob ein Debugger angehängt ist, ob es eine Entwicklungsversion ist, ob es ein Emulator ist. Er warnt und blockiert nie.</string>
 
     <string name="about_feature_decoy">Schein-Tresor</string>
-    <string name="about_feature_decoy_desc">Ein zweites Passwort öffnet einen zweiten Tresor mit eigenen Einträgen. Nichts auf diesem Telefon verrät, ob Sie einen haben.</string>
+    <string name="about_feature_decoy_desc">Ein zweites Passwort öffnet einen zweiten Tresor mit eigenen Einträgen. Nichts in den Dateien dieses Telefons verrät, ob Sie einen haben.</string>
     <string name="about_feature_panic">Panikmodus</string>
     <string name="about_feature_panic_desc">Sperrt, leert die Zwischenablage, entschärft den Fingerabdruck, schaltet die Adressprüfung ab und lässt die App wie einen Rechner aussehen — der wirklich funktioniert.</string>
     <string name="about_feature_heir">Jemand nach Ihnen</string>

@@ -45,6 +45,24 @@ class PasswordPolicyTest {
         assertThat(PasswordStrength.entropyBits("")).isEqualTo(0.0)
     }
 
+    /**
+     * The cost of [PasswordStrength.isCommon] follows the LENGTH of what it is given, and an
+     * imported file chooses that length. This is the bound, and the two assertions are what it must
+     * not break: a real password still gets a verdict, and a very long one is simply not "common".
+     */
+    @Test
+    fun `a value far longer than any common root is not searched at all`() {
+        // The discriminating case, and the reason it is written this way: without the bound, the
+        // dressing is stripped, "password" is left, and the answer is TRUE — after a scan of the
+        // whole value by every root. With it, the answer is false without looking, and false is also
+        // the right answer: 308 characters is not a common password.
+        assertThat(PasswordStrength.isCommon("password" + "!".repeat(300))).isFalse()
+        assertThat(PasswordStrength.isWeak("password" + "!".repeat(300))).isFalse()
+        // The bound does not reach down to anything a person would type.
+        assertThat(PasswordStrength.isCommon("password" + "!".repeat(8))).isTrue()
+        assertThat(PasswordStrength.isCommon("a".repeat(64 * 1024))).isFalse()
+    }
+
     @Test
     fun `repetitions and sequences are discounted`() {
         assertThat(PasswordStrength.score("123456789012")).isLessThan(0.35)

@@ -270,7 +270,7 @@
     <string name="decoy_tile_configured">Cassaforte esca configurata</string>
     <string name="decoy_tile_subtitle">Una seconda password apre una cassaforte falsa. Se qualcuno ti costringe ad aprire l\'app, fornisci quella falsa.</string>
     <string name="decoy_dialog_title">Cassaforte esca</string>
-    <string name="decoy_setup_body">Una cassaforte esca è una seconda cassaforte, completamente separata, che si apre con una password diversa.\n\nA cosa serve: se qualcuno ti costringe ad aprire Pass Tech (frontiera, aggressione, controllo), dai la password dell\'esca. L\'app mostra allora una cassaforte falsa — è crittograficamente impossibile dimostrare che quella vera esista.\n\nDa ricordare:\n• La password dell\'esca deve essere diversa da quella vera\n• Riempi l\'esca con qualche voce credibile\n• Lo sblocco biometrico verrà disattivato, e resterà tale finché esiste un\'esca: l\'impronta apre direttamente la cassaforte vera e annullerebbe l\'esca</string>
+    <string name="decoy_setup_body">Una cassaforte esca è una seconda cassaforte, completamente separata, che si apre con una password diversa.\n\nA cosa serve: se qualcuno ti costringe ad aprire Pass Tech (frontiera, aggressione, controllo), dai la password dell\'esca. L\'app mostra allora una cassaforte falsa, e nulla nei file di questo telefono — né i nomi, né le dimensioni, né il contenuto — dice che ne esiste una seconda.\n\nDa ricordare:\n• La password dell\'esca deve essere diversa da quella vera\n• Riempi l\'esca con qualche voce credibile\n• Questo protegge da una perquisizione del telefono, non dall\'app stessa: chi la usa può ancora scoprire che uno spazio è occupato\n• Lo sblocco biometrico verrà disattivato, e resterà tale finché esiste un\'esca: l\'impronta apre direttamente la cassaforte vera e annullerebbe l\'esca</string>
     <string name="decoy_setup_biometric_warning">Configurare una cassaforte esca disattiverà lo sblocco biometrico. L\'impronta apre direttamente la cassaforte vera e vanificherebbe l\'esca proprio nella situazione per cui esiste. Puoi comunque sbloccare con la password principale.</string>
     <string name="decoy_configure">Configura</string>
     <string name="decoy_password_dialog_title">Password della cassaforte esca</string>
@@ -460,14 +460,14 @@
     <string name="import_format_csv">CSV (Chrome / Edge / altro)</string>
     <string name="import_format_bitwarden">Bitwarden JSON</string>
     <string name="import_format_pass_tech">Pass Tech JSON</string>
-    <string name="import_error_too_large">File troppo grande (max 50 MB)</string>
+    <string name="import_error_too_large">File troppo grande (max 50 MB, 50.000 voci)</string>
     <string name="import_error_empty_file">File vuoto</string>
     <string name="import_error_json_unknown">Formato JSON non riconosciuto</string>
     <string name="import_error_json_invalid">JSON non valido</string>
     <string name="import_error_csv_invalid">CSV non valido</string>
     <string name="import_error_csv_empty">CSV vuoto</string>
     <string name="import_error_csv_no_password_column">Colonna «password» non trovata nel CSV</string>
-    <string name="import_error_cell_too_large">Cella CSV troppo grande (max 64 KB)</string>
+    <string name="import_error_field_too_large">Un campo di questo file è troppo grande (max 64 KB)</string>
 
     <string name="export_plain_dialog_title">Esportazione NON CIFRATA</string>
     <string name="export_plain_warning_headline">Il file esportato conterrà TUTTE le tue password IN CHIARO (leggibili da chiunque).</string>
@@ -523,7 +523,7 @@
     <string name="about_feature_integrity_desc">Prima che tu digiti la tua password principale: se questo telefono può passare in root, se è collegato un debugger, se è una versione di sviluppo, se è un emulatore. Avvisa, e non blocca mai.</string>
 
     <string name="about_feature_decoy">Cassaforte esca</string>
-    <string name="about_feature_decoy_desc">Una seconda password apre una seconda cassaforte, con voci proprie. Nulla su questo telefono dice se ne hai una.</string>
+    <string name="about_feature_decoy_desc">Una seconda password apre una seconda cassaforte, con voci proprie. Nulla nei file di questo telefono dice se ne hai una.</string>
     <string name="about_feature_panic">Modalità panico</string>
     <string name="about_feature_panic_desc">Blocca, svuota gli appunti, disarma l\'impronta, spegne il controllo dell\'indirizzo e dà all\'app l\'aspetto di una calcolatrice — che funziona davvero.</string>
     <string name="about_feature_heir">Qualcuno dopo di te</string>

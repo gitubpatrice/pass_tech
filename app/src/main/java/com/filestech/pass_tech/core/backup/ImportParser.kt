@@ -11,7 +11,9 @@ import com.filestech.pass_tech.core.model.EntryJson
 import com.filestech.pass_tech.core.model.EntryType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.UUID
@@ -34,8 +36,34 @@ object ImportParser {
     /** 50 MB, as 2.7.1, measured the same way: in UTF-16 code units. */
     const val MAX_FILE_CHARS = 50 * 1024 * 1024
 
-    /** A CSV cell beyond this is a file built to make the app grow a buffer without end. */
-    const val MAX_CELL_CHARS = 64 * 1024
+    /**
+     * The longest a single field may be, on EVERY route in: a CSV cell, a JSON value of a Pass Tech
+     * or a Bitwarden export, and the entries of a `.ptbak`.
+     *
+     * Beyond this, the file was built to make the app grow a buffer without end — or to hand a very
+     * large value to something that reads every entry afterwards. The vault audit runs
+     * `PasswordStrength` over each password at every unlock, and its cost follows the LENGTH of the
+     * value, not the number of entries; one oversized `password` froze the app at each opening, for
+     * as long as the entry stayed in the vault.
+     *
+     * Until 3.0.0 this bound existed but lived INSIDE the CSV reader, so three of the four routes
+     * walked past it. That is the shape of defect this project keeps meeting: a guard aimed at one
+     * of two twins.
+     *
+     * 64 KB is far above any real field — about twenty pages of text in a single note.
+     */
+    const val MAX_FIELD_CHARS = 64 * 1024
+
+    /**
+     * How many entries one file may carry.
+     *
+     * Counted on the rows of a CSV and on the items of a JSON array, BEFORE a single [Entry] is
+     * built. [MAX_FILE_CHARS] does not bound this: `a,a,a,…` fits millions of one-character cells
+     * into a file well under 50 MB, and each one becomes an object.
+     *
+     * 50 000 is an order of magnitude past the largest real vault.
+     */
+    const val MAX_ENTRIES = 50_000
 
     /** A TOTP secret is a few dozen characters; a huge one is truncated, never a reason to refuse a file. */
     const val MAX_TOTP_CHARS = 512
@@ -57,12 +85,15 @@ object ImportParser {
         CSV_INVALID("csvInvalid"),
         CSV_EMPTY("csvEmpty"),
         CSV_NO_PASSWORD_COLUMN("csvNoPasswordColumn"),
-        CELL_TOO_LARGE("cellTooLarge"),
+        FIELD_TOO_LARGE("fieldTooLarge"),
     }
 
     class Result(val entries: List<Entry>, val format: Format, val problem: Problem? = null)
 
-    private class CellTooLarge : Exception()
+    /** A file refused outright, and why. Thrown from inside the CSV reader, which cannot return. */
+    private class Refused(val problem: Problem) : Exception()
+
+    private fun refused(problem: Problem) = Result(emptyList(), Format.UNKNOWN, problem)
 
     private val json = Json
 
@@ -96,11 +127,40 @@ object ImportParser {
             return Result(emptyList(), Format.UNKNOWN, Problem.JSON_INVALID)
         }
         val items = (root as? JsonObject)?.get("items") as? JsonArray
+        val array = items ?: root as? JsonArray
+        // The first two branches are the bounds the CSV reader applies as it goes, applied here to
+        // the whole tree at once and before a single Entry exists.
         return when {
+            hasOversizedField(root) -> refused(Problem.FIELD_TOO_LARGE)
+            array == null -> refused(Problem.JSON_UNKNOWN_FORMAT)
+            array.size > MAX_ENTRIES -> refused(Problem.TOO_LARGE)
             items != null -> Result(bitwarden(items, untitled, now, newId), Format.BITWARDEN)
-            root is JsonArray -> Result(passTech(root, now, newId), Format.PASS_TECH)
-            else -> Result(emptyList(), Format.UNKNOWN, Problem.JSON_UNKNOWN_FORMAT)
+            else -> Result(passTech(array, now, newId), Format.PASS_TECH)
         }
+    }
+
+    /**
+     * Whether any text anywhere in [root] is longer than [MAX_FIELD_CHARS].
+     *
+     * It walks whatever the file holds rather than a list of field names, so a format added later is
+     * covered without anyone remembering to come back here. Iterative, never recursive: kotlinx
+     * parses arbitrarily deep JSON, and a recursive walk would meet its own stack before it met an
+     * oversized field.
+     *
+     * Public because [PtbakCodec] needs the same bound: an encrypted backup is still a file somebody
+     * hands over, and its passphrase is handed over with it.
+     */
+    fun hasOversizedField(root: JsonElement): Boolean {
+        val pending = ArrayDeque<JsonElement>()
+        pending.addLast(root)
+        while (pending.isNotEmpty()) {
+            when (val element = pending.removeLast()) {
+                is JsonPrimitive -> if (element.isString && element.content.length > MAX_FIELD_CHARS) return true
+                is JsonArray -> element.forEach(pending::addLast)
+                is JsonObject -> element.values.forEach(pending::addLast)
+            }
+        }
+        return false
     }
 
     /**
@@ -214,8 +274,8 @@ object ImportParser {
     private fun csv(content: String, untitled: String, now: () -> DartDateTime, newId: () -> String): Result {
         val rows = try {
             CsvReader(content).read()
-        } catch (_: CellTooLarge) {
-            return Result(emptyList(), Format.UNKNOWN, Problem.CELL_TOO_LARGE)
+        } catch (refusal: Refused) {
+            return refused(refusal.problem)
         }
         return csvRows(rows, untitled, now, newId)
     }
@@ -274,7 +334,7 @@ object ImportParser {
             var i = 0
             while (i < content.length) {
                 i += if (inQuotes) quoted(i) else plain(i)
-                if (cell.length > MAX_CELL_CHARS) throw CellTooLarge()
+                if (cell.length > MAX_FIELD_CHARS) throw Refused(Problem.FIELD_TOO_LARGE)
             }
             endRow()
             return rows
@@ -322,6 +382,9 @@ object ImportParser {
         private fun endRow() {
             if (cell.isEmpty() && row.isEmpty()) return
             endCell()
+            // Counted on the ROWS, not on the size of the file: a file of `a,a,a,…` stays well
+            // under MAX_FILE_CHARS while building millions of one-character cells.
+            if (rows.size >= MAX_ENTRIES) throw Refused(Problem.TOO_LARGE)
             rows.add(row)
             row = mutableListOf()
         }
