@@ -62,13 +62,22 @@
             android:theme="@style/Theme.PassTech.Splash"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- The everyday icon and name. Enabled; the panic mode swaps the two. -->
+        <!--
+          The everyday icon and name. Enabled; the panic mode swaps the two.
+
+          The label is the PLACEHOLDER, not @string/app_name, and the difference is the launcher.
+          What the launcher draws under an icon is the label of the component it resolved — this
+          alias — and never the one on <application>. So the debug build carried "Pass Tech (debug)"
+          in Settings › Apps and plain "Pass Tech" on the home screen, beside the 2.x app, with the
+          same name and the same look. Patrice tested the wrong one on the S24 on 2026-09-24 and we
+          spent three measurements finding out. In release both resolve to the same two words.
+        -->
         <activity-alias
             android:name=".MainAliasNormal"
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
-            android:label="@string/app_name"
+            android:label="${appLabel}"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
