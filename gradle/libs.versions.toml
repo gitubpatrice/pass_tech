@@ -27,7 +27,7 @@ hilt-navigation-compose = "1.4.0"
 coroutines = "1.11.0"
 
 # Argon2id (pure Java: no native library, so no per-ABI APK split is needed for it).
-bouncycastle = "1.85"
+bouncycastle = "1.86"
 
 # Tests
 junit5 = "6.1.3"
