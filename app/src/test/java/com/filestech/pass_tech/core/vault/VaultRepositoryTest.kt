@@ -122,6 +122,47 @@ class VaultRepositoryTest {
         assertThat(repo.unlock(password)).isInstanceOf(VaultRepository.UnlockResult.Locked::class.java)
     }
 
+    /**
+     * The three screens that reached `collision` used to CANCEL the attempt when the password opened
+     * nothing, so a guess was free on each of them while the unlock screen charged it. `BruteForceGuard`
+     * had tests; its callers did not, which is why five versions went by. These three are the negative
+     * controls: every one of them fails on the code as it stood before 2026-09-24.
+     */
+    @Test
+    fun `setting up a decoy charges the password that opened nothing`() {
+        val session = created()
+        repeat(5) { assertThat(repo.unlock(wrong)).isEqualTo(VaultRepository.UnlockResult.WrongPassword) }
+        // Five failures: the schedule has not started yet.
+        assertThat(repo.lockoutRemainingMillis()).isEqualTo(0L)
+        val decoy = repo.configureDecoy(session, "a decoy password".encodeToByteArray())
+        assertThat(decoy).isInstanceOf(VaultRepository.DecoyResult.Created::class.java)
+        // It was the sixth, and it counted — so the free-slot count cannot be read over and over.
+        assertThat(repo.lockoutRemainingMillis()).isGreaterThan(0L)
+    }
+
+    @Test
+    fun `choosing a new master password charges the collision check`() {
+        val session = created()
+        repeat(5) { repo.unlock(wrong) }
+        assertThat(repo.lockoutRemainingMillis()).isEqualTo(0L)
+        val changed = repo.changePassword(session, password, "a brand new password".encodeToByteArray())
+        assertThat(changed).isInstanceOf(VaultRepository.ChangeResult.Changed::class.java)
+        assertThat(repo.lockoutRemainingMillis()).isGreaterThan(0L)
+    }
+
+    @Test
+    fun `the creation form charges a guess once a vault exists, and only then`() {
+        // Nothing to guess against yet: the first vault on a phone costs nothing.
+        created().close()
+        assertThat(repo.lockoutRemainingMillis()).isEqualTo(0L)
+        // A vault exists now, so this password opened none of them: a guess, whatever is created for it.
+        assertThat(repo.openOrCreate(wrong)).isInstanceOf(VaultRepository.CreateResult.Created::class.java)
+        repeat(4) { assertThat(repo.unlock("nope $it".encodeToByteArray())).isEqualTo(VaultRepository.UnlockResult.WrongPassword) }
+        assertThat(repo.lockoutRemainingMillis()).isEqualTo(0L)
+        repo.unlock("nope again".encodeToByteArray())
+        assertThat(repo.lockoutRemainingMillis()).isGreaterThan(0L)
+    }
+
     @Test
     fun `the creation form creates nothing while a slot cannot be checked`() {
         created().close()

@@ -314,6 +314,12 @@ class VaultRepository(
      * another one — the heir passphrase, which must not be the master password they would then be
      * handing to someone else. The mirror of [verifyPassword]: here the match is the refusal, so it
      * is the match that counts as a failed attempt and the miss that cancels it.
+     *
+     * Cancelling on a miss is safe here, and it is the one place it is — which is why it says so.
+     * [compareToCurrent] compares against the key of the OPEN session and nothing else, so the answer
+     * is about a password the caller already holds. It is not an oracle: unlike [collision], it can
+     * never say whether some OTHER vault on this phone would open. Do not copy this line into a check
+     * that walks the slots.
      */
     fun collidesWithCurrentPassword(session: VaultSession, candidate: ByteArray): CheckResult =
         unavailableAs(CheckResult.KeystoreUnavailable) {
@@ -489,10 +495,17 @@ class VaultRepository(
             guard.failed()
             return CreateResult.Impossible
         }
-        guard.succeeded()
+        // Every slot free means there was nothing on this phone the password could have opened, so
+        // this is a first creation and not a guess. That is also exactly what makes a vault root.
+        val firstOnThisPhone = free.size == Slot.entries.size
+        // Otherwise it IS a failed guess: [openOrCreate] tried the password against every occupied
+        // slot and none of them opened. Cancelling the attempt here — as this line did — handed an
+        // attacker an endless loop through the creation form: delete the vault he was given, guess,
+        // receive a throwaway vault, delete it, guess again, with the counter back to zero each time.
+        if (firstOnThisPhone) guard.succeeded() else guard.failed()
         // Only provably free slots get a key: a key is never re-created under a vault (GPT review of v2.2, P3).
         keystore.ensureHmacKeys(free.map { it.hardwareKeyAlias })
-        val meta = VaultMeta(OccupancyMark.newGeneration(), root = free.size == Slot.entries.size, child = null)
+        val meta = VaultMeta(OccupancyMark.newGeneration(), root = firstOnThisPhone, child = null)
         val session = newSession(target, password, meta) ?: return CreateResult.KeystoreUnavailable
         return CreateResult.Created(written(session, clearCreationRequests = true))
     }
@@ -552,9 +565,21 @@ class VaultRepository(
     }
 
     /**
-     * Whether [password] opens an existing vault. The full work against every slot, and counted: a
-     * collision check must not become a free way to test guesses. A match counts as a failure (the
-     * password is refused), and so does a slot that could not be checked; no match cancels the attempt.
+     * Whether [password] opens an existing vault. The full work against every slot, and charged in
+     * EVERY outcome: a collision check must not become a free way to test guesses.
+     *
+     * The last branch used to do the opposite — `guard.succeeded()` on a password that had opened
+     * nothing at all. Only [succeededWith] may cancel an attempt, and only because a vault really
+     * opened. Three screens reached this branch (set up a decoy, change the master password, and the
+     * creation form through [openOrCreate]), so on all three a wrong guess cost nothing while the
+     * unlock screen charged it: the schedule the About screen advertises did not apply on the paths
+     * an attacker with an open decoy can actually reach. The audit of 2026-09-24 found it, and the
+     * give-away was the asymmetry with [createInFreeSlot], which charges the very same outcome.
+     *
+     * The owner pays a little for this: choosing a decoy password, a new master password or an heir
+     * passphrase now counts as one attempt. Five are free, an unlock cancels one, and the debt decays
+     * on its own — so a person setting one up never meets a delay, and a loop of guesses meets it on
+     * the sixth.
      */
     private fun collision(password: ByteArray): Collision {
         guard.beginAttempt()
@@ -569,7 +594,7 @@ class VaultRepository(
                 Collision.UNKNOWN
             }
             Attempt.NoMatch -> {
-                guard.succeeded()
+                guard.failed()
                 Collision.NONE
             }
         }
