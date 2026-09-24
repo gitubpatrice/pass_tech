@@ -112,6 +112,12 @@ android {
         }
     }
 
+    // No ABI split, unlike the other apps of the portfolio, and the reason is measured rather than
+    // inherited: the only native code left is about 60 KB of AndroidX
+    // (`libandroidx.graphics.path.so`, `libdatastore_shared_counter.so`) in a 3.9 MB APK. Splitting
+    // would save ~45 KB per file, about 1%. The Flutter app split because it carried several MB of
+    // `libflutter.so` per architecture; that reason left with Flutter. One file installs everywhere,
+    // which is also one question less for whoever downloads it by hand.
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
