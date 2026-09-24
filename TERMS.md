@@ -1,17 +1,16 @@
 # Terms of use — Pass Tech
 
-The terms of use are the ones displayed in the app (About → Terms of use):
+The terms that apply are the ones shipped inside the app, which the app itself displays: they read
+with no network, and they are the copy that came with the version installed.
 
-- English: [assets/legal/TERMS.en.md](assets/legal/TERMS.en.md)
-- Français : [assets/legal/TERMS.fr.md](assets/legal/TERMS.fr.md)
-- Deutsch: [assets/legal/TERMS.de.md](assets/legal/TERMS.de.md)
-- Italiano: [assets/legal/TERMS.it.md](assets/legal/TERMS.it.md)
-- Español: [assets/legal/TERMS.es.md](assets/legal/TERMS.es.md)
+- English: [app/src/main/assets/legal/TERMS.en.md](app/src/main/assets/legal/TERMS.en.md)
+- Français : [app/src/main/assets/legal/TERMS.fr.md](app/src/main/assets/legal/TERMS.fr.md)
+- Deutsch: [app/src/main/assets/legal/TERMS.de.md](app/src/main/assets/legal/TERMS.de.md)
+- Italiano: [app/src/main/assets/legal/TERMS.it.md](app/src/main/assets/legal/TERMS.it.md)
+- Español: [app/src/main/assets/legal/TERMS.es.md](app/src/main/assets/legal/TERMS.es.md)
 
-Any other language falls back to English.
+Any other language reads the English one, and the app says so on the screen rather than leaving the
+reader to wonder.
 
-Only those five files are maintained, so the repository and the app cannot say
-different things. They had diverged: until v2.7.0 this page was a separate copy,
-and it had lost two clauses the shipped version still carries — the obligation
-to stop using the app if the terms are refused, and the user's responsibility
-for local law outside France.
+For the earlier Flutter versions (2.x, `com.passtech.pass_tech`), the terms in force are the ones
+shipped with them.

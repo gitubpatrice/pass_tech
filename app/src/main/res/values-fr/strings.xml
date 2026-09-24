@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Libellés repris de l'app Flutter (2.7.1, lib/l10n/app_fr.arb) sauf mention contraire. -->
+
+    <string name="splash_tagline">La protection maximale\npour vos mots de passe.</string>
+    <string name="splash_skip_hint">Toucher l\'écran pour continuer</string>
+    <string name="splash_skip_label">Continuer</string>
+    <string name="splash_logo_content_description">Logo Pass Tech</string>
+
+    <string name="show_password">Afficher le mot de passe</string>
+    <string name="hide_password">Masquer le mot de passe</string>
+    <string name="strength_weak">Faible</string>
+    <string name="strength_medium">Moyen</string>
+    <string name="strength_strong">Fort</string>
+    <string name="strength_very_strong">Très fort</string>
+
+    <string name="setup_title">Créer votre coffre-fort</string>
+    <string name="setup_subtitle">Choisissez un mot de passe maître fort.\nIl chiffre toutes vos données en local.</string>
+    <string name="setup_master_label">Mot de passe maître</string>
+    <string name="setup_master_helper">Minimum 12 caractères</string>
+    <string name="setup_confirm_label">Confirmer le mot de passe</string>
+    <string name="setup_create_cta">Créer le coffre-fort</string>
+    <string name="setup_encrypting">Chiffrement en cours…</string>
+    <string name="setup_error_min">Minimum 12 caractères</string>
+    <string name="password_too_weak">Mot de passe trop devinable — évitez les répétitions, les suites et les mots courants. Allongez-le plutôt que d\'ajouter des symboles.</string>
+    <string name="setup_error_mismatch">Les mots de passe ne correspondent pas</string>
+    <string name="setup_warning">Ce mot de passe ne peut pas être récupéré. Si vous l\'oubliez, vos données seront inaccessibles.</string>
+    <string name="setup_error_impossible">Impossible de créer un coffre sur ce téléphone.</string>
+
+    <string name="backup_reminder_title">Pensez à votre sauvegarde</string>
+    <string name="backup_reminder_body">Votre coffre n\'existe que sur ce téléphone. Ni cloud, ni compte, ni récupération : perdre le téléphone ou oublier le mot de passe maître, c\'est perdre les données.\n\nDès vos premières entrées saisies, exportez une sauvegarde chiffrée (.ptbak) depuis Réglages → Données. C\'est le seul filet qui existe.</string>
+    <string name="action_ok">OK</string>
+
+    <string name="unlock_master_label">Mot de passe maître</string>
+    <string name="unlock_enter_master">Entrez votre mot de passe maître</string>
+    <string name="unlock_too_many_attempts">Trop de tentatives — verrouillé</string>
+    <string name="unlock_try_again_in">Réessayez dans</string>
+    <string name="unit_seconds_short">%1$ds</string>
+    <string name="unit_minutes_short">%1$dmin</string>
+    <string name="unit_minutes_seconds_short">%1$dmin %2$ds</string>
+    <string name="unlock_cta">Déverrouiller</string>
+    <string name="unlock_decrypting">Déchiffrement…</string>
+    <string name="unlock_wrong_password">Mot de passe incorrect</string>
+
+    <string name="keystore_unavailable">La puce de sécurité du téléphone n\'a pas répondu. Réessayez.</string>
+
+    <string name="home_tooltip_lock">Verrouiller</string>
+    <string name="home_empty_no_entry">Aucune entrée</string>
+
+    <!-- Entries: home list, add sheet, editor, detail -->
+    <string name="action_add">Ajouter</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="action_favorite">Favori</string>
+    <string name="action_remove">Retirer</string>
+    <string name="home_empty_hint">Appuyez sur + pour ajouter</string>
+    <string name="home_add_sheet_title">Quel type d\'entrée ?</string>
+    <string name="home_add_password">Mot de passe</string>
+    <string name="home_add_password_sub">Identifiant et mot de passe d\'un compte</string>
+    <string name="home_add_note">Note sécurisée</string>
+    <string name="home_add_note_sub">Texte confidentiel chiffré</string>
+    <string name="home_add_card">Carte bancaire</string>
+    <string name="home_add_card_sub">Numéro, CVV, expiration, PIN</string>
+    <string name="home_delete_title">Supprimer ?</string>
+    <string name="home_delete_confirm">Supprimer \"%1$s\" définitivement ?</string>
+    <string name="home_deleted_snack">\"%1$s\" supprimé</string>
+    <string name="category_web">Web</string>
+    <string name="category_email">Email</string>
+    <string name="category_bank">Banque</string>
+    <string name="category_social">Réseaux sociaux</string>
+    <string name="category_apps">Apps</string>
+    <string name="category_cards">Cartes</string>
+    <string name="category_other">Autres</string>
+    <string name="entry_type_password">Mot de passe</string>
+    <string name="entry_type_note">Note sécurisée</string>
+    <string name="entry_type_card">Carte bancaire</string>
+    <string name="entry_edit_title_edit">Modifier</string>
+    <string name="entry_edit_title_new_password">Nouveau mot de passe</string>
+    <string name="entry_edit_title_new_note">Nouvelle note sécurisée</string>
+    <string name="entry_edit_title_new_card">Nouvelle carte bancaire</string>
+    <string name="entry_edit_add_favorite">Ajouter aux favoris</string>
+    <string name="entry_edit_remove_favorite">Retirer des favoris</string>
+    <string name="entry_edit_category">Catégorie</string>
+    <string name="entry_edit_save">Enregistrer</string>
+    <string name="entry_edit_saving">Enregistrement…</string>
+    <string name="entry_edit_title_required">Le titre est obligatoire</string>
+    <string name="entry_edit_secret_added">Secret 2FA ajouté ✓</string>
+    <string name="entry_edit_discard_title">Abandonner les modifications ?</string>
+    <string name="entry_edit_discard_body">Ce que vous venez de saisir n\'a pas été enregistré et sera perdu.</string>
+    <string name="entry_edit_discard_keep">Continuer la saisie</string>
+    <string name="entry_edit_discard_confirm">Abandonner</string>
+    <string name="entry_edit_field_title_required">Titre *</string>
+    <string name="entry_edit_hint_title_password">ex: Google, Netflix, BNP…</string>
+    <string name="entry_edit_hint_title_note">ex: Code Wi-Fi, RIB, recovery key…</string>
+    <string name="entry_edit_hint_title_card">ex: Visa BNP, Mastercard pro…</string>
+    <string name="entry_edit_field_username">Identifiant</string>
+    <string name="entry_edit_hint_username">Email, nom d\'utilisateur…</string>
+    <string name="entry_edit_field_password">Mot de passe</string>
+    <string name="entry_edit_field_url_optional">URL (optionnel)</string>
+    <string name="entry_edit_hint_url">https://…</string>
+    <string name="entry_edit_field_other_domains_optional">Autres domaines (optionnel)</string>
+    <string name="entry_edit_hint_other_domains">login.microsoftonline.com</string>
+    <string name="entry_edit_helper_other_domains">Les autres adresses où ce même compte se connecte : une page de connexion Microsoft ou Apple, le SSO d\'une entreprise, une autre extension de pays. Un par ligne, %1$d au maximum. Le contrôle du domaine les accepte comme l\'URL ci-dessus.</string>
+    <string name="entry_edit_refused_domain">Refusé à l\'instant</string>
+    <string name="entry_edit_refused_domain_add">Ajouter</string>
+    <string name="entry_edit_field_2fa_optional">Code 2FA — secret TOTP (optionnel)</string>
+    <string name="entry_edit_hint_2fa">Collez l\'URI otpauth:// ou la clé Base32</string>
+    <string name="entry_edit_helper_2fa">Génère des codes à 6 chiffres. Collez l\'URI otpauth:// affichée sous le QR code du service — le secret en est extrait automatiquement.</string>
+    <string name="entry_edit_field_notes_optional">Notes (optionnel)</string>
+    <string name="entry_edit_hint_notes">Informations supplémentaires…</string>
+    <string name="entry_edit_field_content">Contenu</string>
+    <string name="entry_edit_hint_note_content">Texte chiffré confidentiel…</string>
+    <string name="entry_edit_field_cardholder">Titulaire de la carte</string>
+    <string name="entry_edit_hint_cardholder">Nom Prénom</string>
+    <string name="entry_edit_field_card_number">Numéro de carte</string>
+    <string name="entry_edit_hint_card_number">0000 0000 0000 0000</string>
+    <string name="entry_edit_field_expiry">Expiration</string>
+    <string name="entry_edit_hint_expiry">MM/AA</string>
+    <string name="entry_edit_field_cvv">CVV</string>
+    <string name="entry_edit_hint_cvv">000</string>
+    <string name="entry_edit_field_pin_optional">Code PIN (optionnel)</string>
+    <string name="entry_edit_hint_pin">0000</string>
+    <string name="entry_edit_field_issuer_optional">Banque / Émetteur (optionnel)</string>
+    <string name="entry_edit_hint_issuer">BNP Paribas, Boursorama, N26…</string>
+    <string name="entry_edit_hint_card_notes">Plafond, type de carte…</string>
+    <string name="totp_error_empty">Secret vide</string>
+    <string name="totp_error_invalid_chars">Caractères invalides (Base32 attendu)</string>
+    <string name="totp_error_too_short">Secret trop court</string>
+    <string name="entry_detail_copied_snack">%1$s copié — effacé dans %2$ds</string>
+    <string name="entry_detail_copied_snack_kept">%1$s copié</string>
+    <string name="entry_detail_favorite_tooltip">Favori</string>
+    <string name="entry_detail_edit_tooltip">Modifier</string>
+    <string name="entry_detail_delete_tooltip">Supprimer</string>
+    <string name="entry_detail_created_at">Créé le %1$s</string>
+    <string name="entry_detail_updated_at">Modifié le %1$s</string>
+    <string name="entry_detail_field_username">Identifiant</string>
+    <string name="entry_detail_field_password">Mot de passe</string>
+    <string name="entry_detail_copy_tooltip">Copier</string>
+    <string name="entry_detail_field_2fa_totp">Code 2FA — TOTP</string>
+    <string name="entry_detail_field_2fa_code">Code 2FA</string>
+    <string name="entry_detail_field_url">URL</string>
+    <string name="entry_detail_field_other_domains">Autres domaines</string>
+    <string name="entry_detail_field_notes">Notes</string>
+    <string name="entry_detail_field_content">Contenu</string>
+    <string name="entry_detail_copy_notes_tooltip">Copier les notes</string>
+    <string name="entry_detail_note_empty">(vide)</string>
+    <string name="entry_detail_field_holder">Titulaire</string>
+    <string name="entry_detail_field_number">Numéro</string>
+    <string name="entry_detail_field_card_number_copy">Numéro de carte</string>
+    <string name="entry_detail_field_expiry">Expiration</string>
+    <string name="entry_detail_field_cvv">CVV</string>
+    <string name="entry_detail_field_pin">Code PIN</string>
+    <string name="entry_detail_field_pin_copy">PIN</string>
+    <string name="entry_detail_field_issuer">Banque</string>
+    <string name="entry_detail_toggle_visibility">Afficher / masquer</string>
+    <string name="entry_detail_card_label">CARTE</string>
+    <string name="entry_detail_card_holder_label">TITULAIRE</string>
+    <string name="entry_detail_card_expiry_label">EXPIRE</string>
+
+    <!-- Home toolbar, filters and generator -->
+    <string name="home_search_hint">Rechercher…</string>
+    <string name="home_search_open">Rechercher</string>
+    <string name="home_search_close">Fermer la recherche</string>
+    <string name="home_search_clear">Effacer</string>
+    <string name="home_empty_no_result">Aucun résultat</string>
+    <string name="home_tooltip_generator">Générateur</string>
+    <string name="home_tooltip_sort">Trier</string>
+    <string name="home_filter_all">Tous</string>
+    <string name="home_filter_favorites">Favoris</string>
+    <string name="home_filter_passwords">Mots de passe</string>
+    <string name="home_filter_notes">Notes</string>
+    <string name="home_filter_cards">Cartes bancaires</string>
+    <string name="home_sort_recent">Récent</string>
+    <string name="home_sort_oldest">Plus ancien</string>
+    <string name="home_sort_alpha">A → Z</string>
+    <string name="home_sort_alpha_desc">Z → A</string>
+    <string name="home_entry_count_none">Aucune entrée</string>
+    <string name="generator_title">Générateur</string>
+    <string name="generator_use">Utiliser</string>
+    <string name="generator_strength_suffix">%1$s · %2$d bits</string>
+    <string name="generator_generate">Générer</string>
+    <string name="generator_copy">Copier</string>
+    <string name="generator_copied_snack">Copié ✓</string>
+    <string name="generator_mode_chars">Caractères</string>
+    <string name="generator_mode_phrase">Passphrase</string>
+    <string name="generator_length">Longueur : %1$d</string>
+    <string name="generator_chars_header">Caractères</string>
+    <string name="generator_chars_upper">A–Z  Majuscules</string>
+    <string name="generator_chars_lower">a–z  Minuscules</string>
+    <string name="generator_chars_digits">0–9  Chiffres</string>
+    <string name="generator_chars_symbols">!@#  Symboles</string>
+    <string name="generator_phrase_words">Nombre de mots : %1$d</string>
+    <string name="generator_options_header">Options</string>
+    <string name="generator_phrase_append_number">Ajouter un nombre 10–99</string>
+    <string name="generator_phrase_separator">Séparateur</string>
+    <string name="generator_phrase_hint">Une passphrase est plus simple à mémoriser qu\'un mot de passe complexe, et peut être tout aussi forte.</string>
+    <string name="entry_edit_tooltip_generate">Générer</string>
+    <!-- 0 has its own string: "No entry", as 2.7.1's ICU =0 case. -->
+    <plurals name="home_entry_count">
+        <item quantity="one">%1$d entrée</item>
+        <item quantity="many">%1$d d\'entrées</item>
+        <item quantity="other">%1$d entrées</item>
+    </plurals>
+
+    <!-- Settings -->
+    <string name="action_settings">Paramètres</string>
+    <string name="action_more">Plus d\'options</string>
+    <string name="action_disable">Désactiver</string>
+    <string name="action_continue">Continuer</string>
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_section_appearance">Apparence</string>
+    <string name="settings_section_clipboard">Presse-papiers</string>
+    <string name="settings_section_security">Sécurité</string>
+    <string name="settings_section_danger">Zone dangereuse</string>
+    <string name="settings_theme_title">Thème</string>
+    <string name="settings_theme_choose_title">Choisir le thème</string>
+    <string name="settings_language_title">Langue</string>
+    <string name="settings_language_system">Système (auto)</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
+    <string name="settings_clipboard_title">Effacer automatiquement</string>
+    <string name="settings_clipboard_dialog_title">Effacer le presse-papiers après</string>
+    <string name="settings_clipboard_15s">15 secondes</string>
+    <string name="settings_clipboard_30s">30 secondes</string>
+    <string name="settings_clipboard_60s">60 secondes</string>
+    <string name="settings_clipboard_never">Jamais</string>
+    <string name="settings_screenshot_protection_title">Bloquer les captures d\'écran</string>
+    <string name="settings_screenshot_protection_subtitle">Activé par défaut (recommandé). Bloque captures, enregistrement écran, vignette Recent Apps et projection externe. Désactivez UNIQUEMENT si vous avez besoin de coller du texte depuis une autre app sur Samsung — Knox bloque le presse-papier inter-apps quand la protection est active.</string>
+    <string name="settings_screenshot_protection_confirm_off_title">Désactiver la protection ?</string>
+    <string name="settings_screenshot_protection_confirm_off_body">Sans protection, vos mots de passe peuvent apparaître dans les captures d\'écran, l\'aperçu des apps récentes et les enregistrements écran. À n\'utiliser que temporairement pour coller un texte depuis une autre app.</string>
+    <string name="settings_change_master_title">Changer le mot de passe maître</string>
+    <string name="settings_auto_lock_title">Verrouillage automatique</string>
+    <string name="settings_auto_lock_dialog_title">Verrouiller l\'app après</string>
+    <string name="settings_auto_lock_immediate">Immédiatement</string>
+    <string name="settings_auto_lock_1min">1 minute</string>
+    <string name="settings_auto_lock_5min">5 minutes</string>
+    <string name="settings_auto_lock_15min">15 minutes</string>
+    <string name="settings_auto_lock_30min">30 minutes</string>
+    <string name="settings_auto_lock_never">Jamais</string>
+    <string name="settings_lock_now">Verrouiller maintenant</string>
+    <string name="settings_delete_all_title">Supprimer toutes les données</string>
+    <string name="settings_delete_all_subtitle">Action irréversible</string>
+    <string name="settings_delete_all_dialog_title">Supprimer toutes les données ?</string>
+    <string name="settings_delete_all_dialog_body">Toutes vos entrées et le coffre-fort seront supprimés définitivement.</string>
+    <string name="settings_delete_all_confirm">Tout supprimer</string>
+    <string name="reauth_title">Confirmez votre identité</string>
+    <string name="reauth_body">Saisissez votre mot de passe maître pour continuer.</string>
+    <string name="change_password_dialog_title">Nouveau mot de passe</string>
+    <string name="change_password_current_label">Mot de passe actuel</string>
+    <string name="change_password_new_label">Nouveau mot de passe (min. 12)</string>
+    <string name="change_password_confirm_label">Confirmer</string>
+    <string name="change_password_error_current_required">Saisissez votre mot de passe actuel.</string>
+    <string name="change_password_error_wrong_current">Mot de passe actuel incorrect.</string>
+    <string name="change_password_cta">Modifier</string>
+    <string name="change_password_done">Mot de passe modifié ✓</string>
+    <string name="change_password_refused">Ce mot de passe ne peut pas être utilisé. Choisissez-en un autre.</string>
+    <string name="settings_locked_retry">Trop de tentatives. Réessayez dans %1$s.</string>
+    <!-- Biometrics (2.7.1: unlock_screen.dart, settings_screen.dart) -->
+    <string name="unlock_biometric_cta">Empreinte / Face ID</string>
+    <string name="unlock_biometric_failed">Échec biométrique</string>
+    <string name="unlock_biometric_enrollment_changed">Empreinte Android modifiée : le déverrouillage biométrique a été désactivé par sécurité. Déverrouillez avec votre mot de passe principal, puis réactivez la biométrie dans Réglages.</string>
+    <string name="unlock_biometric_disarmed">Le déverrouillage biométrique a été désactivé. Déverrouillez avec votre mot de passe principal, puis réactivez la biométrie dans Réglages.</string>
+    <string name="biometric_prompt_subtitle">Déverrouiller votre coffre-fort</string>
+    <string name="settings_biometric_title">Déverrouillage biométrique</string>
+    <string name="settings_biometric_subtitle">Empreinte digitale ou Face ID</string>
+    <string name="settings_biometric_enabled">Déverrouillage biométrique activé.</string>
+    <string name="settings_biometric_disabled">Déverrouillage biométrique désactivé.</string>
+    <string name="settings_biometric_enable_canceled">Activation biométrique annulée.</string>
+    <string name="settings_biometric_enable_failed">Activation biométrique échouée.</string>
+    <string name="settings_biometric_decoy_conflict">Le déverrouillage biométrique est indisponible sur ce coffre. Seul votre mot de passe maître l\'ouvre.</string>
+    <string name="settings_biometric_new_enrollment_warning">Si vous ajoutez une nouvelle empreinte / un nouveau visage à Android après avoir activé le déverrouillage biométrique, désactivez puis réactivez cette option pour régénérer la clé de sécurité. Sans cela, la nouvelle empreinte pourrait déverrouiller Pass Tech.</string>
+    <string name="change_password_done_biometric_reset">Mot de passe changé. Le déverrouillage biométrique a été désactivé — réactivez-le dans Réglages.</string>
+    <!-- Decoy vault (2.7.1 settings_screen.dart:522-730) -->
+    <string name="settings_section_decoy">Coffre leurre (anti-coercition)</string>
+    <string name="decoy_tile_setup">Configurer un coffre leurre</string>
+    <string name="decoy_tile_configured">Coffre leurre configuré</string>
+    <string name="decoy_tile_subtitle">Un 2e mot de passe ouvre un faux coffre. Si quelqu\'un vous force à ouvrir l\'app, donnez le faux.</string>
+    <string name="decoy_dialog_title">Coffre leurre</string>
+    <string name="decoy_setup_body">Un coffre leurre est un 2e coffre, totalement séparé, ouvert avec un mot de passe différent.\n\nUsage : si quelqu\'un vous force à ouvrir Pass Tech (frontière, agression, contrôle), vous donnez le mot de passe du leurre. L\'app affiche alors un faux coffre, et rien dans les fichiers de ce téléphone — ni leurs noms, ni leurs tailles, ni leur contenu — ne dit qu\'il en existe un second.\n\nÀ retenir :\n• Le mot de passe du leurre doit être différent du vrai\n• Remplissez le leurre avec quelques entrées crédibles\n• Cela protège d\'une fouille du téléphone, pas de l\'app elle-même : qui s\'en sert peut encore découvrir qu\'un emplacement est pris\n• Le déverrouillage biométrique sera désactivé, et le restera tant qu\'un leurre existe : l\'empreinte ouvre directement le vrai coffre, elle annulerait le leurre</string>
+    <string name="decoy_setup_biometric_warning">Configurer un coffre leurre désactivera le déverrouillage biométrique. L\'empreinte ouvre directement le vrai coffre : elle annulerait le leurre dans la situation même où il sert. Vous déverrouillerez avec votre mot de passe principal.</string>
+    <string name="decoy_configure">Configurer</string>
+    <string name="decoy_password_dialog_title">Mot de passe du coffre leurre</string>
+    <string name="decoy_password_label">Mot de passe du leurre (min. 12)</string>
+    <string name="decoy_configured_snack">Coffre leurre configuré ✓</string>
+    <string name="decoy_manage_body">Le coffre leurre est actif.\n\nVous pouvez le supprimer (action silencieuse pour l\'attaquant — il pensera juste qu\'il s\'est trompé de mot de passe).</string>
+    <string name="decoy_delete">Supprimer le leurre</string>
+    <string name="decoy_deleted_snack">Coffre leurre supprimé</string>
+    <string name="decoy_error_impossible">Impossible de créer un coffre leurre sur ce téléphone.</string>
+
+    <!-- Heir access (2.7.1 heir_view_screen.dart, settings_screen.dart:310-520) -->
+    <string name="heir_dialog_title">Accès héritier</string>
+    <string name="heir_dialog_body">Saisissez le mot de passe héritier qui vous a été confié.</string>
+    <string name="heir_password_label">Mot de passe héritier</string>
+    <string name="heir_wrong_passphrase">Mot de passe incorrect</string>
+    <string name="heir_view_title">Accès héritier (lecture seule)</string>
+    <string name="heir_view_close">Fermer l\'app</string>
+    <string name="heir_view_empty">Instantané vide</string>
+    <string name="heir_view_banner_none">Vous accédez à l\'instantané du coffre transmis par son propriétaire. Les modifications ne sont pas possibles. Aucune entrée.</string>
+    <plurals name="heir_view_banner">
+        <item quantity="one">Vous accédez à l\'instantané du coffre transmis par son propriétaire. Les modifications ne sont pas possibles. %1$d entrée.</item>
+        <item quantity="other">Vous accédez à l\'instantané du coffre transmis par son propriétaire. Les modifications ne sont pas possibles. %1$d entrées.</item>
+    </plurals>
+    <string name="heir_view_field_username">Identifiant</string>
+    <string name="heir_view_field_password">Mot de passe</string>
+    <string name="heir_view_field_url">URL</string>
+    <string name="heir_view_field_notes">Notes</string>
+
+    <string name="settings_section_heir">Héritage (dead man\'s switch)</string>
+    <string name="heir_tile_setup">Configurer un héritier</string>
+    <string name="heir_tile_configured">Héritier configuré</string>
+    <string name="heir_tile_subtitle_setup">Un proche pourra accéder au coffre après une période d\'inactivité prolongée. Aucun cloud, aucun tiers.</string>
+    <string name="heir_tile_subtitle_configured">Toucher pour mettre à jour l\'instantané ou désactiver</string>
+    <string name="heir_setup_body">Un mot de passe distinct du vôtre permettra à un proche (conjoint, enfant, exécuteur testamentaire) d\'accéder au contenu du coffre **après une période d\'inactivité prolongée** de votre part (90 jours par défaut + 7 jours de grâce).\n\nÀ retenir :\n• Le mot de passe héritier doit être différent de votre mot de passe principal\n• Communiquez-le à votre héritier de manière sûre (oralement, testament, coffre bancaire) — il n\'est jamais stocké et ne peut pas être récupéré\n• L\'héritier accédera à un instantané du coffre. Pensez à le mettre à jour régulièrement.\n• Si vous vous reconnectez avant la fin de la grâce, le compte à rebours est réinitialisé.\n• Les trois instantanés existent alors et se ressemblent : rien ne dit auquel de vos coffres appartient le vrai. Qu\'un héritier soit configuré sur ce téléphone reste, lui, visible à une analyse — pour le déni, voyez le coffre leurre.\n\nCe système fonctionne 100 % localement, sans cloud ni tiers de confiance.</string>
+    <string name="heir_configure">Configurer</string>
+    <string name="heir_password_prompt_title">Mot de passe de l\'héritier</string>
+    <string name="heir_configured_snack">Héritage configuré ✓ Instantané du coffre chiffré.</string>
+    <string name="heir_vault_empty">Le coffre est vide — rien à transmettre</string>
+    <string name="heir_manage_title">Gérer l\'héritage</string>
+    <string name="heir_manage_body">L\'héritier accède à un instantané du coffre. Vous pouvez :\n\n• Mettre à jour l\'instantané (avec le mot de passe héritier)\n• Désactiver l\'héritage et supprimer l\'instantané</string>
+    <string name="heir_disable">Désactiver</string>
+    <string name="heir_update">Mettre à jour</string>
+    <string name="heir_disabled_snack">Héritage désactivé, instantané supprimé</string>
+    <string name="heir_updated_snack">Instantané mis à jour ✓</string>
+    <string name="heir_threshold_tile_title">Période d\'inactivité avant accès</string>
+    <string name="heir_threshold_tile_subtitle">Seuil : %1$s · inactivité actuelle : %2$s</string>
+    <string name="heir_threshold_dialog_title">Période d\'inactivité avant accès héritier</string>
+    <plurals name="heir_days">
+        <item quantity="one">%1$d jour</item>
+        <item quantity="other">%1$d jours</item>
+    </plurals>
+
+    <!-- Panic mode and its disguise (2.7.1 settings_screen.dart:732-832, CalculatorActivity.kt) -->
+    <string name="app_disguise_label">Calculatrice</string>
+    <string name="calculator_error">Erreur</string>
+    <string name="settings_section_panic">Mode panique</string>
+    <string name="panic_trigger_title">Activer le mode panique</string>
+    <string name="panic_trigger_subtitle">Verrouille, vide le presse-papiers, désactive la biométrie et l\'anti-phishing, et remplace l\'app par une calculatrice fonctionnelle (nom + icône)</string>
+    <string name="panic_reveal_title">Restaurer le nom Pass Tech</string>
+    <string name="panic_reveal_subtitle">L\'app se présente actuellement comme une calculatrice. Pour y revenir sans passer par ici : appui long de 2 s sur son affichage</string>
+    <string name="panic_reveal_snack">Icône Pass Tech restaurée — relancez le launcher si elle n\'apparaît pas</string>
+    <string name="panic_dialog_title">Mode panique ?</string>
+    <string name="panic_dialog_body">Cette action effectue immédiatement :\n\n• Verrouillage du coffre\n• Vidage du presse-papiers\n• Désactivation du déverrouillage biométrique\n• Retrait du service anti-phishing des réglages d\'accessibilité d\'Android, où il porte le nom Pass Tech\n• Remplacement de l\'app par une CALCULATRICE sur le launcher : nom, icône et écran d\'ouverture. La calculatrice fonctionne réellement.\n\n⚠ POUR REVENIR : appui long de 2 secondes sur l\'AFFICHAGE de la calculatrice (la zone du résultat, en haut). Retenez-le — c\'est le seul chemin vers votre coffre tant que le camouflage est actif.\n\nRien n\'est supprimé : votre mot de passe maître ouvre toujours le coffre. Il vous servira à réactiver la biométrie. Le nom et l\'icône se restaurent depuis les Réglages quand vous serez en sécurité.</string>
+    <string name="panic_dialog_activate">Activer</string>
+    <string name="panic_warn_biometric_title">La biométrie sera désactivée</string>
+    <string name="panic_warn_biometric_body">Le mode panique supprime l\'enrôlement biométrique — sinon quelqu\'un pourrait ouvrir votre coffre en vous faisant poser le doigt.\n\nAprès activation, SEUL votre mot de passe maître ouvrira le coffre. Il n\'est récupérable par aucun moyen.\n\nAssurez-vous de le connaître avant de continuer.</string>
+
+    <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <!-- Ce à quoi ressemble le téléphone, dit avant la saisie du mot de passe maître -->
+    <string name="integrity_title">À propos de ce téléphone</string>
+    <string name="integrity_body">Pass Tech a remarqué ceci. Elle fonctionne quand même, et rien de tout cela ne touche votre coffre — mais un téléphone dans cet état peut être lu par d\'autres que vous.</string>
+    <string name="integrity_rooted">Ce téléphone peut passer en root. Tout ce qui a le root peut lire la mémoire de n\'importe quelle application, y compris celle-ci.</string>
+    <string name="integrity_debugger">Un débogueur est attaché à Pass Tech en ce moment.</string>
+    <string name="integrity_debuggable">Ceci est une version de développement. N\'importe quoi sur le téléphone peut lire sa mémoire.</string>
+    <string name="integrity_emulator">Ceci est un émulateur, pas un téléphone. Aucune clé n\'y est gardée par du vrai matériel sécurisé.</string>
+    <string name="integrity_best_effort">Ces contrôles sont faciles à tromper : à lire comme un rappel, jamais comme une garantie.</string>
+    <string name="integrity_understood">Compris</string>
+
+    <!-- Vérification de mise à jour -->
+    <string name="update_title">La version %1$s est sortie</string>
+    <string name="update_body">Pass Tech ne se met pas à jour toute seule et ne télécharge jamais rien d\'elle-même. Le bouton ci-dessous ouvre la page de la version, là où se trouvent les notes et les empreintes.</string>
+    <string name="update_notes_label">Ce qui change</string>
+    <string name="update_sha_label">SHA-256 annoncé pour l\'APK</string>
+    <string name="update_sha_label_named">SHA-256 annoncé pour %1$s</string>
+    <string name="update_open">Ouvrir la page de la version</string>
+    <string name="update_later">Plus tard</string>
+
+    <!-- Audit de sécurité -->
+    <string name="settings_audit_title">Audit de sécurité</string>
+    <string name="settings_audit_subtitle">Mots de passe faibles, doublons, fuites…</string>
+    <string name="audit_title">Audit sécurité</string>
+    <string name="audit_refresh">Actualiser</string>
+    <string name="audit_score_none">Non applicable</string>
+    <string name="audit_score_excellent">Excellent</string>
+    <string name="audit_score_good">Bon</string>
+    <string name="audit_score_fair">Moyen</string>
+    <string name="audit_score_poor">Faible</string>
+    <string name="audit_score_partial">Score partiel : certains mots de passe n\'ont pas été confrontés aux fuites.</string>
+    <string name="audit_stat_entries">Entrées</string>
+    <string name="audit_stat_passwords">Mots de passe</string>
+    <string name="audit_stat_second_factor">Avec 2FA</string>
+    <string name="audit_stat_notes">Notes</string>
+    <string name="audit_stat_cards">Cartes</string>
+    <string name="audit_breach_title">Vérification de fuites de données</string>
+    <string name="audit_breach_body">Compare vos mots de passe aux fuites publiques. Seuls cinq caractères d\'une empreinte quittent le téléphone, jamais un mot de passe.</string>
+    <string name="audit_breach_run">Lancer la vérification</string>
+    <string name="audit_breach_again">Vérifier à nouveau</string>
+    <string name="audit_breach_none">Aucun mot de passe compromis</string>
+    <plurals name="audit_breach_found">
+        <item quantity="one">%1$d mot de passe compromis</item>
+        <item quantity="other">%1$d mots de passe compromis</item>
+    </plurals>
+    <plurals name="audit_breach_unanswered">
+        <item quantity="one">%1$d mot de passe n\'a pas pu être vérifié : il reste hors du score.</item>
+        <item quantity="other">%1$d mots de passe n\'ont pas pu être vérifiés : ils restent hors du score.</item>
+    </plurals>
+    <string name="audit_breach_network_error">Aucune réponse — vérifiez votre connexion</string>
+    <string name="audit_breach_disguised">Rien n\'a été envoyé : l\'app est camouflée, et cette vérification se verrait sur le réseau</string>
+    <string name="audit_weak">Mots de passe faibles</string>
+    <string name="audit_duplicates">Doublons</string>
+    <string name="audit_no_second_factor">Sans 2FA sur compte sensible</string>
+    <string name="audit_stale">Non revus depuis plus d\'un an</string>
+
+    <!-- Anti-phishing -->
+    <string name="phishing_service_label">Pass Tech — anti-phishing</string>
+    <string name="phishing_detector_description">Lit le domaine affiché par le navigateur au premier plan, pour vérifier qu\'il correspond à l\'entrée Pass Tech avant de copier un mot de passe. Seul le domaine est lu, uniquement en mémoire : rien n\'est enregistré, rien n\'est envoyé. Seuls les navigateurs reconnus sont lus. Cette lecture est activée à votre demande, et disparaît de cette liste dès que vous la désactivez dans Pass Tech.</string>
+
+    <string name="settings_section_anti_phishing">Anti-phishing</string>
+    <string name="settings_anti_phishing_title">Vérifier le domaine avant de copier</string>
+    <string name="settings_anti_phishing_description">Compare le domaine du navigateur à ceux que déclare l\'entrée</string>
+    <string name="settings_anti_phishing_active">Activé — prévient si le navigateur n\'est pas sur le bon domaine</string>
+    <string name="settings_anti_phishing_needs_grant">⚠ Activez « %1$s » dans Accessibilité</string>
+    <string name="settings_anti_phishing_open_title">Ouvrir Réglages &gt; Accessibilité</string>
+    <string name="settings_anti_phishing_open_subtitle">Activez « %1$s » dans la liste</string>
+    <string name="settings_anti_phishing_dialog_title">Anti-phishing</string>
+    <string name="settings_anti_phishing_dialog_body">Pass Tech peut vérifier que le navigateur au premier plan est bien sur le domaine de l\'entrée AVANT de copier votre mot de passe, et vous prévenir quand ce n\'est pas le cas — nom qui ressemble, faux site.\n\nPour cela l\'app utilise un service d\'accessibilité Android :\n• il lit le domaine de la barre d\'adresse, et rien d\'autre\n• uniquement sur les navigateurs reconnus (Chrome, Firefox, Brave, Edge, Opera, Vivaldi, Samsung, DuckDuckGo)\n• rien n\'est enregistré, rien n\'est envoyé\n\nDésactiver ici reprend l\'autorisation : le service quitte la liste d\'accessibilité d\'Android, et le réactiver vous la redemandera.\n\nSur l\'écran suivant, activez « %1$s ».</string>
+    <string name="settings_anti_phishing_on_failed">Android a refusé d\'ajouter le service</string>
+    <string name="settings_anti_phishing_off_failed">Android a refusé de retirer le service — retirez-le à la main dans Réglages &gt; Accessibilité</string>
+
+    <string name="phishing_unchecked_snack">⚠ Domaine non vérifié — le service anti-phishing ne tourne pas</string>
+    <string name="phishing_unchecked_action">Réglages</string>
+    <string name="phishing_typo_title">Domaine suspect</string>
+    <string name="phishing_typo_body">Le domaine du navigateur ressemble au vôtre, à une ou deux lettres près — la forme habituelle d\'un faux site. Cela peut être une fausse alerte.</string>
+    <string name="phishing_mismatch_title">Ce n\'est pas le même domaine</string>
+    <string name="phishing_mismatch_body">Le navigateur est sur un domaine totalement différent. La copie a été bloquée.\n\nSi cette page appartient bien à cette entrée — une page de connexion Microsoft ou Apple, le SSO d\'une entreprise — ouvrez l\'entrée et ajoutez-y le domaine. La copie reste bloquée tant que ce n\'est pas fait.</string>
+    <string name="phishing_expected">Attendu</string>
+    <string name="phishing_active">Dans le navigateur</string>
+    <string name="phishing_distance">Distance : %1$d</string>
+    <string name="phishing_close">Fermer</string>
+    <string name="phishing_copy_anyway">Copier quand même</string>
+    <string name="phishing_declare_domain">Ouvrir l\'entrée</string>
+
+    <string name="settings_section_data">Données</string>
+    <string name="settings_backup_encrypted_title">Sauvegarde chiffrée (.ptbak)</string>
+    <string name="settings_backup_encrypted_subtitle">Recommandé — restaurable avec votre passphrase</string>
+    <string name="settings_import_title">Importer un fichier</string>
+    <string name="settings_import_subtitle">CSV, Bitwarden JSON ou .ptbak</string>
+    <string name="settings_export_plain_title">Exporter (JSON non chiffré)</string>
+    <string name="settings_export_plain_subtitle">⚠️ mots de passe en clair</string>
+
+    <string name="passphrase_dialog_encrypt_title">Sauvegarde chiffrée</string>
+    <string name="passphrase_dialog_decrypt_title">Restaurer la sauvegarde</string>
+    <string name="passphrase_dialog_confirm_helper">Choisissez une passphrase pour chiffrer la sauvegarde. Vous en aurez besoin pour restaurer.</string>
+    <string name="passphrase_dialog_enter_helper">Entrez la passphrase utilisée lors de la sauvegarde.</string>
+    <string name="passphrase_label_min">Passphrase (min. 12)</string>
+    <string name="passphrase_label">Passphrase</string>
+    <string name="passphrase_confirm_label">Confirmer</string>
+    <string name="passphrase_error_empty">Passphrase vide</string>
+    <string name="passphrase_error_min">Minimum 12 caractères</string>
+    <string name="passphrase_error_mismatch">Les passphrases ne correspondent pas</string>
+    <string name="passphrase_encrypt_cta">Chiffrer</string>
+    <string name="passphrase_decrypt_cta">Déchiffrer</string>
+
+    <string name="import_untitled_entry">Sans titre</string>
+    <string name="import_confirm_title">Confirmer l\'import</string>
+    <plurals name="import_confirm_body">
+        <item quantity="one">%1$d entrée détectée\nFormat : %2$s\n\nLes doublons (même titre + identifiant) seront ignorés.</item>
+        <item quantity="other">%1$d entrées détectées\nFormat : %2$s\n\nLes doublons (même titre + identifiant) seront ignorés.</item>
+    </plurals>
+    <string name="import_cta">Importer</string>
+    <plurals name="import_done">
+        <item quantity="one">%1$d entrée importée%2$s</item>
+        <item quantity="other">%1$d entrées importées%2$s</item>
+    </plurals>
+    <string name="import_done_none">Aucune entrée importée%1$s</string>
+    <plurals name="import_skipped_suffix">
+        <item quantity="one">" • %1$d doublon ignoré"</item>
+        <item quantity="other">" • %1$d doublons ignorés"</item>
+    </plurals>
+    <string name="import_no_entry">Aucune entrée détectée</string>
+    <string name="import_read_error">Lecture du fichier impossible</string>
+    <string name="import_wrong_passphrase">Passphrase incorrecte ou fichier corrompu</string>
+    <string name="import_format_encrypted_backup">Sauvegarde chiffrée</string>
+    <string name="import_format_csv">CSV (Chrome / Edge / autre)</string>
+    <string name="import_format_bitwarden">Bitwarden JSON</string>
+    <string name="import_format_pass_tech">Pass Tech JSON</string>
+    <string name="import_error_too_large">Fichier trop volumineux (max 50 Mo, 50 000 entrées)</string>
+    <string name="import_error_empty_file">Fichier vide</string>
+    <string name="import_error_json_unknown">Format JSON non reconnu</string>
+    <string name="import_error_json_invalid">JSON invalide</string>
+    <string name="import_error_csv_invalid">CSV invalide</string>
+    <string name="import_error_csv_empty">CSV vide</string>
+    <string name="import_error_csv_no_password_column">Colonne « password » introuvable dans le CSV</string>
+    <string name="import_error_field_too_large">Un champ de ce fichier est trop volumineux (max 64 Ko)</string>
+
+    <string name="export_plain_dialog_title">Export NON CHIFFRÉ</string>
+    <string name="export_plain_warning_headline">Le fichier exporté contiendra TOUS vos mots de passe EN CLAIR (lisibles par n\'importe qui).</string>
+    <string name="export_plain_warning_bullet1">• Toute application ayant accès au stockage pourra le lire.</string>
+    <string name="export_plain_warning_bullet2">• Si vous le partagez via cloud (Drive, Mail…), il y restera.</string>
+    <string name="export_plain_warning_bullet3">• Supprimez-le IMMÉDIATEMENT après usage.</string>
+    <string name="export_plain_warning_tip">Préférez « Sauvegarde chiffrée (.ptbak) » sauf migration vers un autre gestionnaire.</string>
+    <string name="export_plain_confirm">Exporter en clair</string>
+    <string name="backup_saved">Sauvegarde enregistrée</string>
+    <string name="export_saved">Export enregistré</string>
+    <string name="file_write_error">Enregistrement du fichier impossible</string>
+
+    <string name="about_title">À propos</string>
+    <string name="about_tagline">Un gestionnaire de mots de passe qui reste sur votre téléphone</string>
+    <string name="about_version">v%1$s</string>
+
+    <string name="about_check_updates">Vérifier les mises à jour</string>
+    <string name="about_checking">Vérification…</string>
+    <string name="about_check_up_to_date">GitHub a été interrogé : c\'est la dernière version publiée.</string>
+    <string name="about_check_unreachable">GitHub n\'a pas pu être interrogé. On n\'a rien appris — c\'est peut-être la dernière version, peut-être pas.</string>
+    <string name="about_check_disguised">Rien n\'a été demandé. L\'application est camouflée en calculatrice, et cette vérification mettrait sur le réseau un trafic qu\'une calculatrice n\'a aucune raison de faire.</string>
+    <string name="about_check_unreadable_version">Le numéro de cette version ne peut pas être comparé à une version publiée : rien n\'a été demandé.</string>
+
+    <string name="about_section_privacy">Ce que Pass Tech ne fait jamais</string>
+    <string name="about_privacy_no_ads">Aucune publicité</string>
+    <string name="about_privacy_no_tracker">Aucun traceur</string>
+    <string name="about_privacy_offline">Fonctionne hors ligne</string>
+    <string name="about_privacy_no_collect">Ne collecte rien</string>
+    <string name="about_privacy_no_share">Ne partage rien</string>
+    <string name="about_privacy_no_store">Pas de Play Store</string>
+    <string name="about_privacy_network_title">Les deux seuls moments où elle se sert du réseau</string>
+    <string name="about_privacy_network_body">Demander à GitHub si une version plus récente est parue, une fois votre coffre ouvert, %1$d fois par jour au maximum. Et le contrôle des fuites de l\'écran d\'audit, que vous lancez vous-même : le mot de passe n\'est jamais envoyé, seulement les cinq premiers caractères de son empreinte, que des dizaines de milliers d\'autres mots de passe partagent.\n\nRien d\'autre ne quitte jamais ce téléphone, et votre coffre encore moins. Ce que ces deux appels montrent, en revanche, c\'est que quelqu\'un, depuis votre connexion, utilise cette application — GitHub voit une demande sur la dernière version de ce projet, et Have I Been Pwned voit cinq caractères d\'une empreinte.\n\nLes deux s\'arrêtent complètement tant que l\'application est camouflée en calculatrice.</string>
+
+    <string name="about_group_vault">Le coffre</string>
+    <string name="about_group_forced">Si on vous force à l\'ouvrir</string>
+    <string name="about_group_content">Ce qu\'il contient</string>
+    <string name="about_group_watch">Ce qu\'il surveille pour vous</string>
+    <string name="about_group_data">Vos données, entrée et sortie</string>
+
+    <string name="about_feature_vault">Coffre chiffré</string>
+    <string name="about_feature_vault_desc">AES-256-GCM. La clé est dérivée de votre mot de passe maître par Argon2id (%1$d Mio de mémoire, %2$d passes) et par une clé gardée dans la puce sécurisée du téléphone, qui participe à chaque essai, sans exception.</string>
+    <string name="about_feature_biometric">Empreinte, liée à ce téléphone</string>
+    <string name="about_feature_biometric_desc">La clé vit dans le Keystore d\'Android et ne se lit pas sans votre empreinte. Elle ne quitte jamais le téléphone, et une copie du coffre emportée ailleurs ne peut pas s\'en servir.</string>
+    <string name="about_feature_bruteforce">Deviner devient de plus en plus lent</string>
+    <string name="about_feature_bruteforce_desc">%1$s, puis une attente qui grandit de %2$s à %3$s. Une ouverture réussie annule son propre essai et aucun essai plus ancien : alterner entre deux coffres n\'efface donc jamais l\'attente.</string>
+    <string name="about_feature_autolock">Il se verrouille tout seul</string>
+    <string name="about_feature_autolock_desc">Immédiatement, après un délai qui va jusqu\'à %1$s, ou jamais — à votre choix. Quitter l\'application compte comme partir.</string>
+    <string name="about_feature_screenshot">Aucune capture d\'écran</string>
+    <string name="about_feature_screenshot_desc">Aucune capture, et aucun aperçu dans la liste des applications récentes, tant que le réglage est actif.</string>
+    <string name="about_feature_backup_off">Jamais sauvegardé par Android</string>
+    <string name="about_feature_backup_off_desc">Le coffre est exclu de la sauvegarde dans le cloud d\'Android et du transfert d\'un téléphone à l\'autre. La seule copie qui existe est celle que vous faites vous-même.</string>
+    <string name="about_feature_integrity">Il vous dit ce qu\'il voit</string>
+    <string name="about_feature_integrity_desc">Avant que vous tapiez votre mot de passe maître : si ce téléphone peut passer en root, si un débogueur est attaché, si c\'est une version de développement, si c\'est un émulateur. Il prévient, et ne bloque jamais.</string>
+
+    <string name="about_feature_decoy">Coffre leurre</string>
+    <string name="about_feature_decoy_desc">Un deuxième mot de passe ouvre un deuxième coffre, avec ses propres entrées. Rien dans les fichiers de ce téléphone ne dit si vous en avez un.</string>
+    <string name="about_feature_panic">Mode panique</string>
+    <string name="about_feature_panic_desc">Verrouille, vide le presse-papiers, désarme l\'empreinte, coupe le contrôle d\'adresse, et donne à l\'application l\'apparence d\'une calculatrice — qui fonctionne vraiment.</string>
+    <string name="about_feature_heir">Quelqu\'un après vous</string>
+    <string name="about_feature_heir_desc">Un proche ouvre une copie en lecture seule de votre coffre après un silence assez long de votre côté. Sur le téléphone, sans cloud et sans compte.</string>
+
+    <string name="about_feature_types_desc">Mots de passe, cartes bancaires et notes sécurisées.</string>
+    <string name="about_feature_totp">Codes à deux facteurs</string>
+    <string name="about_feature_totp_desc">Les codes à six chiffres, calculés ici, comme une application d\'authentification.</string>
+    <string name="about_feature_otpauth">Secrets à deux facteurs depuis un lien</string>
+    <string name="about_feature_otpauth_desc">Collez le lien otpauth:// que le site affiche sous son QR code : le secret en est extrait.</string>
+    <string name="about_feature_cards">Cartes bancaires</string>
+    <string name="about_feature_cards_desc">Numéro, titulaire, expiration, code de sécurité et code PIN, présentés comme une carte. Le numéro, le code de sécurité et le code PIN restent masqués tant que vous ne les demandez pas.</string>
+    <string name="about_feature_notes">Notes sécurisées</string>
+    <string name="about_feature_notes_desc">N\'importe quel texte confidentiel : RIB, codes de secours, clés de licence.</string>
+    <string name="about_feature_search">Recherche et tri</string>
+    <string name="about_feature_search_desc">Par titre, identifiant, adresse ou contenu ; du plus récent, du plus ancien, de A à Z ou de Z à A.</string>
+    <string name="about_feature_generator">Générateur</string>
+    <string name="about_feature_generator_desc">Des mots de passe de %1$d à %2$d caractères, ou une phrase de passe tirée de %3$s, dans la langue affichée par l\'application.</string>
+
+    <string name="about_feature_audit">Audit de sécurité</string>
+    <string name="about_feature_audit_desc">Une note sur 100 pour le coffre, et ce qui la fait baisser : les mots de passe faibles, ceux qui servent deux fois, ceux sans deuxième facteur. L\'âge est affiché et ne compte jamais contre vous.</string>
+    <string name="about_feature_breach">Contrôle des fuites</string>
+    <string name="about_feature_breach_desc">Demande à Have I Been Pwned si un mot de passe figure dans une fuite publique, sans jamais envoyer ce mot de passe.</string>
+    <string name="about_feature_phishing">Contrôle de l\'adresse</string>
+    <string name="about_feature_phishing_desc">Avant de copier un mot de passe, compare l\'adresse ouverte dans votre navigateur avec celles que déclare l\'entrée, et retient la copie quand aucune ne correspond.</string>
+    <string name="about_feature_clipboard">Presse-papiers vidé</string>
+    <string name="about_feature_clipboard_desc">Au bout de %1$s à %2$s, ou jamais — à votre choix.</string>
+    <string name="about_feature_update">Vérification des mises à jour</string>
+    <string name="about_feature_update_desc">Vous prévient quand une version plus récente paraît, une fois votre coffre ouvert. Elle ne télécharge rien et n\'installe rien.</string>
+
+    <string name="about_feature_backup">Sauvegarde chiffrée (.ptbak)</string>
+    <string name="about_feature_backup_desc">Un fichier que seule votre phrase de passe ouvre, enregistré là où vous voulez. Il lit et écrit le même format que la version 2.7.1.</string>
+    <string name="about_feature_import">Import</string>
+    <string name="about_feature_import_desc">Chrome, Edge, un export JSON de Bitwarden, ou n\'importe quel CSV avec une colonne de mots de passe.</string>
+    <string name="about_feature_theme">Clair ou sombre</string>
+    <string name="about_feature_theme_desc">À votre choix, ou selon le réglage du téléphone.</string>
+
+    <string name="about_section_verify">Vérifier ce que vous téléchargez</string>
+    <string name="about_verify_body">Chaque version publie le SHA-256 de chacun de ses fichiers. Une fois l\'un d\'eux téléchargé, lancez :\n\nsha256sum &lt;le fichier que vous avez téléchargé&gt;\n\net comparez le résultat avec la ligne de ce même fichier sur la page de la version. Si les deux diffèrent, ne l\'installez pas.</string>
+
+    <string name="about_section_help">Aide rapide</string>
+    <string name="about_help_first_title">Premier lancement</string>
+    <string name="about_help_first_1">Choisissez un mot de passe maître d\'au moins 12 caractères.</string>
+    <string name="about_help_first_2">Il chiffre tout, et rien ne permet de le retrouver : si vous l\'oubliez, le coffre est perdu.</string>
+    <string name="about_help_add_title">Ajouter un mot de passe</string>
+    <string name="about_help_add_1">Le bouton Ajouter, en bas de l\'écran principal.</string>
+    <string name="about_help_add_2">Ou ouvrez le générateur et laissez-le en choisir un.</string>
+    <string name="about_help_update_title">Mises à jour</string>
+    <string name="about_help_update_1">Une fois votre coffre ouvert, l\'application demande à GitHub s\'il existe une version plus récente, %1$d fois par jour au maximum.</string>
+    <string name="about_help_update_2">Ou appuyez sur « Vérifier les mises à jour » ci-dessus, quand vous voulez.</string>
+
+    <string name="about_section_author">Auteur</string>
+    <string name="about_author_role">Développeur</string>
+
+    <string name="about_section_links">Aide et liens</string>
+    <string name="about_link_website">Site officiel</string>
+    <string name="about_link_source">Code source</string>
+    <string name="about_link_report">Signaler un problème</string>
+    <string name="about_link_report_subtitle">Ouvre votre application de courrier, la version et le téléphone déjà écrits</string>
+    <string name="about_link_licence">Licence</string>
+    <string name="about_report_subject">Pass Tech %1$s — signalement</string>
+    <string name="about_report_body">Décrivez ce qui s\'est passé :\n\n\n---\nVersion : %1$s\nTéléphone : %2$s (Android %3$s)\n</string>
+    <string name="about_link_failed">Aucune application de ce téléphone ne sait ouvrir cela.</string>
+
+    <string name="legal_privacy_title">Politique de confidentialité</string>
+    <string name="legal_privacy_subtitle">Ce qui reste sur votre téléphone, et les deux moments où l\'application se connecte</string>
+    <string name="legal_terms_title">Conditions d\'utilisation</string>
+    <string name="legal_terms_subtitle">Ce que nous promettons, et ce que nous ne promettons pas</string>
+    <string name="legal_not_translated">Ce document n\'a pas encore été écrit dans votre langue : voici celui en anglais. Un document qui décrirait mal l\'application serait pire qu\'un document à déchiffrer.</string>
+    <string name="legal_unreadable">Ce document n\'a pas pu être lu. Il est aussi publié avec le code source.</string>
+
+    <plurals name="about_attempts">
+        <item quantity="one">%1$d essai</item>
+        <item quantity="other">%1$d essais</item>
+    </plurals>
+    <plurals name="about_entry_types">
+        <item quantity="one">%1$d type d\'entrée</item>
+        <item quantity="other">%1$d types d\'entrée</item>
+    </plurals>
+    <plurals name="about_words">
+        <item quantity="one">%1$d mot</item>
+        <item quantity="other">%1$d mots</item>
+    </plurals>
+
+    <string name="action_about">À propos</string>
+</resources>
+

@@ -1,0 +1,1469 @@
+package com.filestech.pass_tech.ui.settings
+
+import android.app.Activity
+import android.content.Context
+import android.content.res.Resources
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.BrightnessMedium
+import androidx.compose.material.icons.outlined.ContentPasteOff
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Diversity1
+import androidx.compose.material.icons.outlined.Emergency
+import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Policy
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SettingsAccessibility
+import androidx.compose.material.icons.outlined.SettingsBrightness
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.ShieldMoon
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.filestech.pass_tech.R
+import com.filestech.pass_tech.core.backup.ImportParser
+import com.filestech.pass_tech.core.heir.HeirState
+import com.filestech.pass_tech.core.settings.AppLanguage
+import com.filestech.pass_tech.core.settings.AppPreferences
+import com.filestech.pass_tech.core.vault.VaultRepository.BiometricStatus
+import com.filestech.pass_tech.ui.components.PasswordField
+import com.filestech.pass_tech.ui.components.PtCard
+import com.filestech.pass_tech.ui.components.PtSnackbarHost
+import com.filestech.pass_tech.ui.components.authenticate
+import com.filestech.pass_tech.ui.components.countdownText
+import com.filestech.pass_tech.ui.settings.SettingsViewModel.ChangeProblem
+import com.filestech.pass_tech.ui.settings.SettingsViewModel.Message
+import com.filestech.pass_tech.ui.theme.DestructiveRed
+
+/** Which dialog is up: one at a time. */
+private enum class SettingsDialog {
+    THEME,
+    LANGUAGE,
+    CLIPBOARD,
+    AUTO_LOCK,
+    SCREENSHOTS_OFF,
+    CHANGE_PASSWORD,
+    DECOY_SETUP,
+    DECOY_PASSWORD,
+    DECOY_MANAGE,
+    HEIR_SETUP,
+    HEIR_PASSPHRASE,
+    HEIR_UPDATE_PASSPHRASE,
+    HEIR_MANAGE,
+    HEIR_THRESHOLD,
+    ANTI_PHISHING,
+    PANIC_BIOMETRIC_WARNING,
+    PANIC_CONFIRM,
+    DELETE_ALL,
+    DELETE_REAUTH,
+    BACKUP_PASSPHRASE,
+    EXPORT_PLAIN,
+    EXPORT_REAUTH,
+}
+
+/**
+ * The settings (2.7.1, `settings_screen.dart`): each setting on its own card under a section title.
+ * The rest of 2.7.1's settings (decoy, panic, heir, data) come with their features.
+ */
+@Composable
+fun SettingsScreen(settings: SettingsViewModel, snackbar: SnackbarHostState, onBack: () -> Unit, onAudit: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val ui by settings.state.collectAsStateWithLifecycle()
+    var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
+    val haptics = LocalHapticFeedback.current
+    val biometrics by settings.biometrics.collectAsStateWithLifecycle()
+    val hasDecoy by settings.hasDecoy.collectAsStateWithLifecycle()
+    val disguised by settings.disguised.collectAsStateWithLifecycle()
+    val heir by settings.heir.collectAsStateWithLifecycle()
+    val heirOn = heir?.enabled == true
+    val antiPhishing by settings.antiPhishingUi.collectAsStateWithLifecycle()
+    val serviceName = stringResource(R.string.phishing_service_label)
+    val resources = LocalResources.current
+    val pending by settings.pending.collectAsStateWithLifecycle()
+    val openImport = remember { mutableStateOf(false) }
+    // Read back from where it lives rather than held in the view model: on Android 13 that is the
+    // system's own per-app language, which Android's settings can change while this screen exists.
+    // Keyed on the configuration, which is what moves when either picker is used.
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+    val language = remember(LocalConfiguration.current) { AppLanguage.chosen(context) }
+    val onLanguage: (String) -> Unit = { chooseLanguage(context, activity, it) }
+    Messages(settings, snackbar)
+    ArmingPrompts(settings)
+    FilePickers(settings, openImport)
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { PtSnackbarHost(snackbar) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.settings_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            item { SectionTitle(R.string.settings_section_appearance) }
+            item {
+                Tile(Icons.Outlined.BrightnessMedium, stringResource(R.string.settings_theme_title), stringResource(themeLabel(ui.theme))) {
+                    dialog = SettingsDialog.THEME
+                }
+            }
+            item {
+                Tile(
+                    Icons.Outlined.Language,
+                    stringResource(R.string.settings_language_title),
+                    stringResource(languageLabel(language)),
+                ) { dialog = SettingsDialog.LANGUAGE }
+            }
+            item { SectionTitle(R.string.settings_section_clipboard) }
+            item {
+                Tile(
+                    Icons.Outlined.ContentPasteOff,
+                    stringResource(R.string.settings_clipboard_title),
+                    stringResource(clipboardLabel(ui.clipboardSeconds)),
+                ) { dialog = SettingsDialog.CLIPBOARD }
+            }
+            item { SectionTitle(R.string.settings_section_security) }
+            item {
+                ScreenshotTile(ui.screenshotProtection) { on ->
+                    if (on) settings.setScreenshotProtection(true) else dialog = SettingsDialog.SCREENSHOTS_OFF
+                }
+            }
+            // Offered when the phone can authenticate, and kept while THIS vault is armed, to turn it off.
+            // Never for a vault armed elsewhere: its tile would differ from a phone where nothing is armed.
+            if (biometrics.available || biometrics.status == BiometricStatus.THIS_VAULT) {
+                item {
+                    BiometricTile(
+                        status = biometrics.status,
+                        onEnable = settings::enableBiometrics,
+                        onDisable = settings::disableBiometrics,
+                    )
+                }
+            }
+            item {
+                Tile(Icons.Outlined.Key, stringResource(R.string.settings_change_master_title)) {
+                    dialog = SettingsDialog.CHANGE_PASSWORD
+                }
+            }
+            item {
+                Tile(
+                    Icons.Outlined.Timer,
+                    stringResource(R.string.settings_auto_lock_title),
+                    stringResource(autoLockLabel(ui.autoLockSeconds)),
+                ) { dialog = SettingsDialog.AUTO_LOCK }
+            }
+            item {
+                Tile(Icons.Outlined.Lock, stringResource(R.string.settings_lock_now), chevron = false) {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    settings.lockNow()
+                }
+            }
+            // Always shown, on every phone and from every vault: a tile that appeared only where a decoy
+            // is possible would answer the one question the whole design exists to leave open.
+            item {
+                Tile(
+                    icon = Icons.Outlined.Policy,
+                    title = stringResource(R.string.settings_audit_title),
+                    subtitle = stringResource(R.string.settings_audit_subtitle),
+                    onClick = onAudit,
+                )
+            }
+
+            item { SectionTitle(R.string.settings_section_decoy) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.ShieldMoon,
+                    title = stringResource(if (hasDecoy) R.string.decoy_tile_configured else R.string.decoy_tile_setup),
+                    subtitle = stringResource(R.string.decoy_tile_subtitle),
+                ) { dialog = if (hasDecoy) SettingsDialog.DECOY_MANAGE else SettingsDialog.DECOY_SETUP }
+            }
+            item { SectionTitle(R.string.settings_section_heir) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.Diversity1,
+                    title = stringResource(if (heirOn) R.string.heir_tile_configured else R.string.heir_tile_setup),
+                    subtitle = stringResource(
+                        if (heirOn) R.string.heir_tile_subtitle_configured else R.string.heir_tile_subtitle_setup,
+                    ),
+                ) { dialog = if (heirOn) SettingsDialog.HEIR_MANAGE else SettingsDialog.HEIR_SETUP }
+            }
+            // Only once an heir is set up: on any other vault the days would count nothing.
+            if (heirOn) {
+                item {
+                    Tile(
+                        icon = Icons.Outlined.HourglassEmpty,
+                        title = stringResource(R.string.heir_threshold_tile_title),
+                        subtitle = heir?.let { thresholdSubtitle(resources, it) },
+                    ) { dialog = SettingsDialog.HEIR_THRESHOLD }
+                }
+            }
+            antiPhishingSection(antiPhishing, serviceName, settings) { dialog = SettingsDialog.ANTI_PHISHING }
+
+            item { SectionTitle(R.string.settings_section_panic) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.Emergency,
+                    title = stringResource(R.string.panic_trigger_title),
+                    subtitle = stringResource(R.string.panic_trigger_subtitle),
+                    chevron = false,
+                    danger = true,
+                ) {
+                    // The fingerprint is only ever mentioned when it opens THIS vault (design v2.3 §1).
+                    dialog = if (biometrics.status == BiometricStatus.THIS_VAULT) {
+                        SettingsDialog.PANIC_BIOMETRIC_WARNING
+                    } else {
+                        SettingsDialog.PANIC_CONFIRM
+                    }
+                }
+            }
+            // Only while the launcher really shows a calculator: on any other phone the tile would
+            // offer to undo something that is not there.
+            if (disguised) {
+                item {
+                    Tile(
+                        icon = Icons.Outlined.Visibility,
+                        title = stringResource(R.string.panic_reveal_title),
+                        subtitle = stringResource(R.string.panic_reveal_subtitle),
+                        chevron = false,
+                        onClick = settings::reveal,
+                    )
+                }
+            }
+            item { SectionTitle(R.string.settings_section_data) }
+            item {
+                Tile(
+                    Icons.Outlined.Save,
+                    stringResource(R.string.settings_backup_encrypted_title),
+                    stringResource(R.string.settings_backup_encrypted_subtitle),
+                ) { dialog = SettingsDialog.BACKUP_PASSPHRASE }
+            }
+            item {
+                Tile(
+                    Icons.Outlined.FileOpen,
+                    stringResource(R.string.settings_import_title),
+                    stringResource(R.string.settings_import_subtitle),
+                ) { openImport.value = true }
+            }
+            item {
+                Tile(
+                    icon = Icons.Outlined.Description,
+                    title = stringResource(R.string.settings_export_plain_title),
+                    subtitle = stringResource(R.string.settings_export_plain_subtitle),
+                    danger = true,
+                ) { dialog = SettingsDialog.EXPORT_PLAIN }
+            }
+            item { SectionTitle(R.string.settings_section_danger) }
+            item {
+                Tile(
+                    icon = Icons.Outlined.DeleteForever,
+                    title = stringResource(R.string.settings_delete_all_title),
+                    subtitle = stringResource(R.string.settings_delete_all_subtitle),
+                    chevron = false,
+                    danger = true,
+                ) { dialog = SettingsDialog.DELETE_ALL }
+            }
+        }
+    }
+
+    SettingsDialogs(
+        ui = ui,
+        pending = pending,
+        dialog = dialog,
+        settings = settings,
+        haptics = haptics,
+        armedHere = biometrics.status == BiometricStatus.THIS_VAULT,
+        language = language,
+        onLanguage = onLanguage,
+        onDialog = { dialog = it },
+    )
+    if (ui.busy) BusyDialog()
+}
+
+/** One dialog at a time, and the file the owner picked, which brings its own. */
+@Composable
+private fun SettingsDialogs(
+    ui: SettingsViewModel.UiState,
+    pending: SettingsViewModel.Pending?,
+    dialog: SettingsDialog?,
+    settings: SettingsViewModel,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    armedHere: Boolean,
+    language: String,
+    onLanguage: (String) -> Unit,
+    onDialog: (SettingsDialog?) -> Unit,
+) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        SettingsDialog.LANGUAGE -> ChoiceDialog(
+            title = R.string.settings_language_title,
+            choices = LANGUAGE_CHOICES,
+            selected = language,
+            label = ::languageLabel,
+            onChoose = {
+                onLanguage(it)
+                close()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.THEME -> ChoiceDialog(
+            title = R.string.settings_theme_choose_title,
+            choices = AppPreferences.Theme.entries,
+            selected = ui.theme,
+            label = ::themeLabel,
+            icon = ::themeIcon,
+            onChoose = {
+                settings.setTheme(it)
+                close()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.CLIPBOARD -> ChoiceDialog(
+            title = R.string.settings_clipboard_dialog_title,
+            choices = AppPreferences.CLIPBOARD_CHOICES,
+            selected = ui.clipboardSeconds,
+            label = ::clipboardLabel,
+            onChoose = {
+                settings.setClipboard(it)
+                close()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.AUTO_LOCK -> ChoiceDialog(
+            title = R.string.settings_auto_lock_dialog_title,
+            choices = AppPreferences.AUTO_LOCK_CHOICES,
+            selected = ui.autoLockSeconds,
+            label = ::autoLockLabel,
+            onChoose = {
+                settings.setAutoLock(it)
+                close()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.SCREENSHOTS_OFF -> ConfirmDialog(
+            title = R.string.settings_screenshot_protection_confirm_off_title,
+            body = R.string.settings_screenshot_protection_confirm_off_body,
+            confirm = R.string.action_disable,
+            onConfirm = {
+                settings.setScreenshotProtection(false)
+                close()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.CHANGE_PASSWORD -> ChangePasswordDialog(
+            onChange = { current, new ->
+                close()
+                settings.changePassword(current, new)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.DECOY_SETUP, SettingsDialog.DECOY_PASSWORD, SettingsDialog.DECOY_MANAGE ->
+            DecoyDialogs(dialog, settings, armedHere, onDialog)
+        SettingsDialog.ANTI_PHISHING -> AntiPhishingConsentDialog(
+            onConfirm = {
+                close()
+                settings.enableAntiPhishing()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.PANIC_BIOMETRIC_WARNING, SettingsDialog.PANIC_CONFIRM ->
+            PanicDialogs(dialog, settings, haptics, onDialog)
+        SettingsDialog.HEIR_SETUP, SettingsDialog.HEIR_PASSPHRASE, SettingsDialog.HEIR_UPDATE_PASSPHRASE,
+        SettingsDialog.HEIR_MANAGE, SettingsDialog.HEIR_THRESHOLD,
+        -> HeirDialogs(dialog, settings, onDialog)
+        SettingsDialog.DELETE_ALL, SettingsDialog.DELETE_REAUTH, SettingsDialog.BACKUP_PASSPHRASE,
+        SettingsDialog.EXPORT_PLAIN, SettingsDialog.EXPORT_REAUTH,
+        -> DataDialogs(dialog, settings, haptics, onDialog)
+        null -> Unit
+    }
+    PickedFileDialogs(pending, settings)
+}
+
+/**
+ * The decoy vault, in three steps (2.7.1, `settings_screen.dart:522-730`): what it is, the password
+ * that will open it, and later the one action it offers, deleting it.
+ *
+ * Unlike 2.7.1, the vault stays open once the decoy exists. 2.7.1 locked and said "unlock again to
+ * continue"; here the creation hands back the parent, whole, and its tile turns into "set up". The
+ * owner still has to unlock the decoy to fill it, which the explanation asks them to do.
+ */
+@Composable
+private fun DecoyDialogs(dialog: SettingsDialog?, settings: SettingsViewModel, armedHere: Boolean, onDialog: (SettingsDialog?) -> Unit) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        SettingsDialog.DECOY_SETUP -> DecoySetupDialog(
+            armedHere = armedHere,
+            onContinue = { onDialog(SettingsDialog.DECOY_PASSWORD) },
+            onDismiss = close,
+        )
+        SettingsDialog.DECOY_PASSWORD -> NewPasswordDialog(
+            title = R.string.decoy_password_dialog_title,
+            label = R.string.decoy_password_label,
+            cta = R.string.decoy_configure,
+            onValid = { password ->
+                close()
+                settings.configureDecoy(password)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.DECOY_MANAGE -> DecoyManageDialog(
+            onDelete = {
+                close()
+                settings.deleteDecoy()
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+/** What a decoy is for, before anything is asked. The only warning is about THIS vault (design v2.3 §1). */
+@Composable
+private fun DecoySetupDialog(armedHere: Boolean, onContinue: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.ShieldMoon, contentDescription = null) },
+        title = { Text(stringResource(R.string.decoy_dialog_title)) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (armedHere) {
+                    Text(
+                        text = stringResource(R.string.decoy_setup_biometric_warning),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                    )
+                }
+                Text(stringResource(R.string.decoy_setup_body), fontSize = 13.sp)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onContinue) { Text(stringResource(R.string.decoy_configure)) } },
+    )
+}
+
+/** The decoy exists: the one thing left to do with it is to delete it, and 2.7.1 asks for nothing else. */
+@Composable
+private fun DecoyManageDialog(onDelete: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.ShieldMoon, contentDescription = null) },
+        title = { Text(stringResource(R.string.decoy_dialog_title)) },
+        text = { Text(stringResource(R.string.decoy_manage_body), fontSize = 13.sp) },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = DestructiveRed, contentColor = Color.White),
+            ) { Text(stringResource(R.string.decoy_delete)) }
+        },
+    )
+}
+
+/**
+ * The heir (2.7.1, `settings_screen.dart:310-520`): what it is, the passphrase that will open the
+ * snapshot, and afterwards the two things left to do with it — take it again, or turn it off.
+ *
+ * Its "update" is 2.7.1's: a new passphrase replaces the old one, with nothing checked against it.
+ * There is nothing to check against — the old passphrase opens a file, not an account, and the owner
+ * who forgot it has exactly one way out, which is to take the snapshot again.
+ */
+@Composable
+private fun HeirDialogs(dialog: SettingsDialog?, settings: SettingsViewModel, onDialog: (SettingsDialog?) -> Unit) {
+    val close = { onDialog(null) }
+    val heir by settings.heir.collectAsStateWithLifecycle()
+    when (dialog) {
+        SettingsDialog.HEIR_SETUP -> ExplanationDialog(
+            icon = Icons.Outlined.Diversity1,
+            title = R.string.heir_tile_setup,
+            body = R.string.heir_setup_body,
+            confirm = R.string.heir_configure,
+            onConfirm = { onDialog(SettingsDialog.HEIR_PASSPHRASE) },
+            onDismiss = close,
+        )
+        SettingsDialog.HEIR_PASSPHRASE, SettingsDialog.HEIR_UPDATE_PASSPHRASE -> NewPasswordDialog(
+            title = R.string.heir_password_prompt_title,
+            label = R.string.heir_password_label,
+            cta = if (dialog == SettingsDialog.HEIR_PASSPHRASE) R.string.heir_configure else R.string.heir_update,
+            onValid = { passphrase ->
+                close()
+                settings.configureHeir(passphrase, update = dialog == SettingsDialog.HEIR_UPDATE_PASSPHRASE)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.HEIR_MANAGE -> HeirManageDialog(
+            onUpdate = { onDialog(SettingsDialog.HEIR_UPDATE_PASSPHRASE) },
+            onDisable = {
+                close()
+                settings.disableHeir()
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.HEIR_THRESHOLD -> ChoiceDialog(
+            title = R.string.heir_threshold_dialog_title,
+            choices = HeirState.THRESHOLD_CHOICES,
+            selected = heir?.thresholdDays ?: HeirState.DEFAULT_THRESHOLD_DAYS,
+            label = { it },
+            format = { resources, days -> resources.getQuantityString(R.plurals.heir_days, days, days) },
+            onChoose = {
+                settings.setHeirThreshold(it)
+                close()
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+@Composable
+private fun HeirManageDialog(onUpdate: () -> Unit, onDisable: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Diversity1, contentDescription = null) },
+        title = { Text(stringResource(R.string.heir_manage_title)) },
+        text = { Text(stringResource(R.string.heir_manage_body), fontSize = 13.sp) },
+        dismissButton = {
+            TextButton(onClick = onDisable) {
+                Text(stringResource(R.string.heir_disable), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = { Button(onClick = onUpdate) { Text(stringResource(R.string.heir_update)) } },
+    )
+}
+
+/**
+ * What the accessibility service reads, what it does not, and what turning it off later does. The
+ * last line names the service exactly as Android will list it — from the same string Android reads,
+ * so no one can reword one without the other (2.7.1 kept the two apart, and a check in its build
+ * made sure they had not drifted).
+ */
+@Composable
+private fun AntiPhishingConsentDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.VerifiedUser, contentDescription = null) },
+        title = { Text(stringResource(R.string.settings_anti_phishing_dialog_title)) },
+        text = {
+            Text(
+                text = stringResource(R.string.settings_anti_phishing_dialog_body, stringResource(R.string.phishing_service_label)),
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.action_continue)) } },
+    )
+}
+
+/** A long explanation with one way on, and one way out. */
+@Composable
+private fun ExplanationDialog(
+    icon: ImageVector,
+    @StringRes title: Int,
+    @StringRes body: Int,
+    @StringRes confirm: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(icon, contentDescription = null) },
+        title = { Text(stringResource(title)) },
+        text = {
+            Text(
+                text = stringResource(body),
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(confirm)) } },
+    )
+}
+
+/** A password being chosen, typed twice, under the app's one rule. */
+@Composable
+private fun NewPasswordDialog(
+    @StringRes title: Int,
+    @StringRes label: Int,
+    @StringRes cta: Int,
+    onValid: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var problem by remember { mutableStateOf<ChangeProblem?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasswordField(password, { password = it }, stringResource(label), leadingIcon = null)
+                PasswordField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it },
+                    label = stringResource(R.string.change_password_confirm_label),
+                    leadingIcon = null,
+                )
+                problem?.let { Text(stringResource(changeProblemLabel(it)), color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = {
+                problem = SettingsViewModel.checkNewPassword(password, confirmation)
+                if (problem == null) onValid(password)
+            }) { Text(stringResource(cta)) }
+        },
+    )
+}
+
+/** "Threshold: 90 days · current inactivity: 3 days", both counted in the language of the app. */
+private fun thresholdSubtitle(resources: Resources, heir: HeirState.Status): String =
+    resources.getString(
+        R.string.heir_threshold_tile_subtitle,
+        resources.getQuantityString(R.plurals.heir_days, heir.thresholdDays, heir.thresholdDays),
+        resources.getQuantityString(R.plurals.heir_days, heir.inactivityDays, heir.inactivityDays),
+    )
+
+/**
+ * Panic mode, in two steps: what it costs the fingerprint of THIS vault, then what it does in full.
+ * The first step is skipped when no fingerprint opens this vault — including when one opens another,
+ * which this screen must not hint at (design v2.3 §1).
+ */
+@Composable
+private fun PanicDialogs(
+    dialog: SettingsDialog?,
+    settings: SettingsViewModel,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    onDialog: (SettingsDialog?) -> Unit,
+) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        // Not dismissible by a tap outside: the owner reads what they lose before the vault closes.
+        SettingsDialog.PANIC_BIOMETRIC_WARNING -> AlertDialog(
+            onDismissRequest = {},
+            icon = { Icon(Icons.Outlined.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(R.string.panic_warn_biometric_title)) },
+            text = { Text(stringResource(R.string.panic_warn_biometric_body), fontSize = 13.sp) },
+            dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.action_cancel)) } },
+            confirmButton = {
+                TextButton(onClick = { onDialog(SettingsDialog.PANIC_CONFIRM) }) { Text(stringResource(R.string.action_continue)) }
+            },
+        )
+        SettingsDialog.PANIC_CONFIRM -> PanicDialog(
+            onConfirm = {
+                close()
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                settings.panic()
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+/** What panic mode does, in full, before it does it. Long: it is the one screen nobody reads twice. */
+@Composable
+private fun PanicDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Emergency, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(R.string.panic_dialog_title), color = MaterialTheme.colorScheme.error) },
+        text = {
+            Text(
+                text = stringResource(R.string.panic_dialog_body),
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = DestructiveRed, contentColor = Color.White),
+            ) { Text(stringResource(R.string.panic_dialog_activate)) }
+        },
+    )
+}
+
+/** Everything that writes or erases: a backup, an export, and the deletion of it all. */
+@Composable
+private fun DataDialogs(
+    dialog: SettingsDialog?,
+    settings: SettingsViewModel,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    onDialog: (SettingsDialog?) -> Unit,
+) {
+    val close = { onDialog(null) }
+    when (dialog) {
+        SettingsDialog.DELETE_ALL -> ConfirmDialog(
+            title = R.string.settings_delete_all_dialog_title,
+            body = R.string.settings_delete_all_dialog_body,
+            confirm = R.string.settings_delete_all_confirm,
+            onConfirm = { onDialog(SettingsDialog.DELETE_REAUTH) },
+            onDismiss = close,
+        )
+        SettingsDialog.DELETE_REAUTH -> ReauthDialog(
+            onConfirm = { password ->
+                close()
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                settings.deleteAll(password)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.BACKUP_PASSPHRASE -> PassphraseDialog(
+            title = R.string.passphrase_dialog_encrypt_title,
+            helper = R.string.passphrase_dialog_confirm_helper,
+            cta = R.string.passphrase_encrypt_cta,
+            confirm = true,
+            onValid = { passphrase ->
+                close()
+                settings.startBackup(passphrase)
+            },
+            onDismiss = close,
+        )
+        SettingsDialog.EXPORT_PLAIN -> PlainExportWarningDialog(
+            onConfirm = { onDialog(SettingsDialog.EXPORT_REAUTH) },
+            onDismiss = close,
+        )
+        SettingsDialog.EXPORT_REAUTH -> ReauthDialog(
+            onConfirm = { password ->
+                close()
+                settings.startPlainExport(password)
+            },
+            onDismiss = close,
+        )
+        // Every other dialog is answered by SettingsDialogs, its only caller.
+        else -> Unit
+    }
+}
+
+/** The dialogs a picked file brings with it: its passphrase, then how much of it is coming in. */
+@Composable
+private fun PickedFileDialogs(pending: SettingsViewModel.Pending?, settings: SettingsViewModel) {
+    when (val file = pending) {
+        is SettingsViewModel.Pending.Passphrase -> PassphraseDialog(
+            title = R.string.passphrase_dialog_decrypt_title,
+            helper = R.string.passphrase_dialog_enter_helper,
+            cta = R.string.passphrase_decrypt_cta,
+            confirm = false,
+            onValid = settings::openBackup,
+            onDismiss = settings::cancelImport,
+        )
+        is SettingsViewModel.Pending.Confirm -> ImportConfirmDialog(
+            pending = file,
+            onConfirm = settings::confirmImport,
+            onDismiss = settings::cancelImport,
+        )
+        null -> Unit
+    }
+}
+
+@Composable
+private fun Messages(settings: SettingsViewModel, snackbar: SnackbarHostState) {
+    val resources = LocalResources.current
+    LaunchedEffect(settings, snackbar) {
+        settings.messages.collect { message ->
+            val text = messageText(resources, message)
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(text)
+        }
+    }
+}
+
+/**
+ * Reads what the system says each time the screen shows — whether a fingerprint can be read, and
+ * whether the launcher is disguised — and hands arming ciphers to the system prompt.
+ */
+@Composable
+private fun ArmingPrompts(settings: SettingsViewModel) {
+    LaunchedEffect(settings) {
+        settings.refreshBiometricSupport()
+        settings.refreshDisguise()
+        settings.refreshHeir()
+    }
+    // Not LaunchedEffect: the grant is given on an Android screen, so the owner comes back to this
+    // one without it being built again, and a tile still asking for what they have just given.
+    LifecycleResumeEffect(settings) {
+        settings.refreshAntiPhishing()
+        onPauseOrDispose {}
+    }
+    val activity = LocalActivity.current as? FragmentActivity ?: return
+    LaunchedEffect(settings, activity) {
+        settings.prompts.collect { cipher -> settings.armResult(activity.authenticate(cipher)) }
+    }
+}
+
+/**
+ * On when a fingerprint opens THIS vault, off in every other case, and the screen says nothing more.
+ *
+ * Design v2 §9 had this tile warn the owner that a fingerprint opens ANOTHER vault. Patrice dropped that
+ * warning on 2026-09-22, after both reviewers called it an oracle: a vault must never tell anything about
+ * a vault that is not itself, even to someone who knows this one's password. Turning the switch on arms
+ * this vault instead, which is the only thing the owner needs here.
+ *
+ * The note under it is 2.7.1's, for phones that do not invalidate the key at a new enrolment.
+ */
+@Composable
+private fun BiometricTile(status: BiometricStatus, onEnable: () -> Unit, onDisable: () -> Unit) {
+    val on = status == BiometricStatus.THIS_VAULT
+    val change = { checked: Boolean -> if (checked) onEnable() else onDisable() }
+    PtCard(Modifier.fillMaxWidth()) {
+        Column {
+            ListItem(
+                leadingContent = { Icon(Icons.Outlined.Fingerprint, contentDescription = null, tint = iconTint()) },
+                headlineContent = { Text(stringResource(R.string.settings_biometric_title)) },
+                supportingContent = { Text(stringResource(R.string.settings_biometric_subtitle)) },
+                trailingContent = { Switch(checked = on, onCheckedChange = change) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.clickable { change(!on) },
+            )
+            Text(
+                text = stringResource(R.string.settings_biometric_new_enrollment_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 56.dp, end = 16.dp, bottom = 12.dp),
+            )
+        }
+    }
+}
+
+/** One message, one line, in the language of the app. Kept out of the composable: it is only a table. */
+private fun messageText(resources: Resources, message: Message): String = when (message) {
+    Message.PasswordChanged -> resources.getString(R.string.change_password_done)
+    Message.PasswordChangedBiometricsReset -> resources.getString(R.string.change_password_done_biometric_reset)
+    Message.WrongPassword -> resources.getString(R.string.change_password_error_wrong_current)
+    Message.PasswordRefused -> resources.getString(R.string.change_password_refused)
+    is Message.Locked -> resources.getString(R.string.settings_locked_retry, countdownText(resources, message.remainingMillis))
+    Message.KeystoreUnavailable -> resources.getString(R.string.keystore_unavailable)
+    Message.AntiPhishingOnFailed -> resources.getString(R.string.settings_anti_phishing_on_failed)
+    Message.AntiPhishingOffFailed -> resources.getString(R.string.settings_anti_phishing_off_failed)
+    else -> vaultMessageText(resources, message)
+}
+
+/** What the vault itself answered about its fingerprint and its decoy. */
+private fun vaultMessageText(resources: Resources, message: Message): String = when (message) {
+    Message.BiometricsEnabled -> resources.getString(R.string.settings_biometric_enabled)
+    Message.BiometricsDisabled -> resources.getString(R.string.settings_biometric_disabled)
+    Message.BiometricsCanceled -> resources.getString(R.string.settings_biometric_enable_canceled)
+    Message.BiometricsFailed -> resources.getString(R.string.settings_biometric_enable_failed)
+    Message.BiometricsRefused -> resources.getString(R.string.settings_biometric_decoy_conflict)
+    Message.DecoyCreated -> resources.getString(R.string.decoy_configured_snack)
+    Message.DecoyDeleted -> resources.getString(R.string.decoy_deleted_snack)
+    Message.DecoyImpossible -> resources.getString(R.string.decoy_error_impossible)
+    Message.DisguiseRemoved -> resources.getString(R.string.panic_reveal_snack)
+    else -> heirMessageText(resources, message)
+}
+
+/** What the dead man's switch answered. */
+private fun heirMessageText(resources: Resources, message: Message): String = when (message) {
+    Message.HeirConfigured -> resources.getString(R.string.heir_configured_snack)
+    Message.HeirUpdated -> resources.getString(R.string.heir_updated_snack)
+    Message.HeirDisabled -> resources.getString(R.string.heir_disabled_snack)
+    Message.HeirVaultEmpty -> resources.getString(R.string.heir_vault_empty)
+    // The same words as a refused master password: they say nothing about which one it matched.
+    Message.HeirPassphraseRefused -> resources.getString(R.string.change_password_refused)
+    else -> fileMessageText(resources, message)
+}
+
+/** What a file did or did not do: the import and the two exports. */
+private fun fileMessageText(resources: Resources, message: Message): String = when (message) {
+    Message.BackupSaved -> resources.getString(R.string.backup_saved)
+    Message.ExportSaved -> resources.getString(R.string.export_saved)
+    Message.FileWriteError -> resources.getString(R.string.file_write_error)
+    Message.ImportUnreadable -> resources.getString(R.string.import_read_error)
+    Message.ImportTooLarge -> resources.getString(R.string.import_error_too_large)
+    is Message.ImportFailed -> resources.getString(importProblemLabel(message.problem))
+    Message.ImportNoEntry -> resources.getString(R.string.import_no_entry)
+    Message.WrongPassphrase -> resources.getString(R.string.import_wrong_passphrase)
+    is Message.Imported -> importedText(resources, message)
+    // Every other message is answered by messageText, its only caller.
+    else -> error("no words for $message")
+}
+
+/** 2.7.1: 16 sp, the brand colour (`cs.primary`, which keeps its contrast in both themes). */
+@Composable
+private fun SectionTitle(@StringRes title: Int) {
+    Text(
+        text = stringResource(title),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 2.dp, top = 20.dp, end = 2.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun Tile(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    chevron: Boolean = true,
+    danger: Boolean = false,
+    onClick: () -> Unit,
+) {
+    PtCard(Modifier.fillMaxWidth()) {
+        ListItem(
+            leadingContent = { Icon(icon, contentDescription = null, tint = if (danger) DestructiveRed else iconTint()) },
+            headlineContent = { Text(title, color = if (danger) MaterialTheme.colorScheme.error else Color.Unspecified) },
+            supportingContent = subtitle?.let { { Text(it) } },
+            trailingContent = if (chevron) {
+                { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(18.dp)) }
+            } else {
+                null
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(onClick = onClick),
+        )
+    }
+}
+
+@Composable
+private fun iconTint(): Color = MaterialTheme.colorScheme.onSurfaceVariant
+
+/** Off shows the shield in the error colour, as 2.7.1 does. */
+@Composable
+private fun ScreenshotTile(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    PtCard(Modifier.fillMaxWidth()) {
+        ListItem(
+            leadingContent = {
+                Icon(
+                    Icons.Outlined.Shield,
+                    contentDescription = null,
+                    tint = if (enabled) iconTint() else MaterialTheme.colorScheme.error,
+                )
+            },
+            headlineContent = { Text(stringResource(R.string.settings_screenshot_protection_title)) },
+            supportingContent = { Text(stringResource(R.string.settings_screenshot_protection_subtitle), fontSize = 12.sp) },
+            trailingContent = { Switch(checked = enabled, onCheckedChange = onChange) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { onChange(!enabled) },
+        )
+    }
+}
+
+/** Its title, its switch, and the way to the Android screen while that screen still has the say. */
+private fun LazyListScope.antiPhishingSection(
+    ui: SettingsViewModel.AntiPhishingUi,
+    serviceName: String,
+    settings: SettingsViewModel,
+    onConsent: () -> Unit,
+) {
+    item { SectionTitle(R.string.settings_section_anti_phishing) }
+    item {
+        AntiPhishingTile(ui, serviceName) { on -> if (on) onConsent() else settings.disableAntiPhishing() }
+    }
+    // The grant lives in the Android settings, and only the owner can give it there.
+    if (ui.enabled && !ui.granted) {
+        item {
+            Tile(
+                icon = Icons.Outlined.SettingsAccessibility,
+                title = stringResource(R.string.settings_anti_phishing_open_title),
+                subtitle = stringResource(R.string.settings_anti_phishing_open_subtitle, serviceName),
+                onClick = settings::openAccessibilitySettings,
+            )
+        }
+    }
+}
+
+/**
+ * On, waiting for the Android grant, or off — three states, and the middle one is the honest answer
+ * to "the switch is on but nothing is watching". 2.7.1 showed the same three; what is new is that
+ * turning the switch off takes the grant back instead of only remembering a preference.
+ */
+@Composable
+private fun AntiPhishingTile(ui: SettingsViewModel.AntiPhishingUi, serviceName: String, onChange: (Boolean) -> Unit) {
+    val watching = ui.enabled && ui.granted
+    val subtitle = when {
+        watching -> stringResource(R.string.settings_anti_phishing_active)
+        ui.enabled -> stringResource(R.string.settings_anti_phishing_needs_grant, serviceName)
+        else -> stringResource(R.string.settings_anti_phishing_description)
+    }
+    PtCard(Modifier.fillMaxWidth()) {
+        ListItem(
+            leadingContent = {
+                Icon(
+                    Icons.Outlined.VerifiedUser,
+                    contentDescription = null,
+                    tint = if (watching) MaterialTheme.colorScheme.primary else iconTint(),
+                )
+            },
+            headlineContent = { Text(stringResource(R.string.settings_anti_phishing_title)) },
+            supportingContent = { Text(subtitle, fontSize = 12.sp) },
+            trailingContent = { Switch(checked = ui.enabled, onCheckedChange = onChange) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { onChange(!ui.enabled) },
+        )
+    }
+}
+
+@Composable
+private fun <T> ChoiceDialog(
+    @StringRes title: Int,
+    choices: List<T>,
+    selected: T,
+    label: (T) -> Int,
+    onChoose: (T) -> Unit,
+    onDismiss: () -> Unit,
+    icon: ((T) -> ImageVector)? = null,
+    format: ((Resources, T) -> String)? = null,
+) {
+    val resources = LocalResources.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(title)) },
+        text = {
+            Column {
+                choices.forEach { choice ->
+                    ListItem(
+                        leadingContent = icon?.let { { Icon(it(choice), contentDescription = null, modifier = Modifier.size(20.dp)) } },
+                        headlineContent = { Text(format?.invoke(resources, choice) ?: stringResource(label(choice))) },
+                        trailingContent = if (choice == selected) ({ Icon(Icons.Filled.Check, contentDescription = null) }) else null,
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable { onChoose(choice) },
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
+private fun ConfirmDialog(
+    @StringRes title: Int,
+    @StringRes body: Int,
+    @StringRes confirm: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(title)) },
+        text = { Text(stringResource(body)) },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = DestructiveRed, contentColor = Color.White),
+            ) { Text(stringResource(confirm)) }
+        },
+    )
+}
+
+/** Current, new, confirmation; checked in 2.7.1's order before anything reaches the vault. */
+@Composable
+private fun ChangePasswordDialog(onChange: (current: String, new: String) -> Unit, onDismiss: () -> Unit) {
+    var current by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var problem by remember { mutableStateOf<ChangeProblem?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.change_password_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasswordField(current, { current = it }, stringResource(R.string.change_password_current_label), leadingIcon = null)
+                PasswordField(new, { new = it }, stringResource(R.string.change_password_new_label), leadingIcon = null)
+                PasswordField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it },
+                    label = stringResource(R.string.change_password_confirm_label),
+                    leadingIcon = null,
+                )
+                problem?.let { Text(stringResource(changeProblemLabel(it)), color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = {
+                problem = SettingsViewModel.checkChange(current, new, confirmation)
+                if (problem == null) onChange(current, new)
+            }) { Text(stringResource(R.string.change_password_cta)) }
+        },
+    )
+}
+
+@Composable
+private fun ReauthDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.reauth_title)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.reauth_body), fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                PasswordField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(R.string.change_password_current_label),
+                    leadingIcon = null,
+                    onImeAction = { if (password.isNotEmpty()) onConfirm(password) },
+                )
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = { onConfirm(password) }, enabled = password.isNotEmpty()) { Text(stringResource(R.string.action_continue)) }
+        },
+    )
+}
+
+/** An Argon2id derivation runs: nothing to tap until it is over (2.7.1's spinner). */
+@Composable
+private fun BusyDialog() {
+    Dialog(onDismissRequest = {}, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
+        Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+    }
+}
+
+private fun themeLabel(theme: AppPreferences.Theme): Int = when (theme) {
+    AppPreferences.Theme.SYSTEM -> R.string.settings_theme_system
+    AppPreferences.Theme.LIGHT -> R.string.settings_theme_light
+    AppPreferences.Theme.DARK -> R.string.settings_theme_dark
+}
+
+/** "System (auto)" first, then the languages this build carries, as 2.7.1 offered them. */
+private val LANGUAGE_CHOICES = listOf(AppLanguage.SYSTEM) + AppLanguage.CODES
+
+/**
+ * Android 13 and above rebuild the activity themselves once the system's per-app language changes;
+ * below, nothing would happen without the [Activity.recreate], and the screen would sit in the old
+ * language with the new one ticked beside it.
+ */
+private fun chooseLanguage(context: Context, activity: Activity?, code: String) {
+    AppLanguage.choose(context, code)
+    if (AppLanguage.needsRecreate) activity?.recreate()
+}
+
+/**
+ * Each language in its own words. The fallback is deliberately not silent-looking: a code offered
+ * without a name of its own would show "System (auto)" with a tick beside it, which reads as broken
+ * — and `StringsParityTest` holds [AppLanguage.CODES] to one name each so it cannot ship.
+ */
+private fun languageLabel(code: String): Int = when (code) {
+    "en" -> R.string.settings_language_en
+    "fr" -> R.string.settings_language_fr
+    "de" -> R.string.settings_language_de
+    "it" -> R.string.settings_language_it
+    "es" -> R.string.settings_language_es
+    else -> R.string.settings_language_system
+}
+
+private fun themeIcon(theme: AppPreferences.Theme): ImageVector = when (theme) {
+    AppPreferences.Theme.SYSTEM -> Icons.Outlined.SettingsBrightness
+    AppPreferences.Theme.LIGHT -> Icons.Outlined.LightMode
+    AppPreferences.Theme.DARK -> Icons.Outlined.DarkMode
+}
+
+/** The labels of [AppPreferences.CLIPBOARD_CHOICES], in the same order. */
+private val CLIPBOARD_LABELS = AppPreferences.CLIPBOARD_CHOICES.zip(
+    listOf(
+        R.string.settings_clipboard_15s,
+        R.string.settings_clipboard_30s,
+        R.string.settings_clipboard_60s,
+        R.string.settings_clipboard_never,
+    ),
+).toMap()
+
+/** The labels of [AppPreferences.AUTO_LOCK_CHOICES], in the same order. */
+private val AUTO_LOCK_LABELS = AppPreferences.AUTO_LOCK_CHOICES.zip(
+    listOf(
+        R.string.settings_auto_lock_immediate,
+        R.string.settings_auto_lock_1min,
+        R.string.settings_auto_lock_5min,
+        R.string.settings_auto_lock_15min,
+        R.string.settings_auto_lock_30min,
+        R.string.settings_auto_lock_never,
+    ),
+).toMap()
+
+private fun clipboardLabel(seconds: Int): Int = CLIPBOARD_LABELS.getValue(seconds)
+
+private fun autoLockLabel(seconds: Int): Int = AUTO_LOCK_LABELS.getValue(seconds)
+
+/**
+ * The system picker, both ways: one document to read, one to create. The app never browses storage,
+ * and nothing it exports stays behind in its own files (Patrice, 2026-09-22).
+ *
+ * Every launch is announced to the auto-lock first: the trip out of the app is one the owner asked for.
+ */
+@Composable
+private fun FilePickers(settings: SettingsViewModel, openImport: MutableState<Boolean>) {
+    val untitled = stringResource(R.string.import_untitled_entry)
+    val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { settings.importFrom(it, untitled) }
+    }
+    val saveBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BACKUP_MIME)) { uri ->
+        uri?.let { settings.saveTo(SettingsViewModel.Kind.BACKUP, it) }
+    }
+    val savePlain = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(PLAIN_MIME)) { uri ->
+        uri?.let { settings.saveTo(SettingsViewModel.Kind.PLAIN, it) }
+    }
+    LaunchedEffect(settings) {
+        settings.saveRequests.collect { request ->
+            settings.expectFilePicker()
+            when (request.kind) {
+                SettingsViewModel.Kind.BACKUP -> saveBackup.launch(request.suggestedName)
+                SettingsViewModel.Kind.PLAIN -> savePlain.launch(request.suggestedName)
+            }
+        }
+    }
+    if (openImport.value) {
+        openImport.value = false
+        settings.expectFilePicker()
+        // Any type: a CSV, a JSON export or a .ptbak, whatever the phone calls them.
+        importFile.launch(arrayOf("*/*"))
+    }
+}
+
+/** 2.7.1's passphrase dialog: one field to open a backup, two to make one. */
+@Composable
+private fun PassphraseDialog(
+    @StringRes title: Int,
+    @StringRes helper: Int,
+    @StringRes cta: Int,
+    confirm: Boolean,
+    onValid: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var passphrase by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var problem by remember { mutableStateOf<Int?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(helper), fontSize = 13.sp)
+                PasswordField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = stringResource(if (confirm) R.string.passphrase_label_min else R.string.passphrase_label),
+                    leadingIcon = null,
+                )
+                if (confirm) {
+                    PasswordField(
+                        value = confirmation,
+                        onValueChange = { confirmation = it },
+                        label = stringResource(R.string.passphrase_confirm_label),
+                        leadingIcon = null,
+                    )
+                }
+                problem?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(onClick = {
+                problem = checkPassphrase(passphrase, confirmation, confirm)
+                if (problem == null) onValid(passphrase)
+            }) { Text(stringResource(cta)) }
+        },
+    )
+}
+
+/** 2.7.1's order: something typed, then long enough, then the two match. */
+private fun checkPassphrase(passphrase: String, confirmation: String, confirm: Boolean): Int? = when {
+    passphrase.isEmpty() -> R.string.passphrase_error_empty
+    confirm && passphrase.length < PASSPHRASE_MIN -> R.string.passphrase_error_min
+    confirm && passphrase != confirmation -> R.string.passphrase_error_mismatch
+    else -> null
+}
+
+/** How many entries were read, and in which format, before anything touches the vault. */
+@Composable
+private fun ImportConfirmDialog(pending: SettingsViewModel.Pending.Confirm, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val resources = LocalResources.current
+    val format = stringResource(formatLabel(pending.format))
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.import_confirm_title)) },
+        text = { Text(resources.getQuantityString(R.plurals.import_confirm_body, pending.entries.size, pending.entries.size, format)) },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.import_cta)) } },
+    )
+}
+
+/** 2.7.1's red warning before an export nothing protects. */
+@Composable
+private fun PlainExportWarningDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = colors.error, modifier = Modifier.size(40.dp)) },
+        title = {
+            Text(
+                text = stringResource(R.string.export_plain_dialog_title),
+                color = colors.error,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = stringResource(R.string.export_plain_warning_headline),
+                    color = colors.error,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.export_plain_warning_bullet1), fontSize = 13.sp)
+                Text(stringResource(R.string.export_plain_warning_bullet2), fontSize = 13.sp)
+                Text(stringResource(R.string.export_plain_warning_bullet3), fontSize = 13.sp)
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.export_plain_warning_tip), fontStyle = FontStyle.Italic, fontSize = 13.sp)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = DestructiveRed, contentColor = Color.White),
+            ) { Text(stringResource(R.string.export_plain_confirm)) }
+        },
+    )
+}
+
+/**
+ * "3 entries imported • 1 duplicate ignored", from two plurals. Nothing imported has its own string: in
+ * French the plural rule reads 0 as one, and the message would say "1 entree importee" for none.
+ */
+private fun importedText(resources: Resources, message: Message.Imported): String {
+    val suffix = if (message.skipped > 0) {
+        resources.getQuantityString(R.plurals.import_skipped_suffix, message.skipped, message.skipped)
+    } else {
+        ""
+    }
+    return if (message.added == 0) {
+        resources.getString(R.string.import_done_none, suffix)
+    } else {
+        resources.getQuantityString(R.plurals.import_done, message.added, message.added, suffix)
+    }
+}
+
+private fun formatLabel(format: ImportParser.Format?): Int = when (format) {
+    ImportParser.Format.CSV -> R.string.import_format_csv
+    ImportParser.Format.BITWARDEN -> R.string.import_format_bitwarden
+    ImportParser.Format.PASS_TECH -> R.string.import_format_pass_tech
+    // No format: the entries came out of an encrypted backup.
+    else -> R.string.import_format_encrypted_backup
+}
+
+private fun importProblemLabel(problem: ImportParser.Problem): Int = when (problem) {
+    ImportParser.Problem.TOO_LARGE -> R.string.import_error_too_large
+    ImportParser.Problem.EMPTY_FILE -> R.string.import_error_empty_file
+    ImportParser.Problem.JSON_UNKNOWN_FORMAT -> R.string.import_error_json_unknown
+    ImportParser.Problem.JSON_INVALID -> R.string.import_error_json_invalid
+    ImportParser.Problem.CSV_INVALID -> R.string.import_error_csv_invalid
+    ImportParser.Problem.CSV_EMPTY -> R.string.import_error_csv_empty
+    ImportParser.Problem.CSV_NO_PASSWORD_COLUMN -> R.string.import_error_csv_no_password_column
+    ImportParser.Problem.FIELD_TOO_LARGE -> R.string.import_error_field_too_large
+}
+
+private const val BACKUP_MIME = "application/octet-stream"
+private const val PLAIN_MIME = "application/json"
+private const val PASSPHRASE_MIN = 12
+
+private fun changeProblemLabel(problem: ChangeProblem): Int = when (problem) {
+    ChangeProblem.CURRENT_REQUIRED -> R.string.change_password_error_current_required
+    ChangeProblem.TOO_SHORT -> R.string.setup_error_min
+    ChangeProblem.TOO_WEAK -> R.string.password_too_weak
+    ChangeProblem.MISMATCH -> R.string.setup_error_mismatch
+}

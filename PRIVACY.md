@@ -1,20 +1,16 @@
 # Privacy policy — Pass Tech
 
-The privacy policy is the one displayed in the app (About → Privacy policy):
+The policy that applies is the one shipped inside the app, which the app itself displays: it reads
+with no network, and it is the copy that came with the version installed.
 
-- English: [assets/legal/PRIVACY.en.md](assets/legal/PRIVACY.en.md)
-- Français : [assets/legal/PRIVACY.fr.md](assets/legal/PRIVACY.fr.md)
-- Deutsch: [assets/legal/PRIVACY.de.md](assets/legal/PRIVACY.de.md)
-- Italiano: [assets/legal/PRIVACY.it.md](assets/legal/PRIVACY.it.md)
-- Español: [assets/legal/PRIVACY.es.md](assets/legal/PRIVACY.es.md)
+- English: [app/src/main/assets/legal/PRIVACY.en.md](app/src/main/assets/legal/PRIVACY.en.md)
+- Français : [app/src/main/assets/legal/PRIVACY.fr.md](app/src/main/assets/legal/PRIVACY.fr.md)
+- Deutsch: [app/src/main/assets/legal/PRIVACY.de.md](app/src/main/assets/legal/PRIVACY.de.md)
+- Italiano: [app/src/main/assets/legal/PRIVACY.it.md](app/src/main/assets/legal/PRIVACY.it.md)
+- Español: [app/src/main/assets/legal/PRIVACY.es.md](app/src/main/assets/legal/PRIVACY.es.md)
 
-Any other language falls back to English.
+Any other language reads the English one, and the app says so on the screen rather than leaving the
+reader to wonder.
 
-Only those five files are maintained, so the repository and the app cannot say
-different things. They had diverged: until v2.7.0 this page was a separate copy,
-and the one shipped to users declared a `CAMERA` permission the app does not
-have, for a QR scanner removed in v2.6.0.
-
-The permission table is section 10 of each file. It is the one to update when
-`.github/workflows/promesses.yml` reports that the APK permission surface has
-changed.
+For the earlier Flutter versions (2.x, `com.passtech.pass_tech`), the policy in force is the one
+shipped with them.

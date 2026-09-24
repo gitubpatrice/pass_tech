@@ -1,0 +1,138 @@
+# detekt configuration for Pass Tech (Kotlin rewrite).
+#
+# Built upon the default configuration (`buildUponDefaultConfig = true`): everything not listed here
+# keeps detekt's default. Blocking, with no baseline: `maxIssues: 0`.
+#
+# Every deviation from the defaults below says why. A deviation that cannot say why does not belong
+# here: it belongs in the code, as a targeted @Suppress with its reason on the spot.
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+comments:
+  active: true
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false
+
+complexity:
+  active: true
+  LongParameterList:
+    active: true
+    # A stateless Compose "...Content" function takes one lambda per user action. Hoisting them into a
+    # holder object would only move the list somewhere the compiler checks less.
+    functionThreshold: 12
+    # A view model's constructor is its injection point: every parameter is one collaborator Dagger
+    # checks at compile time. Packing them into a holder would hide them from that check without
+    # removing a single dependency.
+    constructorThreshold: 9
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    active: true
+    # Composables are declarative trees: their length is layout, not branching. The threshold stays at
+    # the default everywhere else.
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    active: true
+    ignorePrivate: true
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: true
+    # Keystore and cipher calls fail through a zoo of exception types (KeyStoreException,
+    # ProviderException, InvalidKeyException, IllegalStateException...), several of them unchecked.
+    # Catching `Exception` at those boundaries is the correct shape; catching Throwable or Error is not,
+    # and stays forbidden.
+    exceptionNames:
+      - ArrayIndexOutOfBoundsException
+      - Error
+      - IllegalMonitorStateException
+      - IndexOutOfBoundsException
+      - NullPointerException
+      - Throwable
+
+naming:
+  active: true
+  # The application id is `com.filestech.pass_tech`, underscore included, as for notes_tech and
+  # agenda_tech. The rule is taught the real name rather than silenced.
+  PackageNaming:
+    active: true
+    packagePattern: '[a-z]+(\.[a-z][A-Za-z0-9_]*)*'
+  FunctionNaming:
+    active: true
+    # @Composable functions are PascalCase by Compose convention.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+    propertyPattern: '[A-Za-z][_A-Za-z0-9]*'
+    privatePropertyPattern: '_?[A-Za-z][_A-Za-z0-9]*'
+
+style:
+  active: true
+  ReturnCount:
+    active: true
+    # The file readers and the vault checks exit early at every failed check: that is how "fail
+    # closed" reads best. A guard clause at the top of a function does not count. Past three, the
+    # function is split, or it uses the single-exit rejection of core/json/FileRejected.kt.
+    max: 3
+    excludeGuardClauses: true
+  MagicNumber:
+    active: true
+    # Compose layout is written in literal dp and sp (`16.dp`): those numbers ARE the design, and
+    # naming each of them would only add indirection. Everywhere else, including every size and count
+    # in the crypto code, a number gets a name.
+    ignoreAnnotated: ['Composable', 'Preview']
+    ignoreExtensionFunctions: true
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  WildcardImport:
+    active: true
+  UnusedPrivateMember:
+    active: true
+  UnusedImports:
+    active: true
+
+formatting:
+  active: true
+  android: true
+  autoCorrect: false
+  # MaxLineLength above already covers this, with the same limit.
+  MaximumLineLength:
+    active: false
+  # ONE line length for the whole configuration: 140, the style.MaxLineLength above. The ktlint rules
+  # wrapped in detekt-formatting default to 120 (100 with `android: true`), so a line detekt accepts
+  # was then reported as "Argument should be on a separate line" by its own formatting set.
+  ArgumentListWrapping:
+    maxLineLength: 140
+  ContextReceiverMapping:
+    maxLineLength: 140
+  FunctionReturnTypeSpacing:
+    maxLineLength: 140
+  FunctionSignature:
+    maxLineLength: 140
+  ParameterListWrapping:
+    maxLineLength: 140
+  ParameterWrapping:
+    maxLineLength: 140
+  PropertyWrapping:
+    maxLineLength: 140
+  Wrapping:
+    maxLineLength: 140
+  # ktlint's package-name rule hard-codes "no underscore" with no configurable pattern: it duplicates
+  # naming.PackageNaming above, which knows the real application id.
+  PackageName:
+    active: false

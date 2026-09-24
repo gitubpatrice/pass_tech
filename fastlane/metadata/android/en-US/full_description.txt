@@ -1,35 +1,60 @@
-Pass Tech is a 100% local password manager for Android. No cloud, no
-account, no server, no tracker, no ads.
+Pass Tech keeps your passwords on your phone and nowhere else. No account, no
+server of ours, no cloud, no tracker, no advertising.
 
-<b>Cryptography (v4)</b>
-* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
-* AES-256-GCM with anti-downgrade AAD
-* KEK Keystore-bound (StrongBox/TEE) with HKDF-SHA256
-* CSPRNG via Random.secure
-* Constant-time HMAC verifier
-* Exponential brute-force lockout (1, 2, 4, 8, 16 minutes) backed by a
-  monotonic clock (anti root rollback)
+<b>The vault</b>
+* AES-256-GCM. The key comes from your master password through Argon2id
+  (19 MiB of memory, 2 passes — the OWASP 2024 baseline for mobile) and from a
+  key held in the phone's secure chip, which takes part in every single
+  attempt: a copy of the vault carried to another machine cannot be attacked
+  there.
+* Your master password is never stored, in any form. It cannot be recovered —
+  not by us, not by anyone.
+* Five free attempts, then a wait that grows from 30 seconds to 30 minutes,
+  counted in a file so it survives a restart.
+* Fingerprint unlock, its key in the Android Keystore, destroyed if the
+  fingerprints on the phone change.
+* Locks itself when you leave it. No screenshot and no preview in the list of
+  recent apps.
+* Left out of Android's cloud backup and of phone-to-phone transfer: the only
+  copy that exists is the one you make.
 
-<b>Privacy</b>
-* Anti-phishing per-domain check (minimal AccessibilityService)
-* Decoy vault for plausible deniability (timing-aligned coercion mode)
-* Panic mode: instant lock, biometrics disarmed, cached exports shredded
-* Launcher camouflage (icon disguised as Calculator)
-* Dead-man's switch (post-inactivity inheritance)
-* FLAG_SECURE active by default on password / card / identity entries
-  (toggleable per Settings since v2.3.11) — Notes entries relax
-  FLAG_SECURE so Samsung Knox doesn't hide the clipboard suggestion
-* INTERNET permission used only for anonymous GitHub Releases update
-  check; no data collection
+<b>If someone makes you open it</b>
+* Decoy vault: a second password opens a second vault with its own entries, and
+  nothing on the phone says whether you have one.
+* Panic mode: locks, clears the clipboard, disarms the fingerprint, withdraws
+  the address check and turns the app into a calculator that really works.
+  Nothing is deleted.
+* Heir access: someone you choose opens a read-only snapshot of your vault
+  after a long enough silence on your side. On the phone, with no cloud and no
+  third party.
+
+<b>What it holds</b>
+Passwords, bank cards and secure notes. Two-factor codes generated here, from a
+pasted otpauth:// link. Search and sort. A generator for passwords, and for
+passphrases drawn from a word list in the language the app is showing.
+
+<b>What it watches for you</b>
+* A security audit of the vault: what is weak, what is reused, what has no
+  second factor.
+* A breach check you start yourself, which never sends the password — only the
+  first five characters of its fingerprint, shared by tens of thousands of
+  others.
+* An address check: before a password is copied, it compares the site open in
+  your browser with the ones the entry declares, and holds the copy back when
+  none of them matches. It uses an Android accessibility service that is off
+  until you ask for it, reads the address bar of the browsers it knows and
+  nothing else, and keeps what it reads in memory for fifteen seconds.
+
+<b>The two times it uses the network</b>
+Asking GitHub whether a newer version has been published, at most twice a day,
+and the breach check above. Neither carries anything you typed, and both stop
+entirely while the app is disguised.
 
 <b>Languages</b>
-English, French, German, Italian and Spanish — your pick in Settings,
-independent of the device language.
+English, French, German, Italian and Spanish, picked in the app whatever the
+phone is set to.
 
-<b>Audit (v2.3.8 → v2.4.0)</b>
-Zero-vuln zero-flaw expert audit: A1-A20 + B1-B24 findings closed.
-Dynamic FLAG_SECURE via Kotlin MethodChannel with refcount, shared
-MonotonicClock service, PackageInfo-driven version display, sensitive
-controllers cleared/disposed, panic phishing-snapshot purge.
-
-<b>Open source</b> Apache 2.0 — full source on GitHub.
+<b>Open source</b>
+Apache License 2.0. The whole source is on GitHub, and every release publishes
+the SHA-256 of each file it carries, so you can check that what you installed
+is what was published.

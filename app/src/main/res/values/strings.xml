@@ -1,0 +1,688 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The product name is not translated. -->
+    <string name="app_name" translatable="false">Pass Tech</string>
+
+    <!-- Wording carried over from the Flutter app (2.7.1, lib/l10n/app_en.arb) unless noted. -->
+
+    <!-- Splash, first launch only -->
+    <string name="splash_tagline">Maximum protection for your passwords.</string>
+    <string name="splash_skip_hint">Tap the screen to continue</string>
+    <string name="splash_skip_label">Continue</string>
+    <string name="splash_logo_content_description">Pass Tech logo</string>
+
+    <!-- Password fields -->
+    <string name="show_password">Show password</string>
+    <string name="hide_password">Hide password</string>
+    <string name="strength_weak">Weak</string>
+    <string name="strength_medium">Medium</string>
+    <string name="strength_strong">Strong</string>
+    <string name="strength_very_strong">Very strong</string>
+
+    <!-- Vault creation -->
+    <string name="setup_title">Create your vault</string>
+    <string name="setup_subtitle">Pick a strong master password.\nIt encrypts all your data locally.</string>
+    <string name="setup_master_label">Master password</string>
+    <string name="setup_master_helper">Minimum 12 characters</string>
+    <string name="setup_confirm_label">Confirm password</string>
+    <string name="setup_create_cta">Create vault</string>
+    <string name="setup_encrypting">Encrypting…</string>
+    <string name="setup_error_min">Minimum 12 characters</string>
+    <string name="password_too_weak">Password too guessable — avoid repetition, sequences and common words. Make it longer rather than adding symbols.</string>
+    <string name="setup_error_mismatch">Passwords do not match</string>
+    <string name="setup_warning">This password cannot be recovered. If you forget it, your data will be inaccessible.</string>
+    <!-- New in 3.0.0: no slot is provably free. Deliberately says nothing more. -->
+    <string name="setup_error_impossible">A vault cannot be created on this phone.</string>
+
+    <string name="backup_reminder_title">Remember your backup</string>
+    <string name="backup_reminder_body">Your vault exists only on this phone. No cloud, no account, no recovery: losing the phone or forgetting the master password means losing the data.\n\nAs soon as you have entered your first items, export an encrypted backup (.ptbak) from Settings → Data. It is the only safety net there is.</string>
+    <string name="action_ok">OK</string>
+
+    <!-- Unlock -->
+    <string name="unlock_master_label">Master password</string>
+    <string name="unlock_enter_master">Enter your master password</string>
+    <string name="unlock_too_many_attempts">Too many attempts — locked</string>
+    <string name="unlock_try_again_in">Try again in</string>
+    <string name="unit_seconds_short">%1$ds</string>
+    <string name="unit_minutes_short">%1$dmin</string>
+    <string name="unit_minutes_seconds_short">%1$dmin %2$ds</string>
+    <string name="unlock_cta">Unlock</string>
+    <string name="unlock_decrypting">Decrypting…</string>
+    <string name="unlock_wrong_password">Wrong password</string>
+
+    <!-- New in 3.0.0: the secure hardware did not answer. Never "wrong password" (design v2.2). -->
+    <string name="keystore_unavailable">The phone\'s security chip did not answer. Please try again.</string>
+
+    <!-- Home -->
+    <string name="home_tooltip_lock">Lock</string>
+    <string name="home_empty_no_entry">No entry</string>
+
+    <!-- Entries: home list, add sheet, editor, detail -->
+    <string name="action_add">Add</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_favorite">Favorite</string>
+    <string name="action_remove">Remove</string>
+    <string name="home_empty_hint">Tap + to add</string>
+    <string name="home_add_sheet_title">Which type of entry?</string>
+    <string name="home_add_password">Password</string>
+    <string name="home_add_password_sub">Login and password for an account</string>
+    <string name="home_add_note">Secure note</string>
+    <string name="home_add_note_sub">Encrypted confidential text</string>
+    <string name="home_add_card">Bank card</string>
+    <string name="home_add_card_sub">Number, CVV, expiry, PIN</string>
+    <string name="home_delete_title">Delete?</string>
+    <string name="home_delete_confirm">Delete \"%1$s\" permanently?</string>
+    <string name="home_deleted_snack">\"%1$s\" deleted</string>
+    <string name="category_web">Web</string>
+    <string name="category_email">Email</string>
+    <string name="category_bank">Bank</string>
+    <string name="category_social">Social media</string>
+    <string name="category_apps">Apps</string>
+    <string name="category_cards">Cards</string>
+    <string name="category_other">Other</string>
+    <string name="entry_type_password">Password</string>
+    <string name="entry_type_note">Secure note</string>
+    <string name="entry_type_card">Bank card</string>
+    <string name="entry_edit_title_edit">Edit</string>
+    <!-- 2.7.1 composed "New {type}", which gave "Nouveau note" in French: one title per type instead. -->
+    <string name="entry_edit_title_new_password">New password</string>
+    <string name="entry_edit_title_new_note">New secure note</string>
+    <string name="entry_edit_title_new_card">New bank card</string>
+    <string name="entry_edit_add_favorite">Add to favorites</string>
+    <string name="entry_edit_remove_favorite">Remove from favorites</string>
+    <string name="entry_edit_category">Category</string>
+    <string name="entry_edit_save">Save</string>
+    <string name="entry_edit_saving">Saving…</string>
+    <string name="entry_edit_title_required">Title is required</string>
+    <string name="entry_edit_secret_added">2FA secret added ✓</string>
+    <string name="entry_edit_discard_title">Discard changes?</string>
+    <string name="entry_edit_discard_body">What you have just typed has not been saved and will be lost.</string>
+    <string name="entry_edit_discard_keep">Keep editing</string>
+    <string name="entry_edit_discard_confirm">Discard</string>
+    <string name="entry_edit_field_title_required">Title *</string>
+    <string name="entry_edit_hint_title_password">e.g. Google, Netflix, BNP…</string>
+    <string name="entry_edit_hint_title_note">e.g. Wi-Fi code, IBAN, recovery key…</string>
+    <string name="entry_edit_hint_title_card">e.g. Visa BNP, Mastercard pro…</string>
+    <string name="entry_edit_field_username">Username</string>
+    <string name="entry_edit_hint_username">Email, username…</string>
+    <string name="entry_edit_field_password">Password</string>
+    <string name="entry_edit_field_url_optional">URL (optional)</string>
+    <string name="entry_edit_hint_url">https://…</string>
+    <string name="entry_edit_field_other_domains_optional">Other domains (optional)</string>
+    <string name="entry_edit_hint_other_domains">login.microsoftonline.com</string>
+    <string name="entry_edit_helper_other_domains">The other addresses where this same account signs in: a Microsoft or Apple sign-in page, a company SSO, another country\'s extension. One per line, %1$d at most. The domain check accepts them like the URL above.</string>
+    <string name="entry_edit_refused_domain">Refused a moment ago</string>
+    <string name="entry_edit_refused_domain_add">Add</string>
+    <string name="entry_edit_field_2fa_optional">2FA code — TOTP secret (optional)</string>
+    <string name="entry_edit_hint_2fa">Paste the otpauth:// URI or the Base32 key</string>
+    <string name="entry_edit_helper_2fa">Generates 6-digit codes. Paste the otpauth:// URI shown below the service\'s QR code — the secret is extracted automatically.</string>
+    <string name="entry_edit_field_notes_optional">Notes (optional)</string>
+    <string name="entry_edit_hint_notes">Additional information…</string>
+    <string name="entry_edit_field_content">Content</string>
+    <string name="entry_edit_hint_note_content">Confidential encrypted text…</string>
+    <string name="entry_edit_field_cardholder">Cardholder name</string>
+    <string name="entry_edit_hint_cardholder">First Last</string>
+    <string name="entry_edit_field_card_number">Card number</string>
+    <string name="entry_edit_hint_card_number">0000 0000 0000 0000</string>
+    <string name="entry_edit_field_expiry">Expiry</string>
+    <string name="entry_edit_hint_expiry">MM/YY</string>
+    <string name="entry_edit_field_cvv">CVV</string>
+    <string name="entry_edit_hint_cvv">000</string>
+    <string name="entry_edit_field_pin_optional">PIN code (optional)</string>
+    <string name="entry_edit_hint_pin">0000</string>
+    <string name="entry_edit_field_issuer_optional">Bank / Issuer (optional)</string>
+    <string name="entry_edit_hint_issuer">BNP Paribas, Boursorama, N26…</string>
+    <string name="entry_edit_hint_card_notes">Limit, card type…</string>
+    <string name="totp_error_empty">Empty secret</string>
+    <string name="totp_error_invalid_chars">Invalid characters (Base32 expected)</string>
+    <string name="totp_error_too_short">Secret too short</string>
+    <string name="entry_detail_copied_snack">%1$s copied — cleared in %2$ds</string>
+    <!-- 2.7.1 said "cleared in 0s" when the setting is "never". -->
+    <string name="entry_detail_copied_snack_kept">%1$s copied</string>
+    <string name="entry_detail_favorite_tooltip">Favorite</string>
+    <string name="entry_detail_edit_tooltip">Edit</string>
+    <string name="entry_detail_delete_tooltip">Delete</string>
+    <string name="entry_detail_created_at">Created on %1$s</string>
+    <string name="entry_detail_updated_at">Updated on %1$s</string>
+    <string name="entry_detail_field_username">Username</string>
+    <string name="entry_detail_field_password">Password</string>
+    <string name="entry_detail_copy_tooltip">Copy</string>
+    <string name="entry_detail_field_2fa_totp">2FA code — TOTP</string>
+    <string name="entry_detail_field_2fa_code">2FA code</string>
+    <string name="entry_detail_field_url">URL</string>
+    <string name="entry_detail_field_other_domains">Other domains</string>
+    <string name="entry_detail_field_notes">Notes</string>
+    <string name="entry_detail_field_content">Content</string>
+    <string name="entry_detail_copy_notes_tooltip">Copy notes</string>
+    <string name="entry_detail_note_empty">(empty)</string>
+    <string name="entry_detail_field_holder">Cardholder</string>
+    <string name="entry_detail_field_number">Number</string>
+    <string name="entry_detail_field_card_number_copy">Card number</string>
+    <string name="entry_detail_field_expiry">Expiry</string>
+    <string name="entry_detail_field_cvv">CVV</string>
+    <string name="entry_detail_field_pin">PIN code</string>
+    <string name="entry_detail_field_pin_copy">PIN</string>
+    <string name="entry_detail_field_issuer">Bank</string>
+    <string name="entry_detail_toggle_visibility">Show / hide</string>
+    <string name="entry_detail_card_label">CARD</string>
+    <string name="entry_detail_card_holder_label">CARDHOLDER</string>
+    <string name="entry_detail_card_expiry_label">EXPIRES</string>
+
+    <!-- Home toolbar, filters and generator -->
+    <string name="home_search_hint">Search…</string>
+    <string name="home_search_open">Search</string>
+    <string name="home_search_close">Close the search</string>
+    <string name="home_search_clear">Clear</string>
+    <string name="home_empty_no_result">No result</string>
+    <string name="home_tooltip_generator">Generator</string>
+    <string name="home_tooltip_sort">Sort</string>
+    <string name="home_filter_all">All</string>
+    <string name="home_filter_favorites">Favorites</string>
+    <string name="home_filter_passwords">Passwords</string>
+    <string name="home_filter_notes">Notes</string>
+    <string name="home_filter_cards">Bank cards</string>
+    <string name="home_sort_recent">Recent</string>
+    <string name="home_sort_oldest">Oldest</string>
+    <string name="home_sort_alpha">A → Z</string>
+    <string name="home_sort_alpha_desc">Z → A</string>
+    <string name="home_entry_count_none">No entry</string>
+    <string name="generator_title">Generator</string>
+    <string name="generator_use">Use</string>
+    <string name="generator_strength_suffix">%1$s · %2$d bits</string>
+    <string name="generator_generate">Generate</string>
+    <string name="generator_copy">Copy</string>
+    <string name="generator_copied_snack">Copied ✓</string>
+    <string name="generator_mode_chars">Characters</string>
+    <string name="generator_mode_phrase">Phrase</string>
+    <string name="generator_length">Length: %1$d</string>
+    <string name="generator_chars_header">Characters</string>
+    <string name="generator_chars_upper">A–Z  Uppercase</string>
+    <string name="generator_chars_lower">a–z  Lowercase</string>
+    <string name="generator_chars_digits">0–9  Digits</string>
+    <string name="generator_chars_symbols">!@#  Symbols</string>
+    <string name="generator_phrase_words">Number of words: %1$d</string>
+    <string name="generator_options_header">Options</string>
+    <string name="generator_phrase_append_number">Append a number 10–99</string>
+    <string name="generator_phrase_separator">Separator</string>
+    <string name="generator_phrase_hint">A passphrase is easier to remember than a complex password, and can be just as strong.</string>
+    <string name="entry_edit_tooltip_generate">Generate</string>
+    <!-- 0 has its own string: "No entry", as 2.7.1's ICU =0 case. -->
+    <plurals name="home_entry_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+
+    <!-- Settings -->
+    <string name="action_settings">Settings</string>
+    <string name="action_more">More options</string>
+    <string name="action_disable">Disable</string>
+    <string name="action_continue">Continue</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_clipboard">Clipboard</string>
+    <string name="settings_section_security">Security</string>
+    <string name="settings_section_danger">Danger zone</string>
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_choose_title">Choose theme</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_system">System (auto)</string>
+    <!--
+      Each language named in its own words, as 2.7.1 named them: someone looking for their language
+      is looking for the word they use for it. Not translated, and not computed from the locale
+      either — what an Android build's ICU data answers for "es" is not something this list should
+      depend on.
+    -->
+    <string name="settings_language_en" translatable="false">English</string>
+    <string name="settings_language_fr" translatable="false">Français</string>
+    <string name="settings_language_de" translatable="false">Deutsch</string>
+    <string name="settings_language_it" translatable="false">Italiano</string>
+    <string name="settings_language_es" translatable="false">Español</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_clipboard_title">Auto-clear</string>
+    <string name="settings_clipboard_dialog_title">Clear clipboard after</string>
+    <string name="settings_clipboard_15s">15 seconds</string>
+    <string name="settings_clipboard_30s">30 seconds</string>
+    <string name="settings_clipboard_60s">60 seconds</string>
+    <string name="settings_clipboard_never">Never</string>
+    <string name="settings_screenshot_protection_title">Block screenshots</string>
+    <string name="settings_screenshot_protection_subtitle">Enabled by default (recommended). Blocks screenshots, screen recording, Recent Apps thumbnail and external display projection. Disable ONLY if you need to paste text from another app on Samsung — Knox blocks the cross-app clipboard when protection is active.</string>
+    <string name="settings_screenshot_protection_confirm_off_title">Disable protection?</string>
+    <string name="settings_screenshot_protection_confirm_off_body">Without protection, your passwords may appear in screenshots, the Recent Apps preview and screen recordings. Use only temporarily to paste text from another app.</string>
+    <string name="settings_change_master_title">Change master password</string>
+    <string name="settings_auto_lock_title">Auto-lock</string>
+    <string name="settings_auto_lock_dialog_title">Lock the app after</string>
+    <string name="settings_auto_lock_immediate">Immediately</string>
+    <string name="settings_auto_lock_1min">1 minute</string>
+    <string name="settings_auto_lock_5min">5 minutes</string>
+    <string name="settings_auto_lock_15min">15 minutes</string>
+    <string name="settings_auto_lock_30min">30 minutes</string>
+    <string name="settings_auto_lock_never">Never</string>
+    <string name="settings_lock_now">Lock now</string>
+    <string name="settings_delete_all_title">Delete all data</string>
+    <string name="settings_delete_all_subtitle">Irreversible action</string>
+    <string name="settings_delete_all_dialog_title">Delete all data?</string>
+    <string name="settings_delete_all_dialog_body">All your entries and the vault will be permanently deleted.</string>
+    <string name="settings_delete_all_confirm">Delete everything</string>
+    <string name="reauth_title">Confirm your identity</string>
+    <string name="reauth_body">Enter your master password to continue.</string>
+    <string name="change_password_dialog_title">New password</string>
+    <string name="change_password_current_label">Current password</string>
+    <string name="change_password_new_label">New password (min. 12)</string>
+    <string name="change_password_confirm_label">Confirm</string>
+    <string name="change_password_error_current_required">Enter your current password.</string>
+    <string name="change_password_error_wrong_current">Current password is incorrect.</string>
+    <string name="change_password_cta">Change</string>
+    <string name="change_password_done">Password changed ✓</string>
+    <!-- New: the new password opens an existing vault, the current one included. Same words whatever the vault, on purpose. -->
+    <string name="change_password_refused">This password cannot be used. Choose another one.</string>
+    <!-- New: 2.7.1 had no message for a confirmation refused by the lockout. -->
+    <string name="settings_locked_retry">Too many attempts. Try again in %1$s.</string>
+    <!-- Biometrics (2.7.1: unlock_screen.dart, settings_screen.dart) -->
+    <string name="unlock_biometric_cta">Fingerprint / Face ID</string>
+    <string name="unlock_biometric_failed">Biometric failure</string>
+    <string name="unlock_biometric_enrollment_changed">Android fingerprints changed: biometric unlock was disabled for safety. Unlock with your master password, then re-enable biometric in Settings.</string>
+    <string name="unlock_biometric_disarmed">Biometric unlock was disabled. Unlock with your master password, then re-enable biometric in Settings.</string>
+    <string name="biometric_prompt_subtitle">Unlock your vault</string>
+    <string name="settings_biometric_title">Biometric unlock</string>
+    <string name="settings_biometric_subtitle">Fingerprint or Face ID</string>
+    <string name="settings_biometric_enabled">Biometric unlock enabled.</string>
+    <string name="settings_biometric_disabled">Biometric unlock disabled.</string>
+    <string name="settings_biometric_enable_canceled">Biometric activation canceled.</string>
+    <string name="settings_biometric_enable_failed">Biometric activation failed.</string>
+    <string name="settings_biometric_decoy_conflict">Biometric unlock is unavailable on this vault. Only your master password opens it.</string>
+    <string name="settings_biometric_new_enrollment_warning">If you add a new fingerprint or face to Android after enabling biometric unlock, disable and re-enable this option to regenerate the security key. Without this, the new biometric could unlock Pass Tech.</string>
+    <string name="change_password_done_biometric_reset">Password changed. Biometric unlock has been disabled — re-enable it in Settings.</string>
+    <!-- Decoy vault (2.7.1 settings_screen.dart:522-730) -->
+    <string name="settings_section_decoy">Decoy vault (anti-coercion)</string>
+    <string name="decoy_tile_setup">Set up a decoy vault</string>
+    <string name="decoy_tile_configured">Decoy vault set up</string>
+    <string name="decoy_tile_subtitle">A second password opens a fake vault. If someone forces you to open the app, give the fake one.</string>
+    <string name="decoy_dialog_title">Decoy vault</string>
+    <!-- Third bullet reworded for 3.0.0: biometrics stays off for as long as the decoy exists, it is not
+         merely turned off once. -->
+    <string name="decoy_setup_body">A decoy vault is a second, fully separate vault unlocked with a different password.\n\nUse case: if someone forces you to open Pass Tech (border, assault, control), you give the decoy password. The app then shows a fake vault, and nothing in the files on this phone — their names, their sizes, their contents — says a second one exists.\n\nKeep in mind:\n• The decoy password must differ from the real one\n• Fill the decoy with a few credible entries\n• This covers a search of the phone, not the app itself: someone using it can still work out that a slot is taken\n• Biometric unlock will be turned off, and stays off for as long as a decoy exists: the fingerprint opens the real vault directly, which would defeat the decoy</string>
+    <!-- Shown only when a fingerprint opens THIS vault: no vault ever says anything about another (design v2.3 §1). -->
+    <string name="decoy_setup_biometric_warning">Setting up a decoy vault will turn off biometric unlock. The fingerprint opens the real vault directly, so it would defeat the decoy in the very situation the decoy is for. You can still unlock with your master password.</string>
+    <string name="decoy_configure">Set up</string>
+    <string name="decoy_password_dialog_title">Decoy vault password</string>
+    <string name="decoy_password_label">Decoy password (min. 12)</string>
+    <!-- 2.7.1 added "unlock again to continue": it locked the vault, this does not. -->
+    <string name="decoy_configured_snack">Decoy vault set up ✓</string>
+    <string name="decoy_manage_body">The decoy vault is active.\n\nYou can delete it (silent action for the attacker — they will think they mistyped the password).</string>
+    <string name="decoy_delete">Delete the decoy</string>
+    <string name="decoy_deleted_snack">Decoy vault deleted</string>
+    <!-- New in 3.0.0: no slot is provably free. The same words the creation form gives. -->
+    <string name="decoy_error_impossible">A decoy vault cannot be created on this phone.</string>
+
+    <!-- Heir access (2.7.1 heir_view_screen.dart, settings_screen.dart:310-520) -->
+    <string name="heir_dialog_title">Heir access</string>
+    <!--
+      2.7.1 opened with "Owner inactivity period exceeded", because it only showed this once that was
+      true. Here the offer is on every phone (design v2 §8), so nothing it says may depend on whether
+      an heir exists or on whether the owner has gone silent.
+    -->
+    <string name="heir_dialog_body">Enter the heir password you were given.</string>
+    <string name="heir_password_label">Heir password</string>
+    <!-- The same words for a wrong password and for a vault whose owner is still answering. -->
+    <string name="heir_wrong_passphrase">Wrong password</string>
+    <string name="heir_view_title">Heir access (read only)</string>
+    <string name="heir_view_close">Close app</string>
+    <string name="heir_view_empty">Empty snapshot</string>
+    <string name="heir_view_banner_none">You are viewing the vault snapshot shared by its owner. Edits are not possible. No entry.</string>
+    <plurals name="heir_view_banner">
+        <item quantity="one">You are viewing the vault snapshot shared by its owner. Edits are not possible. %1$d entry.</item>
+        <item quantity="other">You are viewing the vault snapshot shared by its owner. Edits are not possible. %1$d entries.</item>
+    </plurals>
+    <string name="heir_view_field_username">Username</string>
+    <string name="heir_view_field_password">Password</string>
+    <string name="heir_view_field_url">URL</string>
+    <string name="heir_view_field_notes">Notes</string>
+
+    <string name="settings_section_heir">Inheritance (dead man\'s switch)</string>
+    <string name="heir_tile_setup">Set up an heir</string>
+    <string name="heir_tile_configured">Heir set up</string>
+    <string name="heir_tile_subtitle_setup">Someone close to you can reach the vault after a long period of inactivity. No cloud, no third party.</string>
+    <string name="heir_tile_subtitle_configured">Tap to update the snapshot or turn it off</string>
+    <!--
+      The last bullet is not 2.7.1's. It claimed the snapshot was detectable, which was true of its
+      single file; here the three exist and look alike, so what a phone shows is that AN heir was set
+      up, never for which vault.
+    -->
+    <string name="heir_setup_body">A password of its own, different from yours, lets someone close to you (partner, child, executor) reach the contents of the vault **after a long period of inactivity** on your part (90 days by default, plus 7 days of grace).\n\nKeep in mind:\n• The heir password must differ from your master password\n• Give it to your heir safely (in person, in a will, in a bank vault) — it is never stored and cannot be recovered\n• The heir reads a snapshot of the vault. Remember to update it from time to time.\n• If you unlock the vault before the grace ends, the countdown starts again.\n• All three snapshots then exist and look alike: nothing says which of your vaults the real one belongs to. That an heir is set up on this phone does show to an examination — for deniability, see the decoy vault.\n\nThis works entirely on the phone, with no cloud and no trusted third party.</string>
+    <string name="heir_configure">Set up</string>
+    <string name="heir_password_prompt_title">Heir password</string>
+    <string name="heir_configured_snack">Heir set up ✓ Vault snapshot encrypted.</string>
+    <string name="heir_vault_empty">The vault is empty — nothing to pass on</string>
+    <string name="heir_manage_title">Manage inheritance</string>
+    <string name="heir_manage_body">The heir reads a snapshot of the vault. You can:\n\n• Update the snapshot (with the heir password)\n• Turn inheritance off and delete the snapshot</string>
+    <string name="heir_disable">Turn off</string>
+    <string name="heir_update">Update</string>
+    <string name="heir_disabled_snack">Inheritance turned off, snapshot deleted</string>
+    <string name="heir_updated_snack">Snapshot updated ✓</string>
+    <string name="heir_threshold_tile_title">Inactivity before heir access</string>
+    <string name="heir_threshold_tile_subtitle">Threshold: %1$s · current inactivity: %2$s</string>
+    <string name="heir_threshold_dialog_title">Inactivity before heir access</string>
+    <plurals name="heir_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+
+    <!-- Panic mode and its disguise (2.7.1 settings_screen.dart:732-832, CalculatorActivity.kt) -->
+    <!--
+      The name under the launcher icon while the disguise is on. It follows the language of the
+      PHONE, not the one picked inside the app, and that is what we want: the launcher draws it among
+      every other app, and a French "Calculatrice" on a German phone POINTS AT the app it is meant to
+      hide (2.7.0 shipped exactly that). The launcher reads this string with its own configuration,
+      so an Android resource qualifier lands on the right language by itself.
+    -->
+    <string name="app_disguise_label">Calculator</string>
+    <!-- What a division by zero shows. 2.7.1 had this word hard-coded in French, on every phone. -->
+    <string name="calculator_error">Error</string>
+    <string name="settings_section_panic">Panic mode</string>
+    <string name="panic_trigger_title">Activate panic mode</string>
+    <string name="panic_trigger_subtitle">Locks, clears the clipboard, disables biometrics and anti-phishing, and replaces the app with a working calculator (name + icon)</string>
+    <string name="panic_reveal_title">Restore the Pass Tech name</string>
+    <string name="panic_reveal_subtitle">The app currently looks like a calculator. To get back without coming here: long-press its display for 2 s</string>
+    <string name="panic_reveal_snack">Pass Tech icon restored — relaunch the launcher if it does not appear</string>
+    <string name="panic_dialog_title">Panic mode?</string>
+    <string name="panic_dialog_body">This action immediately:\n\n• Locks the vault\n• Clears the clipboard\n• Disables biometric unlock\n• Withdraws the anti-phishing service from Android\'s accessibility settings, where it carries the Pass Tech name\n• Replaces the app with a CALCULATOR on the launcher: name, icon and opening screen. The calculator really works.\n\n⚠ TO COME BACK: long-press for 2 seconds on the calculator\'s DISPLAY (the result area, at the top). Remember this — it is the only way back to your vault while the disguise is active.\n\nNothing is deleted: your master password still opens the vault. You will need it to enable biometrics again. Name and icon can be restored from Settings once you are safe.</string>
+    <string name="panic_dialog_activate">Activate</string>
+    <!-- Shown only when a fingerprint opens THIS vault (design v2.3 §1), and not dismissible. -->
+    <string name="panic_warn_biometric_title">Biometric unlock will be disabled</string>
+    <string name="panic_warn_biometric_body">Panic mode removes the biometric enrolment — otherwise someone could open your vault by making you place your finger.\n\nAfter activation, ONLY your master password will open the vault. It cannot be recovered by any means.\n\nMake sure you know it before continuing.</string>
+
+    <!-- What the phone looks like, said before the master password is typed -->
+    <string name="integrity_title">About this phone</string>
+    <string name="integrity_body">Pass Tech noticed the following. It still works, and none of this touches your vault — but a phone in this state can be read by more than you.</string>
+    <string name="integrity_rooted">This phone can become root. Anything with root can read the memory of any app, this one included.</string>
+    <string name="integrity_debugger">A debugger is attached to Pass Tech right now.</string>
+    <string name="integrity_debuggable">This is a development build. Anything on the phone can read its memory.</string>
+    <string name="integrity_emulator">This is an emulator, not a phone. No key here is held by real secure hardware.</string>
+    <string name="integrity_best_effort">These checks are easy to hide from: read them as a reminder, never as a guarantee.</string>
+    <string name="integrity_understood">Understood</string>
+
+    <!-- Update check (2.7.1 app_update.dart + files_tech_core UpdateService) -->
+    <string name="update_title">Version %1$s is out</string>
+    <string name="update_body">Pass Tech does not update itself and never downloads anything on its own. The button below opens the release page, where the notes and the checksums are.</string>
+    <string name="update_notes_label">What changed</string>
+    <string name="update_sha_label">SHA-256 announced for the APK</string>
+    <string name="update_sha_label_named">SHA-256 announced for %1$s</string>
+    <string name="update_open">Open the release page</string>
+    <string name="update_later">Later</string>
+
+    <!-- Security audit (2.7.1 audit_screen.dart, vault_audit_score.dart) -->
+    <string name="settings_audit_title">Security audit</string>
+    <string name="settings_audit_subtitle">Weak passwords, duplicates, breaches…</string>
+    <string name="audit_title">Security audit</string>
+    <string name="audit_refresh">Refresh</string>
+    <string name="audit_score_none">Not applicable</string>
+    <string name="audit_score_excellent">Excellent</string>
+    <string name="audit_score_good">Good</string>
+    <string name="audit_score_fair">Medium</string>
+    <string name="audit_score_poor">Weak</string>
+    <string name="audit_score_partial">Partial score: some passwords have not been put against the breach list.</string>
+    <string name="audit_stat_entries">Entries</string>
+    <string name="audit_stat_passwords">Passwords</string>
+    <string name="audit_stat_second_factor">With 2FA</string>
+    <string name="audit_stat_notes">Notes</string>
+    <string name="audit_stat_cards">Cards</string>
+    <string name="audit_breach_title">Data breach check</string>
+    <string name="audit_breach_body">Compares your passwords with public breaches. Only five characters of a hash leave the phone, never a password.</string>
+    <string name="audit_breach_run">Run check</string>
+    <string name="audit_breach_again">Check again</string>
+    <string name="audit_breach_none">No compromised password found</string>
+    <plurals name="audit_breach_found">
+        <item quantity="one">%1$d compromised password</item>
+        <item quantity="other">%1$d compromised passwords</item>
+    </plurals>
+    <plurals name="audit_breach_unanswered">
+        <item quantity="one">%1$d password could not be checked: it stays outside the score.</item>
+        <item quantity="other">%1$d passwords could not be checked: they stay outside the score.</item>
+    </plurals>
+    <string name="audit_breach_network_error">No answer at all — check your connection</string>
+    <!-- The launcher is showing a calculator: any traffic at all would contradict it. -->
+    <string name="audit_breach_disguised">Not sent: the app is disguised, and this check would show on the network</string>
+    <string name="audit_weak">Weak passwords</string>
+    <string name="audit_duplicates">Duplicates</string>
+    <string name="audit_no_second_factor">No 2FA on a sensitive account</string>
+    <string name="audit_stale">Not reviewed for over a year</string>
+
+    <!-- Anti-phishing (2.7.1 anti_phishing_service.dart, PhishingDetectorService.kt) -->
+    <!--
+      These two are drawn by ANDROID, in its accessibility settings, so they follow the language of
+      the PHONE like the disguise label above. They are also the only place the owner meets this
+      service outside the app, which is why the description says what is read and what is not.
+    -->
+    <string name="phishing_service_label">Pass Tech — anti-phishing</string>
+    <string name="phishing_detector_description">Reads the domain shown by the browser in front, to check that it matches the Pass Tech entry before a password is copied. Only the domain is read, in memory only: nothing is stored and nothing is sent. Only recognised browsers are read. This is turned on at your request, and disappears from this list when you turn it off in Pass Tech.</string>
+
+    <string name="settings_section_anti_phishing">Anti-phishing</string>
+    <string name="settings_anti_phishing_title">Check the domain before copying</string>
+    <string name="settings_anti_phishing_description">Compares the browser\'s domain with those the entry declares</string>
+    <string name="settings_anti_phishing_active">On — warns when the browser is not on the right domain</string>
+    <!-- The name in quotes is the service label itself, so the two cannot drift apart. -->
+    <string name="settings_anti_phishing_needs_grant">⚠ Turn \"%1$s\" on under Accessibility</string>
+    <string name="settings_anti_phishing_open_title">Open Settings &gt; Accessibility</string>
+    <string name="settings_anti_phishing_open_subtitle">Turn \"%1$s\" on in the list</string>
+    <string name="settings_anti_phishing_dialog_title">Anti-phishing</string>
+    <string name="settings_anti_phishing_dialog_body">Pass Tech can check that the browser in front is on the entry\'s domain BEFORE copying your password, and warn you when it is not — a look-alike name, a fake site.\n\nFor that it uses an Android accessibility service:\n• it reads the domain from the address bar, and nothing else\n• only on recognised browsers (Chrome, Firefox, Brave, Edge, Opera, Vivaldi, Samsung, DuckDuckGo)\n• nothing is stored, nothing is sent\n\nTurning it off here takes the permission back: the service leaves Android\'s accessibility list, and turning it on again asks you for it.\n\nOn the next screen, turn \"%1$s\" on.</string>
+    <string name="settings_anti_phishing_on_failed">Android refused to add the service</string>
+    <string name="settings_anti_phishing_off_failed">Android refused to withdraw the service — remove it by hand under Settings &gt; Accessibility</string>
+
+    <string name="phishing_unchecked_snack">⚠ Domain not checked — the anti-phishing service is not running</string>
+    <string name="phishing_unchecked_action">Settings</string>
+    <string name="phishing_typo_title">Suspicious domain</string>
+    <string name="phishing_typo_body">The domain in the browser looks like yours, one or two letters apart — the usual shape of a fake site. It can be a false alarm.</string>
+    <string name="phishing_mismatch_title">Not the same domain</string>
+    <string name="phishing_mismatch_body">The browser is on a completely different domain. The copy was blocked.\n\nIf this page really belongs to this entry — a Microsoft or Apple sign-in page, a company SSO — open the entry and add the domain to it. The copy stays blocked until you have.</string>
+    <string name="phishing_expected">Expected</string>
+    <string name="phishing_active">In the browser</string>
+    <string name="phishing_distance">Distance: %1$d</string>
+    <string name="phishing_close">Close</string>
+    <string name="phishing_copy_anyway">Copy anyway</string>
+    <string name="phishing_declare_domain">Open the entry</string>
+
+    <!-- Data: backup, import, plain export (2.7.1 settings_screen.dart) -->
+    <string name="settings_section_data">Data</string>
+    <string name="settings_backup_encrypted_title">Encrypted backup (.ptbak)</string>
+    <string name="settings_backup_encrypted_subtitle">Recommended — restorable with your passphrase</string>
+    <string name="settings_import_title">Import a file</string>
+    <string name="settings_import_subtitle">CSV, Bitwarden JSON or .ptbak</string>
+    <string name="settings_export_plain_title">Export (unencrypted JSON)</string>
+    <string name="settings_export_plain_subtitle">⚠️ passwords in clear text</string>
+
+    <string name="passphrase_dialog_encrypt_title">Encrypted backup</string>
+    <string name="passphrase_dialog_decrypt_title">Restore backup</string>
+    <string name="passphrase_dialog_confirm_helper">Pick a passphrase to encrypt the backup. You will need it to restore.</string>
+    <string name="passphrase_dialog_enter_helper">Enter the passphrase used when the backup was made.</string>
+    <string name="passphrase_label_min">Passphrase (min. 12)</string>
+    <string name="passphrase_label">Passphrase</string>
+    <string name="passphrase_confirm_label">Confirm</string>
+    <string name="passphrase_error_empty">Empty passphrase</string>
+    <string name="passphrase_error_min">Minimum 12 characters</string>
+    <string name="passphrase_error_mismatch">Passphrases do not match</string>
+    <string name="passphrase_encrypt_cta">Encrypt</string>
+    <string name="passphrase_decrypt_cta">Decrypt</string>
+
+    <string name="import_untitled_entry">Untitled</string>
+    <string name="import_confirm_title">Confirm import</string>
+    <plurals name="import_confirm_body">
+        <item quantity="one">1 entry detected\nFormat: %2$s\n\nDuplicates (same title + username) will be ignored.</item>
+        <item quantity="other">%1$d entries detected\nFormat: %2$s\n\nDuplicates (same title + username) will be ignored.</item>
+    </plurals>
+    <string name="import_cta">Import</string>
+    <plurals name="import_done">
+        <item quantity="one">1 entry imported%2$s</item>
+        <item quantity="other">%1$d entries imported%2$s</item>
+    </plurals>
+    <string name="import_done_none">No entry imported%1$s</string>
+    <plurals name="import_skipped_suffix">
+        <item quantity="one">" • %1$d duplicate ignored"</item>
+        <item quantity="other">" • %1$d duplicates ignored"</item>
+    </plurals>
+    <string name="import_no_entry">No entry detected</string>
+    <string name="import_read_error">Cannot read the file</string>
+    <string name="import_wrong_passphrase">Wrong password or corrupted file</string>
+    <string name="import_format_encrypted_backup">Encrypted backup</string>
+    <string name="import_format_csv">CSV (Chrome / Edge / other)</string>
+    <string name="import_format_bitwarden">Bitwarden JSON</string>
+    <string name="import_format_pass_tech">Pass Tech JSON</string>
+    <string name="import_error_too_large">File too large (max 50 MB, 50,000 entries)</string>
+    <string name="import_error_empty_file">Empty file</string>
+    <string name="import_error_json_unknown">Unrecognised JSON format</string>
+    <string name="import_error_json_invalid">Invalid JSON</string>
+    <string name="import_error_csv_invalid">Invalid CSV</string>
+    <string name="import_error_csv_empty">Empty CSV</string>
+    <string name="import_error_csv_no_password_column">No \"password\" column found in the CSV</string>
+    <string name="import_error_field_too_large">A field in this file is too large (max 64 KB)</string>
+
+    <string name="export_plain_dialog_title">UNENCRYPTED export</string>
+    <string name="export_plain_warning_headline">The exported file will contain ALL your passwords IN CLEAR TEXT (readable by anyone).</string>
+    <string name="export_plain_warning_bullet1">• Any app with storage access will be able to read it.</string>
+    <string name="export_plain_warning_bullet2">• If you share it via cloud (Drive, Mail…), it will stay there.</string>
+    <string name="export_plain_warning_bullet3">• Delete it IMMEDIATELY after use.</string>
+    <string name="export_plain_warning_tip">Prefer \"Encrypted backup (.ptbak)\" unless migrating to another manager.</string>
+    <string name="export_plain_confirm">Export in clear</string>
+    <string name="backup_saved">Backup saved</string>
+    <string name="export_saved">Export saved</string>
+    <string name="file_write_error">Could not save the file</string>
+
+    <!--
+      About. Every figure in these lines comes from core/about/AppFacts, which reads it from the code
+      that enforces it: no number is typed here, in any language.
+    -->
+    <string name="about_title">About</string>
+    <string name="about_tagline">A password manager that stays on your phone</string>
+    <string name="about_version">v%1$s</string>
+
+    <string name="about_check_updates">Check for updates</string>
+    <string name="about_checking">Checking…</string>
+    <string name="about_check_up_to_date">GitHub was asked: this is the latest published version.</string>
+    <string name="about_check_unreachable">GitHub could not be asked. Nothing was learnt — this may or may not be the latest version.</string>
+    <string name="about_check_disguised">Not asked. The app is disguised as a calculator, and this check would put traffic on the network that a calculator has no reason to make.</string>
+    <string name="about_check_unreadable_version">This build\'s version number cannot be compared with a published release, so nothing was asked.</string>
+
+    <string name="about_section_privacy">What Pass Tech never does</string>
+    <string name="about_privacy_no_ads">No ads</string>
+    <string name="about_privacy_no_tracker">No tracker</string>
+    <string name="about_privacy_offline">Works offline</string>
+    <string name="about_privacy_no_collect">Collects nothing</string>
+    <string name="about_privacy_no_share">Shares nothing</string>
+    <string name="about_privacy_no_store">No Play Store</string>
+    <string name="about_privacy_network_title">The only two times it uses the network</string>
+    <string name="about_privacy_network_body">Asking GitHub whether a newer version has been published, once your vault is open, %1$d times a day at most. And the breach check on the audit screen, which you start yourself: the password itself is never sent, only the first five characters of its fingerprint, which tens of thousands of other passwords share.\n\nNothing else ever leaves this phone, and your vault least of all. What these two calls do show is that someone on your connection uses this app — GitHub sees a request for this project\'s latest release, and Have I Been Pwned sees five characters of a fingerprint.\n\nBoth stop entirely while the app is disguised as a calculator.</string>
+
+    <string name="about_group_vault">The vault</string>
+    <string name="about_group_forced">If someone makes you open it</string>
+    <string name="about_group_content">What it holds</string>
+    <string name="about_group_watch">What it watches for you</string>
+    <string name="about_group_data">Your data, in and out</string>
+
+    <string name="about_feature_vault">Encrypted vault</string>
+    <string name="about_feature_vault_desc">AES-256-GCM. The key is derived from your master password by Argon2id (%1$d MiB of memory, %2$d passes) and by a key held in the phone\'s secure chip, which takes part in every single attempt.</string>
+    <string name="about_feature_biometric">Fingerprint, tied to this phone</string>
+    <string name="about_feature_biometric_desc">The key lives in the Android Keystore and cannot be read without your fingerprint. It never leaves the phone, and a copy of the vault taken elsewhere cannot use it.</string>
+    <string name="about_feature_bruteforce">Guessing gets slower</string>
+    <string name="about_feature_bruteforce_desc">%1$s, then a wait that grows from %2$s to %3$s. Unlocking cancels its own attempt and no earlier one, so alternating between two vaults never clears the delay.</string>
+    <string name="about_feature_autolock">Locks itself</string>
+    <string name="about_feature_autolock_desc">Immediately, after a delay of up to %1$s, or never — your choice. Leaving the app counts as leaving.</string>
+    <string name="about_feature_screenshot">No screenshots</string>
+    <string name="about_feature_screenshot_desc">No screen capture, and no preview in the list of recent apps, for as long as the setting is on.</string>
+    <string name="about_feature_backup_off">Never backed up by Android</string>
+    <string name="about_feature_backup_off_desc">The vault is excluded from the Android cloud backup and from phone-to-phone transfer. The only copy that exists is the one you make yourself.</string>
+    <string name="about_feature_integrity">Tells you what it sees</string>
+    <string name="about_feature_integrity_desc">Before you type your master password: whether this phone can be made root, whether a debugger is attached, whether this is a development build, whether it is an emulator. It warns, and never blocks.</string>
+
+    <string name="about_feature_decoy">Decoy vault</string>
+    <string name="about_feature_decoy_desc">A second password opens a second vault with its own entries. Nothing in the files on this phone says whether you have one.</string>
+    <string name="about_feature_panic">Panic mode</string>
+    <string name="about_feature_panic_desc">Locks, clears the clipboard, disarms the fingerprint, turns the address check off, and makes the app look like a calculator — which really works.</string>
+    <string name="about_feature_heir">Someone after you</string>
+    <string name="about_feature_heir_desc">A relative opens a read-only copy of your vault after a long enough silence on your side. On the phone, with no cloud and no account.</string>
+
+    <string name="about_feature_types_desc">Passwords, bank cards and secure notes.</string>
+    <string name="about_feature_totp">Two-factor codes</string>
+    <string name="about_feature_totp_desc">The six-digit codes, generated here, like an authenticator app.</string>
+    <string name="about_feature_otpauth">Two-factor secrets from a link</string>
+    <string name="about_feature_otpauth_desc">Paste the otpauth:// link a site shows under its QR code and the secret is taken out of it.</string>
+    <string name="about_feature_cards">Bank cards</string>
+    <string name="about_feature_cards_desc">Number, holder, expiry, security code and PIN, shown as a card. The number, the security code and the PIN stay hidden until you ask for them.</string>
+    <string name="about_feature_notes">Secure notes</string>
+    <string name="about_feature_notes_desc">Any confidential text: bank details, recovery codes, licence keys.</string>
+    <string name="about_feature_search">Search and sort</string>
+    <string name="about_feature_search_desc">By title, username, address or content; newest, oldest, A to Z or Z to A.</string>
+    <string name="about_feature_generator">Generator</string>
+    <string name="about_feature_generator_desc">Passwords of %1$d to %2$d characters, or a passphrase drawn from %3$s, in the language the app is showing.</string>
+
+    <string name="about_feature_audit">Security audit</string>
+    <string name="about_feature_audit_desc">A score out of 100 for the vault, and what pulls it down: passwords that are weak, reused, or have no second factor. Age is shown and never counted against you.</string>
+    <string name="about_feature_breach">Breach check</string>
+    <string name="about_feature_breach_desc">Asks Have I Been Pwned whether a password appears in a public leak, without ever sending the password.</string>
+    <string name="about_feature_phishing">Address check</string>
+    <string name="about_feature_phishing_desc">Before a password is copied, compares the address open in your browser with the ones the entry declares, and holds the copy back when none of them matches.</string>
+    <string name="about_feature_clipboard">Clipboard cleared</string>
+    <string name="about_feature_clipboard_desc">After %1$s to %2$s, or never — your choice.</string>
+    <string name="about_feature_update">Update check</string>
+    <string name="about_feature_update_desc">Tells you when a newer version is published, once your vault is open. It downloads nothing and installs nothing.</string>
+
+    <string name="about_feature_backup">Encrypted backup (.ptbak)</string>
+    <string name="about_feature_backup_desc">A file that only your passphrase opens, saved wherever you choose. It reads and writes the same format as version 2.7.1.</string>
+    <string name="about_feature_import">Import</string>
+    <string name="about_feature_import_desc">Chrome, Edge, a Bitwarden JSON export, or any CSV with a password column.</string>
+    <string name="about_feature_theme">Light or dark</string>
+    <string name="about_feature_theme_desc">Your choice, or whatever the phone is set to.</string>
+
+    <string name="about_section_verify">Check what you download</string>
+    <string name="about_verify_body">Every release publishes the SHA-256 of each file it carries. Once you have downloaded one, run:\n\nsha256sum &lt;the file you downloaded&gt;\n\nand compare the result with the line for that same file on the release page. If the two differ, do not install it.</string>
+
+    <string name="about_section_help">Quick help</string>
+    <string name="about_help_first_title">First launch</string>
+    <string name="about_help_first_1">Choose a master password of at least 12 characters.</string>
+    <string name="about_help_first_2">It encrypts everything, and there is no recovery: if you forget it, the vault is lost.</string>
+    <string name="about_help_add_title">Adding a password</string>
+    <string name="about_help_add_1">The Add button at the bottom of the main screen.</string>
+    <string name="about_help_add_2">Or open the generator and let it choose one for you.</string>
+    <string name="about_help_update_title">Updates</string>
+    <string name="about_help_update_1">Once your vault is open, the app asks GitHub whether a newer version exists, %1$d times a day at most.</string>
+    <string name="about_help_update_2">Or press Check for updates above, at any time.</string>
+
+    <string name="about_section_author">Author</string>
+    <string name="about_author_name" translatable="false">Patrice Haltaya</string>
+    <string name="about_author_role">Developer</string>
+
+    <string name="about_section_links">Help and links</string>
+    <string name="about_link_website">Official website</string>
+    <string name="about_link_source">Source code</string>
+    <string name="about_link_report">Report a problem</string>
+    <string name="about_link_report_subtitle">Opens your mail app, with the version and the phone already written in</string>
+    <string name="about_link_licence">Licence</string>
+    <string name="about_link_licence_value" translatable="false">Apache License 2.0</string>
+    <string name="about_report_subject">Pass Tech %1$s — problem report</string>
+    <string name="about_report_body">Describe what happened:\n\n\n---\nVersion: %1$s\nPhone: %2$s (Android %3$s)\n</string>
+    <string name="about_link_failed">No app on this phone can open that.</string>
+
+    <string name="legal_privacy_title">Privacy policy</string>
+    <string name="legal_privacy_subtitle">What stays on your phone, and the two times the app goes online</string>
+    <string name="legal_terms_title">Terms of use</string>
+    <string name="legal_terms_subtitle">What we promise, and what we do not</string>
+    <string name="legal_not_translated">This document has not been written in your language yet, so here is the English one. A document that describes the app wrongly would be worse than one you have to work at.</string>
+    <string name="legal_unreadable">This document could not be read. It is also published with the source code.</string>
+
+    <plurals name="about_attempts">
+        <item quantity="one">%1$d attempt</item>
+        <item quantity="other">%1$d attempts</item>
+    </plurals>
+    <plurals name="about_entry_types">
+        <item quantity="one">%1$d kind of entry</item>
+        <item quantity="other">%1$d kinds of entry</item>
+    </plurals>
+    <plurals name="about_words">
+        <item quantity="one">%1$d word</item>
+        <item quantity="other">%1$d words</item>
+    </plurals>
+
+    <string name="action_about">About</string>
+</resources>

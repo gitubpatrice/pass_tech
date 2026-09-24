@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window theme only: every colour the user sees comes from PassTechTheme in Compose. -->
+    <style name="Theme.PassTech" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Launch theme: the system splash, then Theme.PassTech. -->
+    <style name="Theme.PassTech.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+        <item name="postSplashScreenTheme">@style/Theme.PassTech</item>
+    </style>
+</resources>

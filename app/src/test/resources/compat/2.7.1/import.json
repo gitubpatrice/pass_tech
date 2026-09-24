@@ -1,0 +1,868 @@
+{
+  "empty": {
+    "input": "",
+    "format": "unknown",
+    "error": "emptyFile",
+    "entries": []
+  },
+  "blank": {
+    "input": "   \n  \t ",
+    "format": "unknown",
+    "error": "emptyFile",
+    "entries": []
+  },
+  "csv_minimal": {
+    "input": "name,username,password\nGitHub,alice,s3cret\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "GitHub",
+        "category": "Autres",
+        "username": "alice",
+        "password": "s3cret",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_header_case_and_spaces": {
+    "input": " NAME , Login , PASSWORD , URL \nBank,bob,pw,https://bank.example\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Bank",
+        "category": "Banque",
+        "username": "bob",
+        "password": "pw",
+        "url": "https://bank.example",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_quotes_and_commas": {
+    "input": "name,password,notes\n\"Acme, Inc.\",pw,\"line one\nline two\"\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Acme, Inc.",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "line one\nline two",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_escaped_quotes": {
+    "input": "name,password\n\"He said \"\"hi\"\"\",pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "He said \"hi\"",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_crlf": {
+    "input": "name,password\r\nSite,pw\r\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_no_password_column": {
+    "input": "name,username\nSite,alice\n",
+    "format": "unknown",
+    "error": "csvNoPasswordColumn",
+    "entries": []
+  },
+  "csv_header_only": {
+    "input": "name,password\n",
+    "format": "csv",
+    "error": null,
+    "entries": []
+  },
+  "csv_short_row": {
+    "input": "name,password\nonly-one-cell\nSite,pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_title_from_url": {
+    "input": "name,url,password\n,https://mail.example.com,pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "https://mail.example.com",
+        "category": "Email",
+        "username": "",
+        "password": "pw",
+        "url": "https://mail.example.com",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_no_title_no_password": {
+    "input": "name,url,password\n,,\nSite,,pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_missing_cells": {
+    "input": "name,username,password,url,notes,totp\nSite,alice,pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Autres",
+        "username": "alice",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_alternate_headers": {
+    "input": "title,user,pass,web site,comments,otp\nSite,alice,pw,https://x.example,note,ABCD\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Web",
+        "username": "alice",
+        "password": "pw",
+        "url": "https://x.example",
+        "totpSecret": "ABCD",
+        "notes": "note",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_bitwarden_export_headers": {
+    "input": "name,login_uri,login_username,login_password,login_totp,notes\nSocial,https://facebook.com,alice,pw,JBSWY3DPEHPK3PXP,hello\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Social",
+        "category": "Réseaux sociaux",
+        "username": "alice",
+        "password": "pw",
+        "url": "https://facebook.com",
+        "totpSecret": "JBSWY3DPEHPK3PXP",
+        "notes": "hello",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_categories": {
+    "input": "name,url,password\nMa Banque,,pw\nGmail,,pw\nInsta,,pw\nSomething,https://example.com,pw\nSomething else,,pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Ma Banque",
+        "category": "Banque",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      },
+      {
+        "type": "password",
+        "title": "Gmail",
+        "category": "Email",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      },
+      {
+        "type": "password",
+        "title": "Insta",
+        "category": "Réseaux sociaux",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      },
+      {
+        "type": "password",
+        "title": "Something",
+        "category": "Web",
+        "username": "",
+        "password": "pw",
+        "url": "https://example.com",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      },
+      {
+        "type": "password",
+        "title": "Something else",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_trailing_spaces": {
+    "input": "name,password\n  Site  ,  pw  \n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "json_pass_tech_full": {
+    "input": "[{\"id\":\"kept-id\",\"type\":\"card\",\"title\":\"Visa\",\"category\":\"Banque\",\"username\":\"u\",\"password\":\"p\",\"url\":\"https://x.example\",\"totpSecret\":\"AB\",\"notes\":\"n\",\"isFavorite\":true,\"cardholderName\":\"A B\",\"cardNumber\":\"4111111111111111\",\"cardExpiry\":\"12/28\",\"cardCvv\":\"123\",\"cardPin\":\"9999\",\"cardIssuer\":\"Visa\",\"createdAt\":\"2024-01-02T03:04:05.000\",\"updatedAt\":\"2024-01-02T03:04:05.000\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "card",
+        "title": "Visa",
+        "category": "Banque",
+        "username": "u",
+        "password": "p",
+        "url": "https://x.example",
+        "totpSecret": "AB",
+        "notes": "n",
+        "isFavorite": true,
+        "cardholderName": "A B",
+        "cardNumber": "4111111111111111",
+        "cardExpiry": "12/28",
+        "cardCvv": "123",
+        "cardPin": "9999",
+        "cardIssuer": "Visa"
+      }
+    ]
+  },
+  "json_pass_tech_minimal": {
+    "input": "[{\"title\":\"Bare\",\"category\":\"Autres\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Bare",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "json_pass_tech_missing_title": {
+    "input": "[{\"category\":\"Autres\"},{\"title\":\"Kept\",\"category\":\"Autres\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Kept",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "json_pass_tech_bad_date": {
+    "input": "[{\"title\":\"Bad\",\"category\":\"Autres\",\"createdAt\":\"not a date\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": []
+  },
+  "json_pass_tech_not_maps": {
+    "input": "[\"text\",42,{\"title\":\"Kept\",\"category\":\"Autres\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Kept",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "json_pass_tech_unknown_type": {
+    "input": "[{\"title\":\"T\",\"category\":\"Autres\",\"type\":\"whatever\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "T",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "json_object_unknown": {
+    "input": "{\"hello\":\"world\"}",
+    "format": "unknown",
+    "error": "jsonUnknownFormat",
+    "entries": []
+  },
+  "json_invalid": {
+    "input": "{ not json",
+    "format": "unknown",
+    "error": "jsonInvalid",
+    "entries": []
+  },
+  "bitwarden_login": {
+    "input": "{\"items\":[{\"type\":1,\"name\":\"GitHub\",\"notes\":\"note\",\"favorite\":true,\"login\":{\"username\":\"alice\",\"password\":\"pw\",\"totp\":\"JBSWY3DPEHPK3PXP\",\"uris\":[{\"uri\":\"https://github.com\"},{\"uri\":\"https://other.example\"}]}}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "GitHub",
+        "category": "Web",
+        "username": "alice",
+        "password": "pw",
+        "url": "https://github.com",
+        "totpSecret": "JBSWY3DPEHPK3PXP",
+        "notes": "note",
+        "isFavorite": true,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_login_no_uris": {
+    "input": "{\"items\":[{\"type\":1,\"name\":\"Bank\",\"login\":{\"username\":\"u\",\"password\":\"p\"}}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Bank",
+        "category": "Banque",
+        "username": "u",
+        "password": "p",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_login_empty_uris": {
+    "input": "{\"items\":[{\"type\":1,\"name\":\"Bank\",\"login\":{\"username\":\"u\",\"password\":\"p\",\"uris\":[]}}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Bank",
+        "category": "Banque",
+        "username": "u",
+        "password": "p",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_note": {
+    "input": "{\"items\":[{\"type\":2,\"name\":\"Note\",\"notes\":\"body\",\"favorite\":false}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "note",
+        "title": "Note",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "body",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_card": {
+    "input": "{\"items\":[{\"type\":3,\"name\":\"Card\",\"card\":{\"cardholderName\":\"A B\",\"number\":\"4111 1111 1111 1111\",\"expMonth\":\"7\",\"expYear\":\"2028\",\"code\":\"123\",\"brand\":\"Visa\"}}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "card",
+        "title": "Card",
+        "category": "Banque",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "A B",
+        "cardNumber": "4111111111111111",
+        "cardExpiry": "07/28",
+        "cardCvv": "123",
+        "cardPin": "",
+        "cardIssuer": "Visa"
+      }
+    ]
+  },
+  "bitwarden_card_partial_expiry": {
+    "input": "{\"items\":[{\"type\":3,\"name\":\"Card\",\"card\":{\"number\":\"4111\",\"expMonth\":\"7\"}}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "card",
+        "title": "Card",
+        "category": "Banque",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "4111",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_card_no_card": {
+    "input": "{\"items\":[{\"type\":3,\"name\":\"Card\"}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "card",
+        "title": "Card",
+        "category": "Banque",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_identity_ignored": {
+    "input": "{\"items\":[{\"type\":4,\"name\":\"Identity\"},{\"type\":2,\"name\":\"Kept\"}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "note",
+        "title": "Kept",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_no_name": {
+    "input": "{\"items\":[{\"type\":2}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "note",
+        "title": "Untitled",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_items_not_maps": {
+    "input": "{\"items\":[\"text\",{\"type\":2,\"name\":\"Kept\"}]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": [
+      {
+        "type": "note",
+        "title": "Kept",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "bitwarden_empty_items": {
+    "input": "{\"items\":[]}",
+    "format": "bitwarden",
+    "error": null,
+    "entries": []
+  },
+  "nbsp_only": {
+    "input": "  ",
+    "format": "unknown",
+    "error": "emptyFile",
+    "entries": []
+  },
+  "json_with_bom": {
+    "input": "﻿[{\"title\":\"T\",\"category\":\"Autres\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "T",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "csv_with_bom": {
+    "input": "﻿name,password\nSite,pw\n",
+    "format": "csv",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "Site",
+        "category": "Autres",
+        "username": "",
+        "password": "pw",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  },
+  "json_with_leading_nbsp": {
+    "input": " [{\"title\":\"T\",\"category\":\"Autres\"}]",
+    "format": "pass_tech",
+    "error": null,
+    "entries": [
+      {
+        "type": "password",
+        "title": "T",
+        "category": "Autres",
+        "username": "",
+        "password": "",
+        "url": "",
+        "totpSecret": "",
+        "notes": "",
+        "isFavorite": false,
+        "cardholderName": "",
+        "cardNumber": "",
+        "cardExpiry": "",
+        "cardCvv": "",
+        "cardPin": "",
+        "cardIssuer": ""
+      }
+    ]
+  }
+}

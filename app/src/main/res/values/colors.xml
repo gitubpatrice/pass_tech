@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#262660</color>
+    <!-- The page background of the light theme (2.7.1 fromSeed #1F6FEB), so the splash hands over without a flash. -->
+    <color name="splash_background">#FAF8FF</color>
+</resources>

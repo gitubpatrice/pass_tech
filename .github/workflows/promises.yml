@@ -1,0 +1,117 @@
+name: Promises
+
+# Checks on the ARTEFACT what the app promises in its privacy policy. Nothing else in the repository
+# looks at what the binary really contains: `ci.yml` builds and tests the source, CodeQL analyses it.
+#
+# This job exists because the Flutter app once shipped a permission (ACCESS_NETWORK_STATE) and
+# Google's telemetry components that were declared nowhere in the repository: they came in through a
+# dependency, and only the MERGED manifest showed them. A public promise is checked at every commit,
+# not when the release is cut.
+
+on:
+  push:
+    branches: [master, 'fix/**', 'feat/**']
+  pull_request:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artefact:
+    name: Permissions + trackers on the release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Release and not debug: R8 decides what really stays in the distributed binary. Without
+      # keystore.properties (never in the repository) the APK comes out unsigned, which is enough to
+      # read its manifest and scan its code. It is never uploaded.
+      - name: Build the release APK
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Locate aapt
+        id: sdk
+        run: |
+          AAPT=$(find "$ANDROID_SDK_ROOT/build-tools" -name aapt -type f | sort -V | tail -1)
+          echo "aapt=$AAPT" >> "$GITHUB_OUTPUT"
+          "$AAPT" version
+
+      - name: Locate the APK
+        id: apk
+        run: |
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          test -n "$APK"
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "APK under analysis: $APK"
+
+      # ── Check 1: the permission set is exactly the declared one ─────────────────────────────────
+      - name: Permissions match config/expected-permissions.txt
+        run: |
+          "${{ steps.sdk.outputs.aapt }}" dump permissions "${{ steps.apk.outputs.path }}" \
+            | grep -oP "(?<=uses-permission: name=')[^']+" \
+            | sort -u > /tmp/actual.txt
+
+          # androidx.core declares this signature-level permission from the application id, for its
+          # non-exported dynamic receivers: it is private to the app and widens no external surface.
+          grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' /tmp/actual.txt > /tmp/actual-filtered.txt
+
+          grep -v '^\s*#' config/expected-permissions.txt \
+            | grep -v '^\s*$' | sort -u > /tmp/expected.txt
+
+          echo "── Expected ──"; cat /tmp/expected.txt
+          echo "── Actual ──";   cat /tmp/actual-filtered.txt
+
+          if ! diff -u /tmp/expected.txt /tmp/actual-filtered.txt; then
+            echo ""
+            echo "FAILURE: the permissions of the APK no longer match."
+            echo "  '+' = a permission appeared. Find the dependency that brings it first:"
+            echo "        grep -rn <PERMISSION> app/build/intermediates/manifest_merge_blame_file/"
+            echo "  '-' = a permission disappeared. Update the reference file AND section 10 of the"
+            echo "        FIVE app/src/main/assets/legal/PRIVACY.{en,fr,de,it,es}.md: those are the"
+            echo "        documents the app shows."
+            exit 1
+          fi
+          echo "OK: permission set unchanged."
+
+      # ── Check 2: no known tracker ───────────────────────────────────────────────────────────────
+      # files-tech.com announces "no tracker" for every app. A tracker reported in a Files Tech binary
+      # by the very tool careful users run themselves would cost far more than this check.
+      - name: No known tracker (Exodus Privacy)
+        run: |
+          APK="${{ steps.apk.outputs.path }}"
+          # `-j` is a FLAG (JSON output) and `-o` receives the destination.
+          docker run --rm -v "$PWD:/w" exodusprivacy/exodus-standalone \
+            -j -o /w/exodus.json "/w/$APK" || true
+          if [ ! -f exodus.json ]; then
+            echo "FAILURE: Exodus produced no report."
+            exit 1
+          fi
+          COUNT=$(jq '.trackers | length' exodus.json)
+          echo "Trackers found: $COUNT"
+          jq -r '.trackers[]?.name' exodus.json || true
+          if [ "$COUNT" -ne 0 ]; then
+            echo "FAILURE: $COUNT tracker(s) in the release APK."
+            exit 1
+          fi
+          echo "OK: no tracker."
+
+      - name: Exodus report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: exodus-${{ github.sha }}
+          path: exodus.json
+          if-no-files-found: ignore
+          retention-days: 30

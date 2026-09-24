@@ -1,0 +1,786 @@
+package com.filestech.pass_tech.core.vault
+
+import com.filestech.pass_tech.core.crypto.AesGcm
+import com.filestech.pass_tech.core.crypto.KdfParams
+import com.filestech.pass_tech.core.crypto.SecretBytes
+import com.filestech.pass_tech.core.crypto.useThenWipe
+import com.filestech.pass_tech.core.crypto.wipe
+import com.filestech.pass_tech.core.heir.HeirRepository
+import com.filestech.pass_tech.core.heir.HeirState
+import com.filestech.pass_tech.core.model.Entry
+import com.filestech.pass_tech.core.security.BruteForceGuard
+import javax.crypto.Cipher
+
+/**
+ * The vault slots, as the rest of the app sees them. Design: `audit/conversion-kotlin/10-conception-coffre.md`
+ * (v2.2), reviewed by three adversarial readers.
+ *
+ * Rules that hold everywhere below:
+ * - **Opening never depends on the occupancy marks**: it tries every slot. Whatever state is lost,
+ *   the owner keeps access with the password.
+ * - **Nothing is ever written into a slot that is not PROVABLY free** (file absent, or mark read as
+ *   free). A slot whose mark cannot be read counts as occupied: at worst the app refuses to create a
+ *   vault, it never overwrites one. The only exception is the explicit total erase of a root vault.
+ * - **A decoy never touches the vault that created it**: what a vault may erase is itself and the
+ *   decoy it created, never its parent, which it does not even know about.
+ * - **Every password check does the same work against every slot**, even after a match: the time an
+ *   attempt takes says nothing about which slot answered. Every check is counted by the lockout.
+ * - **A Keystore that does not answer is never a wrong password** (v2.2): the attempt still counts,
+ *   nothing is created or rewritten on a guess, and the caller says "retry". Nor is a slot key ever
+ *   created under a vault: only provably free slots get one.
+ *
+ * Not thread-safe: the caller serialises the calls (one vault operation at a time).
+ */
+// Every public function is one operation on the slots, and they share the invariants above: split
+// across classes, each half would have to re-establish them.
+@Suppress("TooManyFunctions")
+class VaultRepository(
+    private val files: SlotFiles,
+    private val keystore: SlotKeystore,
+    private val guard: BruteForceGuard,
+    private val heir: HeirRepository,
+    private val biometrics: BiometricBinding = BiometricBinding.NONE,
+    private val params: KdfParams = KdfParams.OWASP_MOBILE_2024,
+) {
+
+    enum class EntryMode { CREATE, UNLOCK }
+
+    sealed interface UnlockResult {
+        data class Opened(val session: VaultSession) : UnlockResult
+
+        data object WrongPassword : UnlockResult
+
+        data class Locked(val remainingMillis: Long) : UnlockResult
+
+        /** The Keystore did not answer: nothing is known about the password, and the attempt still counts. */
+        data object KeystoreUnavailable : UnlockResult
+    }
+
+    sealed interface CreateResult {
+        /** The password opened an existing vault: nothing was created. */
+        data class Opened(val session: VaultSession) : CreateResult
+
+        data class Created(val session: VaultSession) : CreateResult
+
+        /** No slot is provably free. Deliberately says nothing more. */
+        data object Impossible : CreateResult
+
+        data class Locked(val remainingMillis: Long) : CreateResult
+
+        /** Nothing was created: a slot could not be checked, and the password might open it. */
+        data object KeystoreUnavailable : CreateResult
+    }
+
+    sealed interface DecoyResult {
+        /** The decoy exists; the returned session is the updated PARENT. */
+        data class Created(val parent: VaultSession) : DecoyResult
+
+        /**
+         * The chosen password cannot be used: it opens an existing vault. The same answer as for "the
+         * same as the current password", which a single-vault phone gives too.
+         */
+        data object PasswordRefused : DecoyResult
+
+        data object Impossible : DecoyResult
+
+        data class Locked(val remainingMillis: Long) : DecoyResult
+
+        /**
+         * The Keystore did not answer. The creation may have stopped after its journal was written: the
+         * caller locks the vault, and the next opening completes or drops it (design v2.1 §3).
+         */
+        data object KeystoreUnavailable : DecoyResult
+    }
+
+    sealed interface DecoyDeleteResult {
+        /** The decoy is gone; the returned session is the updated PARENT. */
+        data class Deleted(val parent: VaultSession) : DecoyDeleteResult
+
+        /** This vault has no decoy any more: nothing to delete. */
+        data object NotConfigured : DecoyDeleteResult
+
+        /**
+         * A decoy may exist and could not be proven: its mark cannot be read, or its creation is still
+         * journalled, or the Keystore did not answer. Nothing was written.
+         */
+        data object KeystoreUnavailable : DecoyDeleteResult
+    }
+
+    sealed interface CheckResult {
+        data object Correct : CheckResult
+
+        data object Wrong : CheckResult
+
+        data class Locked(val remainingMillis: Long) : CheckResult
+
+        data object KeystoreUnavailable : CheckResult
+    }
+
+    sealed interface ChangeResult {
+        /** [biometricsDisarmed]: a fingerprint opened this vault, and no longer does (design v2 §10). */
+        data class Changed(val session: VaultSession, val biometricsDisarmed: Boolean) : ChangeResult
+
+        data object WrongCurrentPassword : ChangeResult
+
+        data object PasswordRefused : ChangeResult
+
+        data class Locked(val remainingMillis: Long) : ChangeResult
+
+        /** Nothing was written: the current password still opens the vault. */
+        data object KeystoreUnavailable : ChangeResult
+    }
+
+    sealed interface HeirConfigureResult {
+        data object Done : HeirConfigureResult
+
+        /** 2.7.1 refuses a snapshot of an empty vault, and says so. */
+        data object VaultEmpty : HeirConfigureResult
+
+        /** The passphrase is the master password of this vault: it is meant for someone else. */
+        data object PassphraseRefused : HeirConfigureResult
+
+        data class Locked(val remainingMillis: Long) : HeirConfigureResult
+
+        data object KeystoreUnavailable : HeirConfigureResult
+    }
+
+    /** Which vault a fingerprint opens, as the owner of an open vault may know it (design v2 §9). */
+    enum class BiometricStatus { OFF, THIS_VAULT, ANOTHER_VAULT }
+
+    sealed interface BiometricUnlockResult {
+        data class Opened(val session: VaultSession) : BiometricUnlockResult
+
+        data class Locked(val remainingMillis: Long) : BiometricUnlockResult
+
+        /** What was armed opens no vault any more: now disarmed. The password still opens the vault. */
+        data object Disarmed : BiometricUnlockResult
+
+        data object KeystoreUnavailable : BiometricUnlockResult
+    }
+
+    /** One attempt, against one slot or against all of them. */
+    private sealed interface Attempt {
+        data class Opened(val session: VaultSession) : Attempt
+
+        data object NoMatch : Attempt
+
+        /** Nothing opened, and at least one slot could not be checked. */
+        data object Indeterminate : Attempt
+    }
+
+    private enum class Collision { NONE, MATCH, UNKNOWN }
+
+    fun statuses(): Map<Slot, SlotStatus> = Slot.entries.associateWith(::status)
+
+    /**
+     * How long the lockout still lasts, 0 if an attempt may be made now: lets the unlock screen show
+     * its countdown before anyone types. 0 as well if the state cannot be read; the attempt then says so.
+     */
+    fun lockoutRemainingMillis(): Long =
+        unavailableAs(0L) { (guard.gate() as? BruteForceGuard.Gate.Locked)?.remainingMillis ?: 0L }
+
+    /**
+     * The creation form shows on a fresh install, and after any deletion, whichever vault it came
+     * from: the screen that follows a deletion never tells whether another vault survived (oracle E).
+     */
+    fun entryMode(): EntryMode {
+        val statuses = statuses().values
+        val fresh = statuses.all { it == SlotStatus.Missing }
+        return if (fresh || statuses.any { it.creationRequested }) EntryMode.CREATE else EntryMode.UNLOCK
+    }
+
+    fun unlock(password: ByteArray): UnlockResult =
+        unavailableAs(UnlockResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return UnlockResult.Locked(gate.remainingMillis)
+            guard.beginAttempt()
+            when (val attempt = tryAllSlots(password)) {
+                is Attempt.Opened -> UnlockResult.Opened(settle(succeededWith(attempt.session)))
+                Attempt.NoMatch -> {
+                    guard.failed()
+                    UnlockResult.WrongPassword
+                }
+                Attempt.Indeterminate -> {
+                    guard.failed()
+                    UnlockResult.KeystoreUnavailable
+                }
+            }
+        }
+
+    /**
+     * The creation form (design v2 §5): a password that opens an existing vault opens it, which is
+     * how the owner gets the real vault back after someone emptied the decoy. Otherwise a new vault
+     * is created in a provably free slot.
+     */
+    fun openOrCreate(password: ByteArray): CreateResult =
+        unavailableAs(CreateResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return CreateResult.Locked(gate.remainingMillis)
+            guard.beginAttempt()
+            when (val attempt = tryAllSlots(password)) {
+                is Attempt.Opened -> CreateResult.Opened(clearCreationRequests(settle(succeededWith(attempt.session))))
+                Attempt.NoMatch -> createInFreeSlot(password)
+                // The password may open the slot that could not be checked: creating now could make two vaults answer it.
+                Attempt.Indeterminate -> {
+                    guard.failed()
+                    CreateResult.KeystoreUnavailable
+                }
+            }
+        }
+
+    /**
+     * Saves [entries] into the open vault. Returns the updated session. Throws
+     * [KeystoreUnavailableException] if the Keystore did not answer, before anything was written.
+     */
+    fun save(session: VaultSession, entries: List<Entry>): VaultSession {
+        val updated = session.with(entries = entries)
+        write(updated)
+        return updated
+    }
+
+    /**
+     * The decoy this vault created, PROVEN still there: its slot's mark reads occupied, with the same
+     * generation. The only decoy [deleteData] may erase. A stale reference reads as no decoy.
+     */
+    fun decoyOf(session: VaultSession): ChildRef? = session.meta.child?.takeIf { status(it.slot).holds(it) }
+
+    /**
+     * Whether this vault may NOT create a decoy: it has one, or one it cannot rule out (an unreadable
+     * mark, a creation still journalled). A second decoy is never offered over one that may exist.
+     */
+    fun hasDecoy(session: VaultSession): Boolean {
+        val child = session.meta.child
+        return session.meta.pendingChild != null ||
+            (child != null && status(child.slot).let { it.holds(child) || it == SlotStatus.Unknown })
+    }
+
+    /**
+     * Creates the decoy of [session] (design v2 §6, v2.1 §3). One per vault: the caller only offers it
+     * when [hasDecoy] is false.
+     */
+    fun configureDecoy(session: VaultSession, password: ByteArray): DecoyResult =
+        unavailableAs(DecoyResult.KeystoreUnavailable) {
+            check(!hasDecoy(session)) { "this vault has a decoy, or cannot rule one out" }
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return DecoyResult.Locked(gate.remainingMillis)
+            when (collision(password)) {
+                Collision.MATCH -> DecoyResult.PasswordRefused
+                Collision.UNKNOWN -> DecoyResult.KeystoreUnavailable
+                Collision.NONE -> {
+                    val statuses = statuses()
+                    val target = (Slot.entries - session.slot).firstOrNull { statuses.getValue(it).provablyFree }
+                    if (target == null) DecoyResult.Impossible else createDecoy(session, target, password)
+                }
+            }
+        }
+
+    /**
+     * Deletes the decoy this vault created (2.7.1: Settings › Decoy vault › Delete). No password is
+     * asked: the vault is open, the decoy holds nothing of the owner's, and an attacker who already
+     * has this session can empty the decoy by hand anyway.
+     *
+     * The decoy's slot becomes a dummy at the largest bucket on disk, so the phone looks exactly as it
+     * would had the decoy never been created. It does NOT ask for the creation form afterwards, unlike
+     * a deletion of one's own data: this vault stays open, and its owner has not lost anything.
+     *
+     * Only a decoy whose mark PROVES the slot is still its own is erased ([decoyOf]). A mark that
+     * cannot be read keeps its journal, and this answers "try again": erasing on a guess could
+     * overwrite a vault that was never this one's decoy.
+     */
+    fun deleteDecoy(session: VaultSession): DecoyDeleteResult =
+        unavailableAs(DecoyDeleteResult.KeystoreUnavailable) {
+            val child = decoyOf(session)
+                ?: return if (hasDecoy(session)) DecoyDeleteResult.KeystoreUnavailable else DecoyDeleteResult.NotConfigured
+            // As at every other deletion (design v2 §9): what a decoy's own session armed opens nothing now.
+            biometrics.purge()
+            // And the decoy's heir with it: its snapshot holds every entry the decoy ever had.
+            heir.forget(child.generation)
+            heir.shred(setOf(child.slot))
+            val updated = session.with(meta = session.meta.copy(child = null))
+            write(updated, erase = child.slot)
+            DecoyDeleteResult.Deleted(updated)
+        }
+
+    /** Re-authentication inside an open vault. Counted by the lockout like any other check. */
+    fun verifyPassword(session: VaultSession, password: ByteArray): CheckResult =
+        unavailableAs(CheckResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return CheckResult.Locked(gate.remainingMillis)
+            compareToCurrent(session, password).also { if (it == CheckResult.Correct) guard.succeeded() else guard.failed() }
+        }
+
+    /**
+     * Whether [candidate] is the password of the open vault, asked while the owner is CHOOSING
+     * another one — the heir passphrase, which must not be the master password they would then be
+     * handing to someone else. The mirror of [verifyPassword]: here the match is the refusal, so it
+     * is the match that counts as a failed attempt and the miss that cancels it.
+     *
+     * Cancelling on a miss is safe here, and it is the one place it is — which is why it says so.
+     * [compareToCurrent] compares against the key of the OPEN session and nothing else, so the answer
+     * is about a password the caller already holds. It is not an oracle: unlike [collision], it can
+     * never say whether some OTHER vault on this phone would open. Do not copy this line into a check
+     * that walks the slots.
+     */
+    fun collidesWithCurrentPassword(session: VaultSession, candidate: ByteArray): CheckResult =
+        unavailableAs(CheckResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return CheckResult.Locked(gate.remainingMillis)
+            compareToCurrent(session, candidate).also { if (it == CheckResult.Wrong) guard.succeeded() else guard.failed() }
+        }
+
+    /** Counts the attempt and answers; the caller records what the answer means for it. */
+    private fun compareToCurrent(session: VaultSession, password: ByteArray): CheckResult {
+        guard.beginAttempt()
+        val derived = VaultContainer.deriveKey(session.header, password, keystore)
+        val correct = derived.valueOrNull()?.useThenWipe { SecretBytes.constantTimeEquals(it, session.key) } ?: false
+        return when {
+            correct -> CheckResult.Correct
+            derived == KeyResult.Unavailable -> CheckResult.KeystoreUnavailable
+            else -> CheckResult.Wrong
+        }
+    }
+
+    /** A new salt and a new key. The previous file stays whole until the atomic replace. */
+    fun changePassword(session: VaultSession, current: ByteArray, new: ByteArray): ChangeResult =
+        when (val check = verifyPassword(session, current)) {
+            is CheckResult.Locked -> ChangeResult.Locked(check.remainingMillis)
+            CheckResult.Wrong -> ChangeResult.WrongCurrentPassword
+            CheckResult.KeystoreUnavailable -> ChangeResult.KeystoreUnavailable
+            CheckResult.Correct -> unavailableAs(ChangeResult.KeystoreUnavailable) { changeVerified(session, new) }
+        }
+
+    /**
+     * "Delete my data" (design v2 §5, v2.1 §1-2). A root vault erases every slot; any other vault
+     * erases itself and its own decoy, and nothing it does not know about. Either way the freed slots
+     * become dummies at the largest bucket on disk, marked for the creation form, and no Keystore key
+     * is regenerated: both paths do the same work, so a stopwatch cannot tell them apart.
+     *
+     * Throws [KeystoreUnavailableException] if the Keystore did not answer, before anything was written:
+     * the session stays open.
+     */
+    fun deleteData(session: VaultSession) {
+        biometrics.purge()
+        // A root vault erases slots it knows nothing about, so it forgets every heir; any other vault
+        // forgets its own and its decoy's (design v2 §5).
+        if (session.meta.root) heir.forgetAll() else forgetHeirsOf(session)
+        val erased = if (session.meta.root) Slot.entries.toSet() else setOfNotNull(session.slot, decoyOf(session)?.slot)
+        heir.shred(erased)
+        val bucket = largestBucketOnDisk(except = null)
+        files.writeAll(erased.associateWith { dummy(it, bucket, creationRequested = true) })
+        session.close()
+    }
+
+    /** This vault's heir, and its decoy's: the two generations a non-root deletion erases. */
+    private fun forgetHeirsOf(session: VaultSession) {
+        heir.forget(session.meta.generation)
+        decoyOf(session)?.let { heir.forget(it.generation) }
+    }
+
+    /** The heir state of this vault, and of this one only (design v2 §8). */
+    fun heirStatus(session: VaultSession): HeirState.Status = heir.status(session.meta.generation)
+
+    /**
+     * Takes, or replaces, the heir snapshot of the open vault. The passphrase must not be the
+     * master password: the owner hands the heir passphrase to someone else.
+     *
+     * An empty vault is refused, as in 2.7.1: a snapshot of nothing helps no one and hides the
+     * mistake until the day it matters.
+     */
+    fun configureHeir(session: VaultSession, passphrase: ByteArray, thresholdDays: Int): HeirConfigureResult =
+        unavailableAs(HeirConfigureResult.KeystoreUnavailable) {
+            if (session.entries.isEmpty()) return HeirConfigureResult.VaultEmpty
+            when (val check = collidesWithCurrentPassword(session, passphrase)) {
+                CheckResult.Correct -> HeirConfigureResult.PassphraseRefused
+                is CheckResult.Locked -> HeirConfigureResult.Locked(check.remainingMillis)
+                CheckResult.KeystoreUnavailable -> HeirConfigureResult.KeystoreUnavailable
+                CheckResult.Wrong -> {
+                    heir.configure(session.slot, session.meta.generation, session.entries, passphrase, thresholdDays)
+                    HeirConfigureResult.Done
+                }
+            }
+        }
+
+    fun setHeirThreshold(session: VaultSession, thresholdDays: Int) = heir.setThreshold(session.meta.generation, thresholdDays)
+
+    /** Shreds the snapshot of the open vault and forgets its heir state. */
+    fun disableHeir(session: VaultSession) = heir.disable(session.slot, session.meta.generation)
+
+    /** This vault was just opened: the silence the heir waits for starts again. */
+    fun markVaultActive(session: VaultSession) = heir.markActive(session.meta.generation)
+
+    /** The read-only entries an heir may see, with no vault open. See [HeirRepository.unlock]. */
+    fun unlockAsHeir(passphrase: ByteArray): HeirRepository.UnlockResult = heir.unlock(passphrase)
+
+    /**
+     * Whether a fingerprint opens some vault: the unlock screen offers it. Says nothing of which, and
+     * `false` if the secure hardware did not answer: the password is always there.
+     */
+    fun biometricsArmed(): Boolean = unavailableAs(false) { biometrics.armedGeneration() != null }
+
+    fun biometricStatus(session: VaultSession): BiometricStatus =
+        when (biometrics.armedGeneration()) {
+            null -> BiometricStatus.OFF
+            session.meta.generation -> BiometricStatus.THIS_VAULT
+            else -> BiometricStatus.ANOTHER_VAULT
+        }
+
+    /**
+     * Starts arming biometrics on [session]; `null` if refused: this vault has a decoy, or cannot rule
+     * one out (design v2 §9, v2.1 §3). A fingerprint must never open the vault a decoy stands in front
+     * of: that was the 2.7.0 flaw. Disarms whatever was armed.
+     */
+    fun cipherToArmBiometrics(session: VaultSession): Cipher? = if (hasDecoy(session)) null else biometrics.cipherToArm()
+
+    /**
+     * Seals the key of [session] with [cipher], once the prompt authenticated it. `false` if refused:
+     * the check is made again, a decoy may have been created since [cipherToArmBiometrics].
+     */
+    fun armBiometrics(session: VaultSession, cipher: Cipher): Boolean {
+        if (hasDecoy(session)) return false
+        biometrics.arm(session.meta.generation, session.key, cipher)
+        return true
+    }
+
+    fun cipherToUnlockWithBiometrics(): BiometricBinding.Start = biometrics.cipherToUnlock()
+
+    fun disarmBiometrics() = biometrics.purge()
+
+    /**
+     * Opens the vault that armed biometrics, with a cipher the prompt authenticated (design v2 §9): the
+     * sealed key is tried on every slot, and opens the one it decrypts whose generation it carries. Not
+     * a password guess, so the lockout does not count it; but a running lockout refuses it, as 2.7.1 did.
+     *
+     * A vault with a decoy, or one it cannot rule out, is never opened by a fingerprint, whatever
+     * armed it: checked here, at the moment of use, and not only when arming (Gemini review of the
+     * biometrics, 2026-09-22). The purges keep this from happening; this keeps it from mattering.
+     */
+    fun unlockWithBiometrics(cipher: Cipher): BiometricUnlockResult =
+        unavailableAs(BiometricUnlockResult.KeystoreUnavailable) {
+            val gate = guard.gate()
+            if (gate is BruteForceGuard.Gate.Locked) return BiometricUnlockResult.Locked(gate.remainingMillis)
+            val armed = biometrics.open(cipher)
+            val session = armed?.key?.useThenWipe { openArmed(it, armed.generation) }
+            if (session != null && !hasDecoy(session)) return BiometricUnlockResult.Opened(settle(session))
+            session?.close()
+            biometrics.purge()
+            BiometricUnlockResult.Disarmed
+        }
+
+    private fun changeVerified(session: VaultSession, new: ByteArray): ChangeResult =
+        when (collision(new)) {
+            Collision.MATCH -> ChangeResult.PasswordRefused
+            Collision.UNKNOWN -> ChangeResult.KeystoreUnavailable
+            Collision.NONE -> {
+                // Read before the new key exists: a Keystore that does not answer here leaves nothing to wipe.
+                val armedHere = biometrics.armedGeneration() == session.meta.generation
+                val changed = newSession(session.slot, new, session.meta)?.with(entries = session.entries)
+                if (changed == null) {
+                    ChangeResult.KeystoreUnavailable
+                } else {
+                    // Only this vault's arming: another vault's owner would see their fingerprint stop
+                    // working because of a vault they must not know about (design v2 §10).
+                    if (armedHere) biometrics.purge()
+                    written(changed)
+                    session.close()
+                    ChangeResult.Changed(changed, biometricsDisarmed = armedHere)
+                }
+            }
+        }
+
+    private fun createInFreeSlot(password: ByteArray): CreateResult {
+        val statuses = statuses()
+        val free = Slot.entries.filter { statuses.getValue(it).provablyFree }
+        val target = free.firstOrNull()
+        if (target == null) {
+            guard.failed()
+            return CreateResult.Impossible
+        }
+        // Every slot free means there was nothing on this phone the password could have opened, so
+        // this is a first creation and not a guess. That is also exactly what makes a vault root.
+        val firstOnThisPhone = free.size == Slot.entries.size
+        // Otherwise it IS a failed guess: [openOrCreate] tried the password against every occupied
+        // slot and none of them opened. Cancelling the attempt here — as this line did — handed an
+        // attacker an endless loop through the creation form: delete the vault he was given, guess,
+        // receive a throwaway vault, delete it, guess again, with the counter back to zero each time.
+        if (firstOnThisPhone) guard.succeeded() else guard.failed()
+        // Only provably free slots get a key: a key is never re-created under a vault (GPT review of v2.2, P3).
+        keystore.ensureHmacKeys(free.map { it.hardwareKeyAlias })
+        val meta = VaultMeta(OccupancyMark.newGeneration(), root = firstOnThisPhone, child = null)
+        val session = newSession(target, password, meta) ?: return CreateResult.KeystoreUnavailable
+        return CreateResult.Created(written(session, clearCreationRequests = true))
+    }
+
+    /**
+     * The decoy is derived before anything is written, journalled in the parent BEFORE it exists, and
+     * biometrics are purged before any write: a failure at any point leaves no orphan and no
+     * fingerprint that opens the parent while a decoy exists (GPT 5.6 reviews of v2 §3, §C and v2.2 P4).
+     */
+    private fun createDecoy(parent: VaultSession, target: Slot, password: ByteArray): DecoyResult {
+        val child = ChildRef(target, OccupancyMark.newGeneration())
+        keystore.ensureHmacKeys(listOf(target.hardwareKeyAlias))
+        val decoy = newSession(target, password, VaultMeta(child.generation, root = false, child = null))
+            ?: return DecoyResult.KeystoreUnavailable
+        try {
+            biometrics.purge()
+            val journalled = parent.with(meta = parent.meta.copy(pendingChild = child))
+            write(journalled)
+            write(decoy)
+            val confirmed = journalled.with(meta = journalled.meta.copy(child = child, pendingChild = null))
+            write(confirmed)
+            return DecoyResult.Created(confirmed)
+        } finally {
+            decoy.close()
+        }
+    }
+
+    /**
+     * Completes or drops a decoy creation that was interrupted (design v2.1 §3). Best effort: if the
+     * target's mark cannot be read, or the write fails, the journal stays for the next opening. It is
+     * never dropped on an unreadable mark: that would orphan a decoy that exists.
+     */
+    private fun settle(session: VaultSession): VaultSession {
+        val pending = session.meta.pendingChild ?: return session
+        val status = status(pending.slot)
+        if (status == SlotStatus.Unknown) return session
+        val child = if (status.holds(pending)) pending else session.meta.child
+        val settled = session.with(meta = session.meta.copy(child = child, pendingChild = null))
+        return try {
+            write(settled)
+            settled
+        } catch (_: KeystoreUnavailableException) {
+            session
+        }
+    }
+
+    /** After the creation form opened an existing vault, the next start shows the unlock form again. Best effort. */
+    private fun clearCreationRequests(session: VaultSession): VaultSession {
+        if (statuses().values.any { it.creationRequested }) {
+            try {
+                write(session, clearCreationRequests = true)
+            } catch (_: KeystoreUnavailableException) {
+                // Harmless: the creation form shows once more, and the next opening retries.
+            }
+        }
+        return session
+    }
+
+    /**
+     * Whether [password] opens an existing vault. The full work against every slot, and charged in
+     * EVERY outcome: a collision check must not become a free way to test guesses.
+     *
+     * The last branch used to do the opposite — `guard.succeeded()` on a password that had opened
+     * nothing at all. Only [succeededWith] may cancel an attempt, and only because a vault really
+     * opened. Three screens reached this branch (set up a decoy, change the master password, and the
+     * creation form through [openOrCreate]), so on all three a wrong guess cost nothing while the
+     * unlock screen charged it: the schedule the About screen advertises did not apply on the paths
+     * an attacker with an open decoy can actually reach. The audit of 2026-09-24 found it, and the
+     * give-away was the asymmetry with [createInFreeSlot], which charges the very same outcome.
+     *
+     * The owner pays a little for this: choosing a decoy password, a new master password or an heir
+     * passphrase now counts as one attempt. Five are free, an unlock cancels one, and the debt decays
+     * on its own — so a person setting one up never meets a delay, and a loop of guesses meets it on
+     * the sixth.
+     */
+    private fun collision(password: ByteArray): Collision {
+        guard.beginAttempt()
+        return when (val attempt = tryAllSlots(password)) {
+            is Attempt.Opened -> {
+                attempt.session.close()
+                guard.failed()
+                Collision.MATCH
+            }
+            Attempt.Indeterminate -> {
+                guard.failed()
+                Collision.UNKNOWN
+            }
+            Attempt.NoMatch -> {
+                guard.failed()
+                Collision.NONE
+            }
+        }
+    }
+
+    /**
+     * A vault in [slot] with no entries yet: a fresh salt, and a key from [password] and the slot's
+     * hardware key. `null` if the Keystore did not answer.
+     */
+    private fun newSession(slot: Slot, password: ByteArray, meta: VaultMeta): VaultSession? {
+        val header = VaultContainer.newHeader(slot, params)
+        return VaultContainer.deriveKey(header, password, keystore).valueOrNull()?.let { VaultSession(slot, header, it, meta, emptyList()) }
+    }
+
+    /** Records the success, then hands [session] over; wipes its key if the success cannot be recorded. */
+    private fun succeededWith(session: VaultSession): VaultSession =
+        try {
+            guard.succeeded()
+            session
+        } catch (e: Exception) {
+            session.close()
+            throw e
+        }
+
+    /**
+     * Writes a session that owns its key, and wipes that key if the write fails. Never for a saved
+     * session, which shares its key with the open one.
+     */
+    private fun written(session: VaultSession, clearCreationRequests: Boolean = false): VaultSession =
+        try {
+            write(session, clearCreationRequests)
+            session
+        } catch (e: Exception) {
+            session.close()
+            throw e
+        }
+
+    /**
+     * Seals [session] and rewrites every slot file (design v2 §7). Dummies are regenerated when smaller
+     * than the new bucket or when the creation mode ends; a missing slot file becomes a dummy. An
+     * occupied or unknown slot keeps its ciphertext byte for byte — this session has no key for it —
+     * and is brought up to the common size with random bytes written AFTER it, which needs no key.
+     *
+     * That last part is new in 3.0.0. Such a slot used to be left exactly as it was, so a vault that
+     * grew past a bucket left every other occupied slot smaller than the rest: a file smaller than
+     * the largest was therefore an occupied one, and the decoy stopped being deniable to anyone
+     * holding a copy of the directory (audit of 2026-09-24).
+     */
+    private fun write(session: VaultSession, clearCreationRequests: Boolean = false, erase: Slot? = null) {
+        val statuses = statuses()
+        val plain = VaultPayload(session.entries, session.meta).toBytes()
+        val bucket = maxOf(Padding.bucketFor(plain.size), largestBucketOnDisk(except = session.slot))
+        val mark = OccupancyMark.occupied(session.meta.generation).seal(session.slot, keystore)
+        val content = plain.useThenWipe { Padding.pad(it, bucket) }.useThenWipe { padded ->
+            VaultContainer.seal(session.header, session.key, padded, mark)
+        }
+        val updates = mutableMapOf(session.slot to content)
+        for (slot in Slot.entries - session.slot) {
+            val request = dummyRequest(slot, statuses.getValue(slot), bucket, clearCreationRequests, erase)
+            if (request != null) {
+                updates[slot] = dummy(slot, bucket, request)
+            } else {
+                // A slot this session has no key for: occupied, or a mark it cannot read. Its
+                // plaintext cannot be re-padded — but its FILE can still be brought to the common
+                // size, which is all an observer of the directory ever sees ([VaultContainer.grownTo]).
+                // `null` back means it is already that long, and then it is left exactly as it is.
+                SlotFiller.grownTo(files.read(slot).orEmpty(), bucket + AesGcm.TAG_LENGTH)
+                    ?.let { grown -> updates[slot] = grown }
+            }
+        }
+        files.writeAll(updates)
+    }
+
+    /**
+     * Whether [slot] is rewritten as a DUMMY by this save, and with which creation request. `null`
+     * means it is not: an occupied slot, or one whose mark cannot be read, keeps the ciphertext this
+     * session has no key for. [write] still brings its file up to the common size. The one exception
+     * is [erase], the decoy this vault is deleting on purpose.
+     */
+    private fun dummyRequest(slot: Slot, status: SlotStatus, bucket: Int, clearCreationRequests: Boolean, erase: Slot?): Boolean? =
+        when {
+            slot == erase -> false
+            status == SlotStatus.Missing -> false
+            status !is SlotStatus.Marked || status.mark.occupied -> null
+            else -> {
+                val keepRequest = status.mark.creationRequested && !clearCreationRequests
+                if (bucketOf(slot) < bucket || keepRequest != status.mark.creationRequested) keepRequest else null
+            }
+        }
+
+    /**
+     * A slot file nobody can open: random key, never stored, over padding only. Indistinguishable
+     * from a real vault without its password, and cheap: no Argon2id to run. The slot keeps a hardware
+     * key all the same, so that an attempt costs the same work on every slot.
+     */
+    private fun dummy(slot: Slot, bucket: Int, creationRequested: Boolean): String {
+        keystore.ensureHmacKeys(listOf(slot.hardwareKeyAlias))
+        val header = VaultContainer.newHeader(slot, params)
+        return SecretBytes.random(AesGcm.KEY_LENGTH).useThenWipe { key ->
+            VaultContainer.seal(header, key, Padding.pad(ByteArray(0), bucket), OccupancyMark.free(creationRequested).seal(slot, keystore))
+        }
+    }
+
+    private fun tryAllSlots(password: ByteArray): Attempt {
+        var opened: VaultSession? = null
+        var indeterminate = false
+        for (slot in Slot.entries) {
+            when (val attempt = tryOpen(slot, password)) {
+                is Attempt.Opened -> if (opened == null) opened = attempt.session else attempt.session.close()
+                Attempt.Indeterminate -> indeterminate = true
+                Attempt.NoMatch -> Unit
+            }
+        }
+        return when {
+            opened != null -> Attempt.Opened(opened)
+            indeterminate -> Attempt.Indeterminate
+            else -> Attempt.NoMatch
+        }
+    }
+
+    /**
+     * The same work on every slot: Argon2id and the hardware HMAC, on a synthetic header when the slot
+     * has no readable file (GPT review of v2.2, P5).
+     */
+    private fun tryOpen(slot: Slot, password: ByteArray): Attempt {
+        val parsed = files.read(slot)?.let { VaultContainer.parseOrNull(it, slot) }
+        val derived = VaultContainer.deriveKey(parsed?.header ?: VaultContainer.newHeader(slot, params), password, keystore)
+        val key = derived.valueOrNull()
+        return when {
+            parsed == null -> {
+                key?.wipe()
+                Attempt.NoMatch
+            }
+            derived == KeyResult.Unavailable -> Attempt.Indeterminate
+            key == null -> Attempt.NoMatch
+            else -> openWith(slot, parsed, key)
+        }
+    }
+
+    /** The one slot [key] decrypts and whose vault carries [generation]; `null` if none. [key] is left to the caller. */
+    private fun openArmed(key: ByteArray, generation: String): VaultSession? {
+        var found: VaultSession? = null
+        for (slot in Slot.entries) {
+            val parsed = files.read(slot)?.let { VaultContainer.parseOrNull(it, slot) } ?: continue
+            val attempt = openWith(slot, parsed, key.copyOf())
+            if (attempt is Attempt.Opened) {
+                if (found == null && attempt.session.meta.generation == generation) found = attempt.session else attempt.session.close()
+            }
+        }
+        return found
+    }
+
+    private fun openWith(slot: Slot, parsed: VaultContainer.Parsed, key: ByteArray): Attempt {
+        val payload = VaultContainer.openOrNull(parsed, key)?.useThenWipe(VaultPayload::fromPaddedBytesOrNull)
+        return if (payload == null) {
+            key.wipe()
+            Attempt.NoMatch
+        } else {
+            Attempt.Opened(VaultSession(slot, parsed.header, key, payload.meta, payload.entries))
+        }
+    }
+
+    private fun status(slot: Slot): SlotStatus {
+        val content = files.read(slot) ?: return SlotStatus.Missing
+        return VaultContainer.parseOrNull(content, slot)
+            ?.let { OccupancyMark.openOrNull(it.occupancy, slot, keystore) }
+            ?.let { SlotStatus.Marked(it) }
+            ?: SlotStatus.Unknown
+    }
+
+    /** Whether this slot provably holds [child]: its mark reads occupied, with the child's generation. */
+    private fun SlotStatus.holds(child: ChildRef): Boolean =
+        this is SlotStatus.Marked && mark.occupied && mark.generation == child.generation
+
+    /** The padded plaintext size of a slot, read without its key. 0 if unreadable. */
+    private fun bucketOf(slot: Slot): Int =
+        files.read(slot)?.let { VaultContainer.parseOrNull(it, slot) }?.cipherAndTag?.size?.minus(AesGcm.TAG_LENGTH) ?: 0
+
+    private fun largestBucketOnDisk(except: Slot?): Int =
+        maxOf(Padding.FIRST_BUCKET, Slot.entries.filter { it != except }.maxOfOrNull(::bucketOf) ?: 0)
+
+    /** Runs [block]; a Keystore that did not answer anywhere inside becomes [unavailable]. */
+    private inline fun <T> unavailableAs(unavailable: T, block: () -> T): T =
+        try {
+            block()
+        } catch (_: KeystoreUnavailableException) {
+            unavailable
+        }
+}

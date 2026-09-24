@@ -1,0 +1,8 @@
+Pass Tech 3.0.0 — riscritta da zero in Kotlin.
+
+È una nuova app accanto alla 2.x, non un suo aggiornamento. Esporta una copia .ptbak dalla vecchia, importala qui, e togli la vecchia quando sei soddisfatto.
+
+Novità della riscrittura:
+• Tre posti per la cassaforte della stessa dimensione, così nulla sul telefono dice se usi un'esca.
+• Il controllo del dominio legge nove browser, e una voce può dichiarare più indirizzi.
+• Cinque lingue, scelte nell'app.

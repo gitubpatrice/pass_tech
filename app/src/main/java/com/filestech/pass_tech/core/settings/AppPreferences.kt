@@ -1,0 +1,131 @@
+package com.filestech.pass_tech.core.settings
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.filestech.pass_tech.core.model.EntryQuery
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Plain app settings, in a DataStore: nothing secret and nothing that says whether a vault exists.
+ * Security state (lockout, heir, biometric binding) lives in the encrypted state store instead.
+ * A damaged file reads as the defaults.
+ */
+@Singleton
+class AppPreferences @Inject constructor(private val store: DataStore<Preferences>) {
+
+    private val data: Flow<Preferences> = store.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+
+    /** Whether the first-launch splash was seen (2.7.1: `splash_shown_v1`). */
+    val splashShown: Flow<Boolean> = data.map { it[SPLASH_SHOWN] ?: false }
+
+    suspend fun markSplashShown() {
+        store.edit { it[SPLASH_SHOWN] = true }
+    }
+
+    /**
+     * How long the vault stays open once the app is left, in seconds: one of [AUTO_LOCK_CHOICES]. A value
+     * that is not one of them (a damaged or hand-edited file) reads as the default, never as [NEVER].
+     */
+    val autoLockSeconds: Flow<Int> = data.map { prefs -> prefs[AUTO_LOCK]?.takeIf { it in AUTO_LOCK_CHOICES } ?: AUTO_LOCK_DEFAULT }
+
+    suspend fun setAutoLockSeconds(seconds: Int) {
+        require(seconds in AUTO_LOCK_CHOICES) { "Not an auto-lock choice: $seconds" }
+        store.edit { it[AUTO_LOCK] = seconds }
+    }
+
+    /**
+     * How long a copied value stays in the clipboard, in seconds: one of [CLIPBOARD_CHOICES], 0 for
+     * never cleared. A value that is not one of them reads as the default.
+     */
+    val clipboardClearSeconds: Flow<Int> =
+        data.map { prefs -> prefs[CLIPBOARD_CLEAR]?.takeIf { it in CLIPBOARD_CHOICES } ?: CLIPBOARD_DEFAULT }
+
+    suspend fun setClipboardClearSeconds(seconds: Int) {
+        require(seconds in CLIPBOARD_CHOICES) { "Not a clipboard choice: $seconds" }
+        store.edit { it[CLIPBOARD_CLEAR] = seconds }
+    }
+
+    /** 2.7.1: `theme_mode`, the system's by default. */
+    val theme: Flow<Theme> = data.map { prefs -> Theme.entries.firstOrNull { it.key == prefs[THEME] } ?: Theme.SYSTEM }
+
+    suspend fun setTheme(theme: Theme) {
+        store.edit { it[THEME] = theme.key }
+    }
+
+    /**
+     * FLAG_SECURE on every screen (2.7.1: `screenshot_protection_enabled`, on by default). Anything but
+     * an explicit `false` reads as on.
+     */
+    val screenshotProtection: Flow<Boolean> = data.map { it[SCREENSHOT_PROTECTION] != false }
+
+    suspend fun setScreenshotProtection(enabled: Boolean) {
+        store.edit { it[SCREENSHOT_PROTECTION] = enabled }
+    }
+
+    /**
+     * Whether the owner asked for the anti-phishing check (2.7.1: `anti_phishing_enabled`, off by
+     * default). It belongs to the phone and not to a vault, like the theme: it describes a service
+     * anyone can see in the Android settings, so holding it per vault would say nothing more and
+     * would let one vault's setting answer for another's.
+     */
+    val antiPhishing: Flow<Boolean> = data.map { it[ANTI_PHISHING] == true }
+
+    suspend fun setAntiPhishing(enabled: Boolean) {
+        store.edit { it[ANTI_PHISHING] = enabled }
+    }
+
+    /**
+     * When the update check last UNDERSTOOD an answer, on the wall clock. Zero until the first one.
+     */
+    val updateLastCheckMillis: Flow<Long> = data.map { it[UPDATE_LAST_CHECK] ?: 0L }
+
+    suspend fun setUpdateLastCheckMillis(millis: Long) {
+        store.edit { it[UPDATE_LAST_CHECK] = millis }
+    }
+
+    /** The order of the home list, kept from one opening to the next (2.7.1: `sort_mode`). */
+    val sortMode: Flow<EntryQuery.Sort> = data.map { EntryQuery.Sort.fromKey(it[SORT_MODE]) }
+
+    suspend fun setSortMode(sort: EntryQuery.Sort) {
+        store.edit { it[SORT_MODE] = sort.key }
+    }
+
+    enum class Theme(val key: String) { SYSTEM("system"), LIGHT("light"), DARK("dark") }
+
+    companion object {
+        /** The vault never locks by itself. */
+        const val NEVER = -1
+
+        /** 2.7.1's choices: immediately, 1, 5, 15 or 30 minutes, never. */
+        val AUTO_LOCK_CHOICES = listOf(0, 60, 300, 900, 1800, NEVER)
+
+        /** 2.7.1's default: 5 minutes. */
+        const val AUTO_LOCK_DEFAULT = 300
+
+        /** 2.7.1's choices: 15, 30 or 60 seconds, or never (0). */
+        val CLIPBOARD_CHOICES = listOf(15, 30, 60, 0)
+
+        /** 2.7.1's default: 30 seconds. */
+        const val CLIPBOARD_DEFAULT = 30
+
+        private val SPLASH_SHOWN = booleanPreferencesKey("splash_shown")
+        private val AUTO_LOCK = intPreferencesKey("auto_lock_seconds")
+        private val CLIPBOARD_CLEAR = intPreferencesKey("clipboard_clear")
+        private val SORT_MODE = stringPreferencesKey("sort_mode")
+        private val THEME = stringPreferencesKey("theme_mode")
+        private val SCREENSHOT_PROTECTION = booleanPreferencesKey("screenshot_protection_enabled")
+        private val ANTI_PHISHING = booleanPreferencesKey("anti_phishing_enabled")
+        private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check_ms")
+    }
+}

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the anti-phishing service is allowed to see.
+
+  packageNames holds the browsers whose address bar this app knows how to find, and the system sends
+  it nothing from any other app: a banking app, a messenger or a keyboard never reaches it. The list
+  is the same one as PhishingDetectorService.ADDRESS_BARS, and a browser missing from either side
+  simply cannot be read — the verdict then says so instead of saying all is well.
+
+  canRetrieveWindowContent is what lets the address bar be read at all, and flagReportViewIds what
+  lets it be found by its identifier rather than by walking the whole page.
+
+  The event types are the two that mean "the page changed": no taps, no scrolls, no typing, no focus.
+-->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagReportViewIds"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/phishing_detector_description"
+    android:notificationTimeout="200"
+    android:packageNames="com.android.chrome,com.brave.browser,com.vivaldi.browser,com.microsoft.emmx,com.opera.browser,org.mozilla.firefox,org.mozilla.fenix,com.sec.android.app.sbrowser,com.duckduckgo.mobile.android" />

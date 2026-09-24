@@ -1,0 +1,274 @@
+[
+  {
+    "url": "example.com",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "https://example.com/login?next=/account",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "http://example.com",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "www.example.com",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "EXAMPLE.COM",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "example.com:8443",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "https://user:secret@example.com/",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "  example.com  ",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com",
+    "distance": null
+  },
+  {
+    "url": "example.com",
+    "active": "login.example.com",
+    "verdict": "ok",
+    "expectedDomain": "example.com",
+    "activeDomain": "login.example.com",
+    "distance": null
+  },
+  {
+    "url": "example.co.uk",
+    "active": "www.example.co.uk",
+    "verdict": "ok",
+    "expectedDomain": "example.co.uk",
+    "activeDomain": "www.example.co.uk",
+    "distance": null
+  },
+  {
+    "url": "login.example.com",
+    "active": "example.com",
+    "verdict": "mismatch",
+    "expectedDomain": "login.example.com",
+    "activeDomain": "example.com",
+    "distance": 6
+  },
+  {
+    "url": "a.example.com",
+    "active": "b.example.com",
+    "verdict": "typosquatting",
+    "expectedDomain": "a.example.com",
+    "activeDomain": "b.example.com",
+    "distance": 1
+  },
+  {
+    "url": "victim.github.io",
+    "active": "attacker.github.io",
+    "verdict": "mismatch",
+    "expectedDomain": "victim.github.io",
+    "activeDomain": "attacker.github.io",
+    "distance": 7
+  },
+  {
+    "url": "victim.pages.dev",
+    "active": "attacker.pages.dev",
+    "verdict": "mismatch",
+    "expectedDomain": "victim.pages.dev",
+    "activeDomain": "attacker.pages.dev",
+    "distance": 7
+  },
+  {
+    "url": "paypal.com",
+    "active": "paypa1.com",
+    "verdict": "typosquatting",
+    "expectedDomain": "paypal.com",
+    "activeDomain": "paypa1.com",
+    "distance": 1
+  },
+  {
+    "url": "paypal.com",
+    "active": "paypall.com",
+    "verdict": "typosquatting",
+    "expectedDomain": "paypal.com",
+    "activeDomain": "paypall.com",
+    "distance": 1
+  },
+  {
+    "url": "example.com",
+    "active": "exarnple.com",
+    "verdict": "typosquatting",
+    "expectedDomain": "example.com",
+    "activeDomain": "exarnple.com",
+    "distance": 2
+  },
+  {
+    "url": "example.com",
+    "active": "example.co",
+    "verdict": "typosquatting",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.co",
+    "distance": 1
+  },
+  {
+    "url": "example.com",
+    "active": "evil.com",
+    "verdict": "mismatch",
+    "expectedDomain": "example.com",
+    "activeDomain": "evil.com",
+    "distance": 5
+  },
+  {
+    "url": "example.com",
+    "active": "example.com.evil.com",
+    "verdict": "mismatch",
+    "expectedDomain": "example.com",
+    "activeDomain": "example.com.evil.com",
+    "distance": 9
+  },
+  {
+    "url": "mabanque.fr",
+    "active": "phishing-site-numero-un.tk",
+    "verdict": "mismatch",
+    "expectedDomain": "mabanque.fr",
+    "activeDomain": "phishing-site-numero-un.tk",
+    "distance": 22
+  },
+  {
+    "url": "",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": null,
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "   ",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": null,
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "not a url",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": null,
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "localhost",
+    "active": "localhost",
+    "verdict": "ok",
+    "expectedDomain": null,
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "example",
+    "active": "example.com",
+    "verdict": "ok",
+    "expectedDomain": null,
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "example.com",
+    "active": null,
+    "verdict": "unknown",
+    "expectedDomain": "example.com",
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "example.com",
+    "active": "",
+    "verdict": "unknown",
+    "expectedDomain": "example.com",
+    "activeDomain": null,
+    "distance": null
+  },
+  {
+    "url": "société.fr",
+    "active": "xn--socit-esab.fr",
+    "verdict": "mismatch",
+    "expectedDomain": "soci%c3%a9t%c3%a9.fr",
+    "activeDomain": "xn--socit-esab.fr",
+    "distance": 15
+  },
+  {
+    "url": "https://société.fr/compte",
+    "active": "xn--socit-esab.fr",
+    "verdict": "mismatch",
+    "expectedDomain": "soci%c3%a9t%c3%a9.fr",
+    "activeDomain": "xn--socit-esab.fr",
+    "distance": 15
+  },
+  {
+    "url": "xn--socit-esab.fr",
+    "active": "xn--socit-esab.fr",
+    "verdict": "ok",
+    "expectedDomain": "xn--socit-esab.fr",
+    "activeDomain": "xn--socit-esab.fr",
+    "distance": null
+  },
+  {
+    "url": "münchen.de",
+    "active": "xn--mnchen-3ya.de",
+    "verdict": "mismatch",
+    "expectedDomain": "m%c3%bcnchen.de",
+    "activeDomain": "xn--mnchen-3ya.de",
+    "distance": 11
+  },
+  {
+    "url": "example.com.",
+    "active": "example.com",
+    "verdict": "typosquatting",
+    "expectedDomain": "example.com.",
+    "activeDomain": "example.com",
+    "distance": 1
+  },
+  {
+    "url": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+    "active": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+    "verdict": "ok",
+    "expectedDomain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+    "activeDomain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+    "distance": null
+  }
+]

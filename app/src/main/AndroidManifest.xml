@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      INTERNET serves two documented uses, and only these two (PRIVACY §6): the GitHub update check,
+      and the opt-in breach check (HIBP, k-anonymity). The vault itself never leaves the device.
+      The published permission set is measured on the APK by the "Promises" CI job, against
+      config/expected-permissions.txt, never read from this file: the merged manifest is what ships.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      The five root managers core/integrity/IntegritySignals.ROOT_APPS looks for, named one by one.
+      From Android 11 (targetSdk 30) an app sees no package it has not declared, so getPackageInfo
+      answered NameNotFoundException for all five on every modern phone: half the root check was
+      blind, and said so to nobody. Never QUERY_ALL_PACKAGES — five names are what is needed, and a
+      store or an F-Droid review has no reason to object to them.
+
+      The cost is that the list is readable in the published manifest, so a rooted owner can rename
+      their manager to escape it. Magisk already hides its package by default, so that cost was
+      mostly paid before this was written; the paths in SU_PATHS are the other half of the check.
+    -->
+    <queries>
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="eu.chainfire.supersu" />
+        <package android:name="com.koushikdutta.superuser" />
+        <package android:name="com.thirdparty.superuser" />
+        <package android:name="com.noshufou.android.su" />
+    </queries>
+
+    <!--
+      allowBackup="false" plus both exclusion rule sets: no cloud backup and no device-to-device
+      transfer of anything. The vault keys live in the AndroidKeyStore, bound to this install; a
+      restored copy of the vault files would be unreadable anyway, and a backed-up copy is one more
+      place an attacker could collect them from.
+    -->
+    <application
+        android:name=".PassTechApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="${appLabel}"
+        android:localeConfig="@xml/locales_config"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PassTech.Splash"
+        android:usesCleartextTraffic="false">
+
+        <!--
+          Not exported: the launcher goes through the aliases below, which carry the MAIN/LAUNCHER
+          filter and their own exported="true" — the system resolves the alias, and its target does
+          not need to be exported. CalculatorActivity reaches this one by an explicit intent inside
+          the same UID, which exported does not govern. Any installed app could otherwise open the
+          unlock screen by component name: no extra is read there, so the impact was small, but the
+          surface was free (2.7.1, audit 2026-08-03).
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.PassTech.Splash"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!--
+          The everyday icon and name. Enabled; the panic mode swaps the two.
+
+          The label is the PLACEHOLDER, not @string/app_name, and the difference is the launcher.
+          What the launcher draws under an icon is the label of the component it resolved — this
+          alias — and never the one on <application>. So the debug build carried "Pass Tech (debug)"
+          in Settings › Apps and plain "Pass Tech" on the home screen, beside the 2.x app, with the
+          same name and the same look. Patrice tested the wrong one on the S24 on 2026-09-24 and we
+          spent three measurements finding out. In release both resolve to the same two words.
+        -->
+        <activity-alias
+            android:name=".MainAliasNormal"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="${appLabel}"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!--
+          The disguise. Its icon is a SEPARATE drawing: pointing at @mipmap/ic_launcher would leave
+          the Pass Tech logo on the launcher under the name "Calculator", which is more telling than
+          no disguise at all. Its target is the calculator, not MainActivity: tapping it must not
+          open the unlock screen (2.7.1 SEC F2, v2.5.4).
+        -->
+        <!--
+          A task of its own (taskAffinity), which 2.7.1 does not do and pays for. Sharing one, the way
+          two activities of the same app do by default, undid the disguise: coming back out of the
+          calculator replaces the task with the vault, and the launcher then resolves its "Calculator"
+          entry to THAT task and brings the unlock screen to the front. Tapping the calculator icon
+          showed Pass Tech. Found on the emulator; nothing in the code says it.
+        -->
+        <activity
+            android:name=".ui.calculator.CalculatorActivity"
+            android:exported="false"
+            android:icon="@drawable/ic_launcher_calc"
+            android:label="@string/app_disguise_label"
+            android:taskAffinity="${applicationId}.calculator"
+            android:theme="@style/Theme.PassTech" />
+
+        <activity-alias
+            android:name=".MainAliasDecoy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_calc"
+            android:label="@string/app_disguise_label"
+            android:targetActivity=".ui.calculator.CalculatorActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Clears the clipboard once the delay is over, even while the app is in the background. -->
+        <receiver
+            android:name=".core.clipboard.SecureClipboard$ClearReceiver"
+            android:exported="false" />
+
+        <!--
+          Reads the address bar of a browser in front, to tell the owner when they are about to paste
+          a password on the wrong site.
+
+          enabled="false" is the point, and 2.7.1 does not do it. A declared accessibility service is
+          listed under Settings › Accessibility for as long as its component is enabled, under its own
+          name: an owner who never asked for this would find "Pass Tech — anti-phishing" there, and a
+          phone whose launcher has been turned into a calculator would say "Pass Tech" one settings
+          screen away. The app enables the component when the protection is switched on and disables
+          it when it is switched off — which is also what withdraws the grant, so "off" stops the
+          reading instead of only writing a preference (2.7.1 wrote the preference and left the
+          service running).
+        -->
+        <service
+            android:name=".core.phishing.PhishingDetectorService"
+            android:enabled="false"
+            android:exported="false"
+            android:label="@string/phishing_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/phishing_detector" />
+        </service>
+    </application>
+</manifest>

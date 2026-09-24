@@ -1,38 +1,63 @@
-Pass Tech è un gestore di password 100% locale per Android. Nessun
-cloud, nessun account, nessun server, nessun tracker, nessuna pubblicità.
+Pass Tech conserva le tue password sul tuo telefono e da nessun'altra parte.
+Nessun account, nessun server nostro, nessun cloud, nessun tracciatore, nessuna
+pubblicità.
 
-<b>Crittografia (v4)</b>
-* Argon2id (m=19 MiB, t=2, p=1 — OWASP 2024)
-* AES-256-GCM con AAD anti-downgrade
-* KEK legata al Keystore (StrongBox/TEE) con HKDF-SHA256
-* CSPRNG tramite Random.secure
-* Verifica HMAC a tempo costante
-* Blocco anti forza bruta esponenziale (1, 2, 4, 8, 16 minuti) basato su
-  un orologio monotono (resiste allo spostamento dell'ora da root)
+<b>La cassaforte</b>
+* AES-256-GCM. La chiave viene dalla tua password principale tramite Argon2id
+  (19 MiB di memoria, 2 passaggi — il riferimento OWASP 2024 per il mobile) e
+  da una chiave custodita nel chip sicuro del telefono, che partecipa a ogni
+  singolo tentativo: una copia della cassaforte portata su un'altra macchina
+  non può esservi attaccata.
+* La tua password principale non viene mai salvata, in nessuna forma. Non può
+  essere recuperata — né da noi, né da nessuno.
+* Cinque tentativi liberi, poi un'attesa che cresce da 30 secondi a 30 minuti,
+  contata in un file, quindi sopravvive a un riavvio.
+* Sblocco con l'impronta, la sua chiave nel Keystore di Android, distrutta se
+  le impronte del telefono cambiano.
+* Si blocca quando esci. Nessuno screenshot e nessuna anteprima nell'elenco
+  delle app recenti.
+* Esclusa dal backup nel cloud di Android e dal trasferimento da telefono a
+  telefono: l'unica copia che esiste è quella che fai tu.
 
-<b>Riservatezza</b>
-* Anti-phishing per dominio (AccessibilityService minimo)
-* Cassaforte esca anti-coercizione (negabilità plausibile, tempi
-  allineati)
-* Modalità panico: blocco immediato, biometria disarmata, cache di esportazione distrutta
-* Camuffamento nel launcher (icona travestita da Calcolatrice)
-* Eredità dopo lunga inattività (interruttore dell'uomo morto)
-* FLAG_SECURE attivo di default sulle voci password / carta / identità
-  (regolabile nelle Impostazioni dalla v2.3.11) — le voci Nota
-  allentano FLAG_SECURE affinché Samsung Knox non nasconda il
-  suggerimento di incolla
-* Il permesso INTERNET serve solo al controllo anonimo degli
-  aggiornamenti tramite l'API GitHub Releases; nessuna raccolta di dati
+<b>Se qualcuno ti costringe ad aprirla</b>
+* Cassaforte esca: una seconda password apre una seconda cassaforte con voci
+  proprie, e nulla sul telefono dice se ne hai una.
+* Modalità panico: blocca, svuota gli appunti, disarma l'impronta, ritira il
+  controllo del dominio e trasforma l'app in una calcolatrice che funziona
+  davvero. Nulla viene cancellato.
+* Accesso erede: una persona che scegli tu apre un'istantanea in sola lettura
+  della tua cassaforte dopo un silenzio abbastanza lungo dalla tua parte. Sul
+  telefono, senza cloud e senza terzi.
+
+<b>Che cosa contiene</b>
+Password, carte bancarie e note sicure. Codici a due fattori generati qui, da
+un link otpauth:// incollato. Ricerca e ordinamento. Un generatore di password
+e di passphrase tratte da un elenco di parole nella lingua dell'app.
+
+<b>Che cosa sorveglia per te</b>
+* Un controllo di sicurezza della cassaforte: che cosa è debole, che cosa è
+  riutilizzato, che cosa non ha un secondo fattore.
+* Un controllo delle violazioni che avvii tu, che non invia mai la password —
+  solo i primi cinque caratteri della sua impronta, condivisi da decine di
+  migliaia di altre.
+* Un controllo del dominio: prima che una password venga copiata, confronta il
+  sito aperto nel tuo browser con quelli che la voce dichiara, e trattiene la
+  copia quando nessuno corrisponde. Usa un servizio di accessibilità di
+  Android, spento finché non lo chiedi, che legge la barra degli indirizzi dei
+  browser che conosce e nient'altro, e tiene in memoria ciò che legge per
+  quindici secondi.
+
+<b>Le due volte in cui usa la rete</b>
+Chiedere a GitHub se è uscita una versione più recente, al massimo due volte al
+giorno, e il controllo delle violazioni qui sopra. Nessuno dei due trasporta
+ciò che hai digitato, ed entrambi si fermano del tutto quando l'app è
+camuffata.
 
 <b>Lingue</b>
-Italiano, inglese, francese, tedesco e spagnolo — a scelta nelle
-Impostazioni, indipendentemente dalla lingua del dispositivo.
+Inglese, francese, tedesco, italiano e spagnolo, scelte nell'app qualunque sia
+la lingua del telefono.
 
-<b>Audit (v2.3.8 → v2.4.0)</b>
-Audit specialistico senza vulnerabilità aperte: A1-A20 e B1-B24 chiusi.
-FLAG_SECURE dinamico tramite MethodChannel Kotlin con refcount, servizio
-MonotonicClock condiviso, versione letta da PackageInfo, controller
-sensibili svuotati e rilasciati, istantanea anti-phishing eliminata in
-modalità panico.
-
-<b>Open source</b> Apache 2.0 — codice integrale su GitHub.
+<b>Codice aperto</b>
+Licenza Apache 2.0. Tutto il codice sorgente è su GitHub, e ogni versione
+pubblica lo SHA-256 di ciascun file: puoi verificare che ciò che hai installato
+sia ciò che è stato pubblicato.
