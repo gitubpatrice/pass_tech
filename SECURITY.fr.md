@@ -12,13 +12,22 @@ Seule la dernière version publiée sur GitHub Releases est activement maintenue
 | Version | Identifiant d'application | Suivie |
 |---|---|---|
 | 3.0.x | `com.filestech.pass_tech` | ✅ |
-| 2.7.x | `com.passtech.pass_tech` | ⚠️ l'app Flutter — migration seulement, voir plus bas |
+| 2.7.x | `com.passtech.pass_tech` | ❌ **fin de vie** — voir plus bas |
 | < 2.7 | `com.passtech.pass_tech` | ❌ |
 
 **La 3.0.0 est une réécriture, en Kotlin, et une application différente.** Elle s'installe à côté de
 la 2.x, pas par-dessus. Pour passer de l'une à l'autre : exportez une sauvegarde `.ptbak` depuis la
 2.x, importez-la dans la 3.0, puis retirez l'ancienne quand vous serez satisfait. L'historique de la
 2.x vit dans les tags de ce dépôt ; son document de sécurité est celui livré avec elle.
+
+**La 2.7.1 est la dernière version Flutter, et elle est finie.** Elle ne recevra plus aucun travail,
+correctifs de sécurité compris. Son téléchargement reste en ligne sur GitHub Releases au lieu d'être
+retiré, pour une seule raison : elle tourne sur Android 7, et la 3.0 demande Android 8. La retirer
+enlèverait la seule version qui fonctionne aux téléphones qui ne peuvent pas installer la
+remplaçante, sans rien leur donner en échange. Rien d'autre ne doit y renvoyer.
+
+Aucune sauvegarde ne se retrouve orpheline, dans un sens comme dans l'autre : la 3.0 lit tous les
+`.ptbak` jamais écrits — v1, v2 et v3 — et le fichier qu'elle écrit se réimporte dans la 2.7.1.
 
 ## Signaler une vulnérabilité
 

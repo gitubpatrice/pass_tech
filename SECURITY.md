@@ -12,13 +12,22 @@ Only the latest version published on GitHub Releases is actively maintained on t
 | Version | Application id | Supported |
 |---|---|---|
 | 3.0.x | `com.filestech.pass_tech` | ✅ |
-| 2.7.x | `com.passtech.pass_tech` | ⚠️ the Flutter app — migration only, see below |
+| 2.7.x | `com.passtech.pass_tech` | ❌ **end of life** — see below |
 | < 2.7 | `com.passtech.pass_tech` | ❌ |
 
 **3.0.0 is a rewrite, in Kotlin, and a different application.** It installs beside 2.x rather than
 over it. To move across: export a `.ptbak` backup from 2.x, import it into 3.0, and remove the old
 app once you are satisfied. The 2.x history lives in this repository's tags; its own security
 document is the one shipped with it.
+
+**2.7.1 is the last Flutter release, and it is finished.** It gets no further work of any kind,
+security fixes included. Its download stays up on GitHub Releases instead of being taken down, for
+one reason: it runs on Android 7, and 3.0 needs Android 8. Taking it away would remove the only
+working version from phones that cannot install the replacement, and give them nothing back. Nobody
+else should be sent to it.
+
+A backup is never stranded in either direction: 3.0 reads every `.ptbak` ever written — v1, v2 and
+v3 — and the file it writes imports back into 2.7.1.
 
 ## Reporting a vulnerability
 
