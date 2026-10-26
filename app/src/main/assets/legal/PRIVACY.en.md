@@ -1,7 +1,7 @@
 # Privacy Policy — Pass Tech
 
 - **Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-- **Last changed**: 23 September 2026
+- **Last changed**: 26 October 2026
 - **Publisher**: Files Tech — Patrice Haltaya
 - **Contact**: contact@files-tech.com
 - **Source code**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
@@ -142,3 +142,8 @@ top says which.
 ## 12. Contact
 
 contact@files-tech.com
+
+An e-mail you choose to write to us is used only to answer you; it is kept for the time of the
+exchange, then erased. You can ask for access to it or its erasure at the same address, and complain
+to the CNIL, the French data protection authority (www.cnil.fr), if you think your rights are not
+respected.

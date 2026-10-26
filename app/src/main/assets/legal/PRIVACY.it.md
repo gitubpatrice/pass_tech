@@ -1,7 +1,7 @@
 # Informativa sulla privacy — Pass Tech
 
 - **Si applica a**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-- **Ultima modifica**: 23 settembre 2026
+- **Ultima modifica**: 26 ottobre 2026
 - **Editore**: Files Tech — Patrice Haltaya
 - **Contatto**: contact@files-tech.com
 - **Codice sorgente**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
@@ -149,3 +149,8 @@ alto dice quale.
 ## 12. Contatto
 
 contact@files-tech.com
+
+Un'e-mail che scegli di scriverci serve solo a risponderti; è conservata per il tempo dello scambio,
+poi cancellata. Puoi chiederne l'accesso o la cancellazione allo stesso indirizzo, e rivolgerti alla
+CNIL, l'autorità francese per la protezione dei dati (www.cnil.fr), se ritieni che i tuoi diritti
+non siano rispettati.

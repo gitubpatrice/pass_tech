@@ -1,7 +1,7 @@
 # Nutzungsbedingungen — Pass Tech
 
 - **Gilt für**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-- **Letzte Änderung**: 23. September 2026
+- **Letzte Änderung**: 26. Oktober 2026
 - **Herausgeber**: Files Tech — Patrice Haltaya
 - **Kontakt**: contact@files-tech.com
 - **Quellcode**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
@@ -65,9 +65,11 @@ Insbesondere:
   eine Seite in einer anderen App lässt sich nicht lesen — und die App sagt dann, die Prüfung habe
   nicht stattfinden können, statt zu sagen, alles sei in Ordnung.
 
-Soweit das Gesetz es zulässt, können wir nicht für Datenverlust haften, der auf ein vergessenes
-Master-Passwort, eine schlecht verwahrte Sicherung, ein unglückliches Löschen, den Ausfall eines
-Dienstes Dritter oder eine Nutzung der App außerhalb ihres Zwecks zurückgeht.
+Die App wird kostenlos von einer Privatperson bereitgestellt. Soweit das Gesetz es zulässt, haften
+wir nicht für indirekte Schäden und nicht für Datenverlust, der auf ein vergessenes Master-Passwort,
+eine schlecht verwahrte Sicherung, ein unglückliches Löschen, den Ausfall eines Dienstes Dritter
+oder eine Nutzung der App außerhalb ihres Zwecks zurückgeht. Diese Beschränkung gilt weder bei
+grober Fahrlässigkeit oder Vorsatz noch für Schäden, deren Ausschluss das Gesetz verbietet.
 
 ## 5. Was Ihnen obliegt
 

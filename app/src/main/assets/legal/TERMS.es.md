@@ -1,7 +1,7 @@
 # Condiciones de uso — Pass Tech
 
 - **Se aplica a**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-- **Última modificación**: 23 de septiembre de 2026
+- **Última modificación**: 26 de octubre de 2026
 - **Editor**: Files Tech — Patrice Haltaya
 - **Contacto**: contact@files-tech.com
 - **Código fuente**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
@@ -62,9 +62,11 @@ En particular:
   una página abierta dentro de otra app, no puede leerse — y la app dice entonces que la
   comprobación no ha podido hacerse, en lugar de decir que todo va bien.
 
-En la medida en que la ley lo permite, no podemos ser considerados responsables de una pérdida de
-datos debida a una contraseña maestra olvidada, a una copia mal guardada, a un borrado desafortunado,
-al fallo de un servicio de terceros, o a un uso de la app fuera de aquello para lo que sirve.
+La app se ofrece gratuitamente, por un particular. En la medida en que la ley lo permite, no somos
+responsables de los daños indirectos, ni de una pérdida de datos debida a una contraseña maestra
+olvidada, a una copia mal guardada, a un borrado desafortunado, al fallo de un servicio de terceros,
+o a un uso de la app fuera de aquello para lo que sirve. Esta limitación no se aplica en caso de
+culpa grave o dolo, ni a los daños que la ley prohíbe excluir.
 
 ## 5. Qué te corresponde a ti
 
