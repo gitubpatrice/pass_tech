@@ -1,7 +1,7 @@
 # Conditions d'utilisation — Pass Tech
 
 - **S'applique à** : Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-- **Dernière modification** : 23 septembre 2026
+- **Dernière modification** : 26 octobre 2026
 - **Éditeur** : Files Tech — Patrice Haltaya
 - **Contact** : contact@files-tech.com
 - **Code source** : https://github.com/gitubpatrice/pass_tech — Apache License 2.0
@@ -66,10 +66,11 @@ En particulier :
   pas, ou une page ouverte dans une autre application, ne peut pas être lu — et l'application dit
   alors que le contrôle n'a pas pu être fait, plutôt que de dire que tout va bien.
 
-Dans la limite de ce que permet la loi, nous ne pouvons pas être tenus responsables d'une perte de
-données due à un mot de passe maître oublié, à une sauvegarde mal gardée, à une suppression
-malheureuse, à la défaillance d'un service tiers, ou à un usage de l'application en dehors de ce à
-quoi elle sert.
+L'application est fournie gratuitement, par un particulier. Dans la mesure permise par la loi, nous
+ne sommes pas responsables des dommages indirects, ni d'une perte de données due à un mot de passe
+maître oublié, à une sauvegarde mal gardée, à une suppression malheureuse, à la défaillance d'un
+service tiers, ou à un usage de l'application en dehors de ce à quoi elle sert. Cette limite ne
+s'applique ni en cas de faute lourde ou dolosive, ni aux dommages que la loi interdit d'exclure.
 
 ## 5. Ce qui vous revient
 

@@ -1,7 +1,7 @@
 # Terms of Use — Pass Tech
 
 - **Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
-- **Last changed**: 23 September 2026
+- **Last changed**: 26 October 2026
 - **Publisher**: Files Tech — Patrice Haltaya
 - **Contact**: contact@files-tech.com
 - **Source code**: https://github.com/gitubpatrice/pass_tech — Apache License 2.0
@@ -61,9 +61,11 @@ In particular:
   inside another app, cannot be read — and the app then says the check could not be made rather than
   saying all is well.
 
-To the extent the law allows, we cannot be held responsible for data lost through a forgotten master
-password, a backup kept badly, a mishandled deletion, a third-party service failing, or use of the
-app outside what it is meant for.
+The app is provided free of charge, by a private individual. To the extent the law allows, we are
+not liable for indirect damage, nor for data lost through a forgotten master password, a backup kept
+badly, a mishandled deletion, a third-party service failing, or use of the app outside what it is
+meant for. This limit applies neither to gross negligence or wilful misconduct, nor to damage the
+law forbids excluding.
 
 ## 5. What is yours to do
 
