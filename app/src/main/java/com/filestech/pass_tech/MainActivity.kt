@@ -11,9 +11,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -26,6 +29,7 @@ import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
 import com.filestech.pass_tech.ui.AppViewModel
 import com.filestech.pass_tech.ui.PassTechApp
+import com.filestech.pass_tech.ui.SelectionClipboard
 import com.filestech.pass_tech.ui.about.AboutViewModel
 import com.filestech.pass_tech.ui.audit.AuditViewModel
 import com.filestech.pass_tech.ui.entries.EntriesViewModel
@@ -102,18 +106,23 @@ class MainActivity : FragmentActivity() {
                 )
                 onDispose {}
             }
+            // The selection toolbar's Copy and Cut go through the vault's clipboard: marked sensitive, cleared.
+            val platformClipboard = LocalClipboard.current
+            val selectionClipboard = remember(platformClipboard) { SelectionClipboard(platformClipboard, clipboard) }
             PassTechTheme(darkTheme = dark) {
-                PassTechApp(
-                    app = app,
-                    entry = entry,
-                    entries = entries,
-                    home = home,
-                    settings = settings,
-                    audit = audit,
-                    about = about,
-                    update = update,
-                    splash = splash,
-                )
+                CompositionLocalProvider(LocalClipboard provides selectionClipboard) {
+                    PassTechApp(
+                        app = app,
+                        entry = entry,
+                        entries = entries,
+                        home = home,
+                        settings = settings,
+                        audit = audit,
+                        about = about,
+                        update = update,
+                        splash = splash,
+                    )
+                }
             }
         }
     }
