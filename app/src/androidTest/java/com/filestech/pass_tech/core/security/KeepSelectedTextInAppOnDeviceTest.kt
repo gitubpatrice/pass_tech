@@ -1,7 +1,6 @@
 package com.filestech.pass_tech.core.security
 
 import android.content.Context
-import android.os.Build
 import android.view.ContextThemeWrapper
 import android.view.textclassifier.TextClassification
 import android.view.textclassifier.TextClassificationContext
@@ -25,7 +24,7 @@ import org.junit.runner.RunWith
  *
  * On the real activity, where the fields live: the classifier manager Compose reads, a session made from
  * it as Compose makes one, the context a dialog or a sheet wraps, and the Compose flag that lists other
- * apps' text actions before Android 11. The control, the application's own manager keeping the system
+ * apps' text actions. The control, the application's own manager keeping the system
  * classifier, shows the first test can fail and that the setting stays local to the activity.
  */
 @SdkSuppress(minSdkVersion = 28)
@@ -49,13 +48,12 @@ class KeepSelectedTextInAppOnDeviceTest {
         assertThat(activityManager().textClassifier).isSameInstanceAs(TextClassifier.NO_OP)
     }
 
-    /** Before Android 11 every app is visible: Compose must not list their text actions. From 11 on, it is left alone. */
+    /** Compose must list no other app's text action, on any version: package visibility is granted per app. */
     @OptIn(ExperimentalFoundationApi::class)
     @Test
-    fun beforeAndroid11ComposeListsNoOtherAppsTextAction() {
+    fun composeListsNoOtherAppsTextAction() {
         activityManager() // the activity has run its onCreate
-        assertThat(ComposeFoundationFlags.isSmartSelectionEnabled)
-            .isEqualTo(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+        assertThat(ComposeFoundationFlags.isSmartSelectionEnabled).isFalse()
     }
 
     /** What Compose does before showing the toolbar: a session, then a classification. */
