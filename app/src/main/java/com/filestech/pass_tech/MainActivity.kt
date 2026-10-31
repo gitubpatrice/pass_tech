@@ -21,7 +21,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.panic.LauncherDisguise
-import com.filestech.pass_tech.core.security.turnOffTextClassifier
+import com.filestech.pass_tech.core.security.keepSelectedTextInApp
 import com.filestech.pass_tech.core.settings.AppLanguage
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
@@ -81,8 +81,8 @@ class MainActivity : FragmentActivity() {
         // before the setting is read; lifted only once it reads an explicit "off" (2.7.1's default).
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         // Before the first field exists: the selection toolbar's "Translate" would hand the selected
-        // text of an entry to another app. See `turnOffTextClassifier`.
-        turnOffTextClassifier()
+        // text of an entry to another app. See `keepSelectedTextInApp`.
+        keepSelectedTextInApp()
         setContent {
             val ui by settings.state.collectAsStateWithLifecycle()
             LaunchedEffect(ui.screenshotProtection) {

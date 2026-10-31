@@ -1,11 +1,14 @@
 package com.filestech.pass_tech.core.security
 
 import android.content.Context
+import android.os.Build
 import android.view.ContextThemeWrapper
 import android.view.textclassifier.TextClassification
 import android.view.textclassifier.TextClassificationContext
 import android.view.textclassifier.TextClassificationManager
 import android.view.textclassifier.TextClassifier
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,17 +21,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The selection toolbar's "Translate" would hand an entry's text to another app: the text classifier
- * is off for the whole of [MainActivity]. See [turnOffTextClassifier].
+ * The selection toolbar must not hand an entry's text to another app: see [keepSelectedTextInApp].
  *
- * On the real activity, where the fields live: the manager Compose reads, a session made from it as
- * Compose makes one, and the context a dialog or a sheet wraps. The control, the application's own
- * manager keeping the system classifier, shows the first test can fail and that the setting stays
- * local to the activity.
+ * On the real activity, where the fields live: the classifier manager Compose reads, a session made from
+ * it as Compose makes one, the context a dialog or a sheet wraps, and the Compose flag that lists other
+ * apps' text actions before Android 11. The control, the application's own manager keeping the system
+ * classifier, shows the first test can fail and that the setting stays local to the activity.
  */
 @SdkSuppress(minSdkVersion = 28)
 @RunWith(AndroidJUnit4::class)
-class TextClassifierOffOnDeviceTest {
+class KeepSelectedTextInAppOnDeviceTest {
 
     private lateinit var scenario: ActivityScenario<MainActivity>
 
@@ -45,6 +47,15 @@ class TextClassifierOffOnDeviceTest {
     @Test
     fun theActivityTurnsTheTextClassifierOff() {
         assertThat(activityManager().textClassifier).isSameInstanceAs(TextClassifier.NO_OP)
+    }
+
+    /** Before Android 11 every app is visible: Compose must not list their text actions. From 11 on, it is left alone. */
+    @OptIn(ExperimentalFoundationApi::class)
+    @Test
+    fun beforeAndroid11ComposeListsNoOtherAppsTextAction() {
+        activityManager() // the activity has run its onCreate
+        assertThat(ComposeFoundationFlags.isSmartSelectionEnabled)
+            .isEqualTo(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
     }
 
     /** What Compose does before showing the toolbar: a session, then a classification. */
