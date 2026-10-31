@@ -1,6 +1,6 @@
 # Terms of Use — Pass Tech
 
-- **Applies to**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+- **Applies to**: Pass Tech 3.0.0 and later (`com.filestech.pass_tech`)
 - **Last changed**: 26 October 2026
 - **Publisher**: Files Tech — Patrice Haltaya
 - **Contact**: contact@files-tech.com

@@ -1,0 +1,5 @@
+Pass Tech 3.0.1 — le texte sélectionné reste dans l'application.
+
+• La barre de sélection ne propose plus « Traduire » ni les actions d'une autre application, sur toutes les versions d'Android : elles lui transmettaient la sélection.
+• « Copier » depuis une sélection passe par le presse-papiers du coffre : marqué sensible et vidé après le délai, comme les boutons de copie. Avant, il n'était jamais vidé.
+• Conditions et confidentialité précisées : responsabilité, et sort d'un e-mail à l'éditeur.

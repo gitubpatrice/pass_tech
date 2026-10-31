@@ -1,0 +1,5 @@
+Pass Tech 3.0.1 — markierter Text bleibt in der App.
+
+• Die Auswahlleiste bietet kein „Übersetzen“ und keine Textaktionen anderer Apps mehr, unter jedem Android: Sie gaben die Auswahl an diese App weiter.
+• „Kopieren“ aus einer Auswahl nutzt jetzt die Zwischenablage des Tresors: als vertraulich markiert und nach der Frist geleert, wie die Kopierknöpfe. Bisher blieb der Text dort.
+• Nutzungsbedingungen und Datenschutz präzisiert: Haftung, und was mit einer E-Mail an den Herausgeber geschieht.

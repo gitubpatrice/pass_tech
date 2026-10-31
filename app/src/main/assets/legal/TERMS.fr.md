@@ -1,6 +1,6 @@
 # Conditions d'utilisation — Pass Tech
 
-- **S'applique à** : Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+- **S'applique à** : Pass Tech 3.0.0 et suivantes (`com.filestech.pass_tech`)
 - **Dernière modification** : 26 octobre 2026
 - **Éditeur** : Files Tech — Patrice Haltaya
 - **Contact** : contact@files-tech.com

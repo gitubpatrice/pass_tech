@@ -1,0 +1,5 @@
+Pass Tech 3.0.1 — el texto seleccionado se queda en la app.
+
+• La barra de selección ya no ofrece «Traducir» ni las acciones de otra app, en ninguna versión de Android: le pasaban el texto seleccionado.
+• «Copiar» desde una selección pasa ahora por el portapapeles de la caja fuerte: marcado como sensible y vaciado tras el plazo, como los botones de copia. Antes nunca se vaciaba.
+• Términos y privacidad precisados: responsabilidad, y qué pasa con un correo enviado al editor.

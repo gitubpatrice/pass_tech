@@ -1,0 +1,5 @@
+Pass Tech 3.0.1 — selected text stays in the app.
+
+• The selection toolbar no longer offers Translate or another app's text actions, on any Android version: they handed the selected text to that app.
+• Copy from a selection now goes through the vault's own clipboard: marked sensitive and cleared after the delay, like the copy buttons. It was never cleared before.
+• Terms and privacy policy clarified: liability, and what happens to an e-mail sent to the publisher.

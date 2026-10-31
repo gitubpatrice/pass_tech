@@ -1,6 +1,6 @@
 # Política de privacidad — Pass Tech
 
-- **Se aplica a**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+- **Se aplica a**: Pass Tech 3.0.0 y posteriores (`com.filestech.pass_tech`)
 - **Última modificación**: 26 de octubre de 2026
 - **Editor**: Files Tech — Patrice Haltaya
 - **Contacto**: contact@files-tech.com

@@ -1,0 +1,5 @@
+Pass Tech 3.0.1 — il testo selezionato resta nell'app.
+
+• La barra di selezione non propone più «Traduci» né le azioni di un'altra app, su ogni versione di Android: le passavano il testo selezionato.
+• «Copia» da una selezione passa ora per gli appunti della cassaforte: segnato come sensibile e svuotato dopo il tempo previsto, come i pulsanti di copia. Prima non veniva mai svuotato.
+• Termini e privacy precisati: responsabilità, e sorte di un'e-mail inviata all'editore.

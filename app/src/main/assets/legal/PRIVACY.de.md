@@ -1,6 +1,6 @@
 # Datenschutzerklärung — Pass Tech
 
-- **Gilt für**: Pass Tech 3.0.0 (`com.filestech.pass_tech`)
+- **Gilt für**: Pass Tech 3.0.0 und neuer (`com.filestech.pass_tech`)
 - **Letzte Änderung**: 26. Oktober 2026
 - **Herausgeber**: Files Tech — Patrice Haltaya
 - **Kontakt**: contact@files-tech.com
