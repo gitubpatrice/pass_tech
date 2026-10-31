@@ -21,6 +21,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.filestech.pass_tech.core.clipboard.SensitiveClipboard
 import com.filestech.pass_tech.core.panic.LauncherDisguise
+import com.filestech.pass_tech.core.security.turnOffTextClassifier
 import com.filestech.pass_tech.core.settings.AppLanguage
 import com.filestech.pass_tech.core.settings.AppPreferences
 import com.filestech.pass_tech.core.vault.VaultManager
@@ -79,6 +80,9 @@ class MainActivity : FragmentActivity() {
         // No screenshot, no recent-apps thumbnail: the screens show secrets. On from the first frame,
         // before the setting is read; lifted only once it reads an explicit "off" (2.7.1's default).
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // Before the first field exists: the selection toolbar's "Translate" would hand the selected
+        // text of an entry to another app. See `turnOffTextClassifier`.
+        turnOffTextClassifier()
         setContent {
             val ui by settings.state.collectAsStateWithLifecycle()
             LaunchedEffect(ui.screenshotProtection) {
